@@ -21,9 +21,16 @@ app.use(
 export async function startServer() {
   try {
     await connectDatabase();
-    return app.listen(Env.PORT, () => {
+    const server = app.listen(Env.PORT, () => {
       console.log(`Server is running on port ${Env.PORT}`);
     });
+
+    server.on("error", (error: NodeJS.ErrnoException) => {
+      console.error("Failed to start server:", error);
+      process.exit(1);
+    });
+
+    return server;
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
