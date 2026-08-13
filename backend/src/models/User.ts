@@ -41,7 +41,6 @@ const userSchema = new Schema<UserDocument>(
       transform: (doc, ret) => {
         if (ret) {
           delete (ret as any).password;
-          delete (ret as any).__v;
         }
         return ret;
       },
