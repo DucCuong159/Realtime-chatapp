@@ -1,8 +1,12 @@
 export type Time = `${number}${"s" | "m" | "h" | "d" | "w" | "y"}`;
 
 export const convertTimeToMs = (time: Time): number => {
-  const value = parseInt(time.slice(0, -1), 10);
+  const value = Number(time.slice(0, -1));
   const unit = time.slice(-1);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error("Invalid time value");
+  }
 
   switch (unit) {
     case "s":
