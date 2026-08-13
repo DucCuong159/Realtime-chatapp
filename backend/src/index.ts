@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import "dotenv/config";
 import express, { Request, Response } from "express";
+import helmet from "helmet";
 import passport from "passport";
 import connectDatabase from "./config/database.config.js";
 import { Env } from "./config/env.config.js";
@@ -14,6 +15,7 @@ import router from "./routes/index.js";
 
 const app = express();
 
+app.use(helmet());
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
