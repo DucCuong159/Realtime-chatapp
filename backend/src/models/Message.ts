@@ -6,11 +6,12 @@ export interface IReaction {
 }
 
 export interface MessageDocument extends Document {
-  conversation: Types.ObjectId;
+  conversationId: Types.ObjectId;
   sender: Types.ObjectId;
   receiver: Types.ObjectId;
+  replyTo?: Types.ObjectId;
   content?: string;
-  imageOrVideoUrl?: string;
+  media?: string;
   contentType?: "text" | "image" | "video";
   reactions?: IReaction[];
   messageStatus: string;
@@ -21,7 +22,7 @@ export interface MessageDocument extends Document {
 
 const messageSchema = new Schema<MessageDocument>(
   {
-    conversation: {
+    conversationId: {
       type: Schema.Types.ObjectId,
       ref: "Conversation",
       required: true,
@@ -36,12 +37,20 @@ const messageSchema = new Schema<MessageDocument>(
       ref: "User",
       required: true,
     },
+    replyTo: {
+      type: Schema.Types.ObjectId,
+      ref: "Message",
+    },
     content: { type: String },
-    imageOrVideoUrl: { type: String },
+    media: { type: String },
     contentType: { type: String, enum: ["text", "image", "video"] },
     reactions: [
       {
-        user: { type: Schema.Types.ObjectId, ref: "User" },
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
         emoji: { type: String },
       },
     ],

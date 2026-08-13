@@ -2,10 +2,10 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface ConversationDocument extends Document {
   participants: Types.ObjectId[];
-  lastMessage: Types.ObjectId;
+  lastMessage?: Types.ObjectId;
   unreadCount: number;
   isGroup: boolean;
-  groupName: string;
+  groupName?: string;
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -13,19 +13,27 @@ export interface ConversationDocument extends Document {
 
 const conversationSchema = new Schema<ConversationDocument>(
   {
-    participants: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "User",
-        require: true,
-      },
-    ],
+    participants: {
+      type: [
+        {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+      ],
+      required: true,
+      validate: [
+        (val: Types.ObjectId[]) => val && val.length > 0,
+        "Participants array cannot be empty",
+      ],
+    },
     lastMessage: {
       type: Schema.Types.ObjectId,
       ref: "Message",
     },
     unreadCount: { type: Number, default: 0 },
     isGroup: { type: Boolean, default: false },
+    groupName: { type: String },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

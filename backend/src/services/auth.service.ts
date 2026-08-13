@@ -1,8 +1,5 @@
 import UserModel from "../models/User.js";
-import {
-  NotFoundException,
-  UnauthorizedException,
-} from "../utils/app-error.js";
+import { UnauthorizedException } from "../utils/app-error.js";
 import {
   LoginSchemaType,
   RegisterSchemaType,
@@ -25,13 +22,10 @@ export const loginService = async (body: LoginSchemaType) => {
   const { email, password } = body;
   const user = await UserModel.findOne({ email });
 
-  if (!user) {
-    throw new NotFoundException("User does not exist");
-  }
+  const isPasswordValid = user ? await user.comparePassword(password) : false;
 
-  const isPasswordValid = await user.comparePassword(password);
-  if (!isPasswordValid) {
-    throw new UnauthorizedException("Invalid password");
+  if (!user || !isPasswordValid) {
+    throw new UnauthorizedException("Invalid email or password");
   }
 
   return user;
