@@ -1,9 +1,13 @@
 import UserModel from "../models/User.js";
 import { UnauthorizedException } from "../utils/app-error.js";
+import { compareValue } from "../utils/bcrypt.js";
 import {
   LoginSchemaType,
   RegisterSchemaType,
 } from "../validators/auth.validator.js";
+
+const DUMMY_PASSWORD_HASH =
+  "$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeg6Lruj3vjPGga31lW";
 
 export const registerService = async (body: RegisterSchemaType) => {
   const { email } = body;
@@ -22,7 +26,10 @@ export const loginService = async (body: LoginSchemaType) => {
   const { email, password } = body;
   const user = await UserModel.findOne({ email });
 
-  const isPasswordValid = user ? await user.comparePassword(password) : false;
+  const isPasswordValid = await compareValue(
+    password,
+    user?.password || DUMMY_PASSWORD_HASH
+  );
 
   if (!user || !isPasswordValid) {
     throw new UnauthorizedException("Invalid email or password");
