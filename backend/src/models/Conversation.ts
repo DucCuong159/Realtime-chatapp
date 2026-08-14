@@ -30,6 +30,7 @@ const conversationSchema = new Schema<ConversationDocument>(
     lastMessage: {
       type: Schema.Types.ObjectId,
       ref: "Message",
+      default: null,
     },
     unreadCount: { type: Number, default: 0 },
     isGroup: { type: Boolean, default: false },

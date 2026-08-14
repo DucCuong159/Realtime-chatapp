@@ -8,10 +8,10 @@ export interface IReaction {
 export interface MessageDocument extends Document {
   conversationId: Types.ObjectId;
   sender: Types.ObjectId;
-  receiver: Types.ObjectId;
+  receiver?: Types.ObjectId;
   replyTo?: Types.ObjectId;
   content?: string;
-  media?: string;
+  image?: string;
   contentType?: "text" | "image" | "video";
   reactions?: IReaction[];
   messageStatus: string;
@@ -35,14 +35,14 @@ const messageSchema = new Schema<MessageDocument>(
     receiver: {
       type: Schema.Types.ObjectId,
       ref: "User",
-      required: true,
     },
     replyTo: {
       type: Schema.Types.ObjectId,
       ref: "Message",
+      default: null,
     },
     content: { type: String },
-    media: { type: String },
+    image: { type: String },
     contentType: { type: String, enum: ["text", "image", "video"] },
     reactions: [
       {
