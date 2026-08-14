@@ -42,7 +42,13 @@ export const initializeSocket = (httpServer: HTTPServer) => {
       socket.userId = decodedToken.userId;
       return next();
     } catch (error) {
-      console.log("Error in socket authentication:", error);
+      if (
+        error instanceof jwt.JsonWebTokenError ||
+        error instanceof jwt.TokenExpiredError
+      ) {
+        return next(new Error("Unauthenticated"));
+      }
+      console.error("Error in socket authentication:", error);
       return next(new Error("Internal server error"));
     }
   });
