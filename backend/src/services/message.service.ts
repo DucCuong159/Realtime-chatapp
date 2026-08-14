@@ -1,8 +1,8 @@
 import cloudinary from "../config/cloudinary.config.js";
-import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
-import { BadRequestException, NotFoundException } from "../utils/app-error.js";
+import { NotFoundException } from "../utils/app-error.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
+import { validateConversationParticipantsService } from "./conversation.service.js";
 
 export const sendMessageService = async (
   userId: string,
@@ -10,16 +10,10 @@ export const sendMessageService = async (
 ) => {
   const { conversationId, content, image, replyTo } = body;
 
-  const conversation = await ConversationModel.findOne({
-    _id: conversationId,
-    participants: {
-      $in: [userId],
-    },
-  });
-
-  if (!conversation) {
-    throw new BadRequestException("Conversation not found or unauthorized");
-  }
+  const conversation = await validateConversationParticipantsService(
+    conversationId,
+    userId,
+  );
 
   if (replyTo) {
     const replyMessage = await MessageModel.findOne({
