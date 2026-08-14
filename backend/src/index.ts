@@ -19,7 +19,7 @@ app.use(helmet());
 // TODO: We will use multer later to handle large file uploads and limit sizes.
 // For now, bypass the global JSON body limit for the message send route.
 app.use((req, res, next) => {
-  if (req.originalUrl === "/api/conversation/message/send") {
+  if (req.method === "POST" && req.path === "/api/conversation/message/send") {
     return next();
   }
   express.json({ limit: "100kb" })(req, res, next);
