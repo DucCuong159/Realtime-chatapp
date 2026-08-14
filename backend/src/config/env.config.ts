@@ -12,9 +12,7 @@ function validateJwtSecret(secret: string): void {
   ];
 
   if (secret.length < minLength) {
-    throw new Error(
-      `JWT_SECRET must be at least ${minLength} characters long`,
-    );
+    throw new Error(`JWT_SECRET must be at least ${minLength} characters long`);
   }
 
   if (weakSecrets.includes(secret.toLowerCase())) {
@@ -34,4 +32,9 @@ export const Env = {
   JWT_SECRET: jwtSecret,
   JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "15m"),
   FRONTEND_ORIGIN: getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
-};
+
+  // Cloudinary
+  CLOUDINARY_CLOUD_NAME: getEnv("CLOUDINARY_CLOUD_NAME"),
+  CLOUDINARY_API_KEY: getEnv("CLOUDINARY_API_KEY"),
+  CLOUDINARY_API_SECRET: getEnv("CLOUDINARY_API_SECRET"),
+} as const;
