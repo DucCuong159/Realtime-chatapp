@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { passportAuthenticateJwt } from "../config/passport.config.js";
 import {
   authStatusController,
@@ -6,7 +7,6 @@ import {
   logoutController,
   registerController,
 } from "../controllers/auth.controller.js";
-import rateLimit from "express-rate-limit";
 
 // Limit to 5 authentication attempts per 15 minutes per IP address
 const authLimiter = rateLimit({

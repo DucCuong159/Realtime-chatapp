@@ -16,7 +16,14 @@ import router from "./routes/index.js";
 const app = express();
 
 app.use(helmet());
-app.use(express.json());
+// TODO: We will use multer later to handle large file uploads and limit sizes.
+// For now, bypass the global JSON body limit for the message send route.
+app.use((req, res, next) => {
+  if (req.method === "POST" && req.path === "/api/conversation/message/send") {
+    return next();
+  }
+  express.json({ limit: "100kb" })(req, res, next);
+});
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(

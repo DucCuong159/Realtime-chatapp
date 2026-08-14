@@ -2,10 +2,11 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface ConversationDocument extends Document {
   participants: Types.ObjectId[];
-  lastMessage?: Types.ObjectId;
+  lastMessage?: Types.ObjectId | null;
   unreadCount: number;
   isGroup: boolean;
   groupName?: string;
+  directKey?: string | null;
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -30,10 +31,15 @@ const conversationSchema = new Schema<ConversationDocument>(
     lastMessage: {
       type: Schema.Types.ObjectId,
       ref: "Message",
+      default: null,
     },
     unreadCount: { type: Number, default: 0 },
     isGroup: { type: Boolean, default: false },
     groupName: { type: String },
+    directKey: {
+      type: String,
+      default: null,
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -41,6 +47,14 @@ const conversationSchema = new Schema<ConversationDocument>(
     },
   },
   { timestamps: true },
+);
+
+conversationSchema.index(
+  { directKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { directKey: { $type: "string" } },
+  },
 );
 
 const ConversationModel = mongoose.model<ConversationDocument>(
