@@ -1,4 +1,9 @@
+import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.config.js";
+import {
+  emitLastMessageToParticipants,
+  emitNewMessageToConversationRoom,
+} from "../lib/socket.js";
 import MessageModel from "../models/Message.js";
 import { NotFoundException } from "../utils/app-error.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
@@ -54,7 +59,14 @@ export const sendMessageService = async (
     },
   ]);
 
-  // websocket implementation
+  conversation.lastMessage = newMessage._id as mongoose.Types.ObjectId;
+  await conversation.save();
 
+  // websocket emit the new message to the conversation room
+  emitNewMessageToConversationRoom(userId, conversationId, newMessage);
+
+  // websocket emit the last message to members (personnal room user)
+  const participantIds = conversation.participants.map((id) => id.toString());
+  emitLastMessageToParticipants(participantIds, conversationId, newMessage);
   return { userMessage: newMessage, conversation };
 };

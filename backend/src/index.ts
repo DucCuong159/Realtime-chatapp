@@ -3,17 +3,22 @@ import cors from "cors";
 import "dotenv/config";
 import express, { Request, Response } from "express";
 import helmet from "helmet";
+import http from "http";
 import passport from "passport";
 import connectDatabase from "./config/database.config.js";
 import { Env } from "./config/env.config.js";
-import { errorHandler } from "./middlewares/errorHandler.middleware.js";
-
 import { HTTPSTATUS } from "./config/http.config.js";
 import "./config/passport.config.js";
+import { initializeSocket } from "./lib/socket.js";
 import { asyncHandler } from "./middlewares/asyncHandler.middleware.js";
+import { errorHandler } from "./middlewares/errorHandler.middleware.js";
 import router from "./routes/index.js";
 
 const app = express();
+const server = http.createServer(app);
+
+// Attach Socket.IO to HTTP server
+initializeSocket(server);
 
 app.use(helmet());
 // TODO: We will use multer later to handle large file uploads and limit sizes.
@@ -49,16 +54,16 @@ app.use("/api", router);
 async function startServer() {
   try {
     await connectDatabase();
-    const server = app.listen(Env.PORT, () => {
+    const sv = server.listen(Env.PORT, () => {
       console.log(`Server is running on port ${Env.PORT}`);
     });
 
-    server.on("error", (error: NodeJS.ErrnoException) => {
+    sv.on("error", (error: NodeJS.ErrnoException) => {
       console.error("Failed to start server:", error);
       process.exit(1);
     });
 
-    return server;
+    return sv;
   } catch (error) {
     console.error("Failed to start server:", error);
     process.exit(1);
