@@ -29,13 +29,3 @@ export const setJwtAuthCookie = (
 export const clearJwtAuthCookie = (res: Response) => {
   return res.clearCookie("accessToken", { path: "/" });
 };
-
-export const parseCookies = (cookieHeader: string): Record<string, string> => {
-  return cookieHeader.split(";").reduce((acc, str) => {
-    const [key, ...val] = str.trim().split("=");
-    if (key) {
-      acc[key] = decodeURIComponent(val.join("="));
-    }
-    return acc;
-  }, {} as Record<string, string>);
-};

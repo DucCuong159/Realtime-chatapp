@@ -1,9 +1,9 @@
+import { parseCookie } from "cookie";
 import { Server as HTTPServer } from "http";
 import jwt from "jsonwebtoken";
 import { Server as SocketServer, type Socket } from "socket.io";
 import { Env } from "../config/env.config.js";
 import { validateConversationParticipantsService } from "../services/conversation.service.js";
-import { parseCookies } from "../utils/cookie.js";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -28,7 +28,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
       const rawCookies = socket.handshake.headers.cookie || "";
       if (!rawCookies) return next(new Error("Unauthenticated"));
 
-      const cookies = parseCookies(rawCookies);
+      const cookies = parseCookie(rawCookies);
       const token = cookies.accessToken;
       if (!token) return next(new Error("Unauthenticated"));
 
