@@ -4,61 +4,101 @@ import UserModel from "../models/User.js";
 import { BadRequestException, NotFoundException } from "../utils/app-error.js";
 import { CreateConversationSchemaType } from "../validators/conversation.validator.js";
 
+const validateGroupParticipants = async (
+  userId: string,
+  participants: string[],
+) => {
+  // Reject if participant list contains the creator's own userId
+  if (participants.includes(userId)) {
+    throw new BadRequestException(
+      "Participants list should not include yourself",
+    );
+  }
+
+  // Reject duplicate participant IDs
+  const uniqueParticipants = new Set(participants);
+  if (uniqueParticipants.size !== participants.length) {
+    throw new BadRequestException("Participants list contains duplicate IDs");
+  }
+
+  // Verify all participants exist in the database
+  const existingUsersCount = await UserModel.countDocuments({
+    _id: { $in: participants },
+  });
+  if (existingUsersCount !== participants.length) {
+    throw new NotFoundException("One or more participants not found");
+  }
+};
+
+const createGroupConversation = async (
+  userId: string,
+  participants: string[],
+  groupName: string,
+) => {
+  await validateGroupParticipants(userId, participants);
+
+  const allParticipantIds = [userId, ...participants];
+  const conversation = await ConversationModel.create({
+    participants: allParticipantIds,
+    isGroup: true,
+    groupName,
+    createdBy: userId,
+  });
+
+  return conversation.populate("participants", "name avatar");
+};
+
+const createSingleConversation = async (
+  userId: string,
+  participantId: string,
+) => {
+  if (participantId === userId) {
+    throw new BadRequestException("Cannot create a conversation with yourself");
+  }
+
+  const otherUser = await UserModel.findById(participantId);
+  if (!otherUser) {
+    throw new NotFoundException("User not found");
+  }
+
+  const allParticipantIds = [participantId, userId];
+
+  const existingConversation = await ConversationModel.findOne({
+    isGroup: false,
+    participants: {
+      $all: allParticipantIds,
+      $size: 2,
+    },
+  }).populate("participants", "name avatar");
+
+  if (existingConversation) return existingConversation;
+
+  const conversation = await ConversationModel.create({
+    participants: allParticipantIds,
+    isGroup: false,
+    createdBy: userId,
+  });
+
+  return conversation.populate("participants", "name avatar");
+};
+
 export const createConversationService = async (
   userId: string,
   body: CreateConversationSchemaType,
 ) => {
   const { participantId, isGroup, participants, groupName } = body;
 
-  let conversation;
-  let allParticipantIds: string[] = [];
-
   if (isGroup && participants?.length && groupName) {
-    allParticipantIds = [userId, ...participants];
-    conversation = await ConversationModel.create({
-      participants: allParticipantIds,
-      isGroup: true,
-      groupName,
-      createdBy: userId,
-    });
-    conversation = await conversation.populate("participants", "name avatar");
-  } else if (participantId) {
-    if (participantId === userId) {
-      throw new BadRequestException(
-        "Cannot create a conversation with yourself",
-      );
-    }
-
-    const otherUser = await UserModel.findById(participantId);
-    if (!otherUser) {
-      throw new NotFoundException("User not found");
-    }
-    allParticipantIds = [participantId, userId];
-
-    const existingConversation = await ConversationModel.findOne({
-      participants: {
-        $all: allParticipantIds,
-        $size: 2,
-      },
-    }).populate("participants", "name avatar");
-
-    if (existingConversation) return existingConversation;
-
-    conversation = await ConversationModel.create({
-      participants: allParticipantIds,
-      isGroup: false,
-      createdBy: userId,
-    });
-    conversation = await conversation.populate("participants", "name avatar");
-  } else {
-    throw new BadRequestException(
-      "Participant ID or group parameters are required",
-    );
+    return createGroupConversation(userId, participants, groupName);
   }
 
-  // Implement websocket
+  if (participantId) {
+    return createSingleConversation(userId, participantId);
+  }
 
-  return conversation;
+  throw new BadRequestException(
+    "Participant ID or group parameters are required",
+  );
 };
 
 export const getUserConversationsService = async (userId: string) => {
@@ -80,7 +120,7 @@ export const getUserConversationsService = async (userId: string) => {
   return conversations;
 };
 
-export const getSingleConversationService = async (
+export const validateConversationParticipantsService = async (
   conversationId: string,
   userId: string,
 ) => {
@@ -92,10 +132,20 @@ export const getSingleConversationService = async (
   });
 
   if (!conversation) {
-    throw new BadRequestException(
-      "Conversation not found or you are not authorized to view this conversation",
-    );
+    throw new BadRequestException("Conversation not found or unauthorized");
   }
+
+  return conversation;
+};
+
+export const getSingleConversationService = async (
+  conversationId: string,
+  userId: string,
+) => {
+  const conversation = await validateConversationParticipantsService(
+    conversationId,
+    userId,
+  );
 
   const messages = await MessageModel.find({ conversationId })
     .populate("sender", "name avatar")
@@ -107,7 +157,8 @@ export const getSingleConversationService = async (
         select: "name avatar",
       },
     })
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .limit(50);
 
   return {
     conversation,
