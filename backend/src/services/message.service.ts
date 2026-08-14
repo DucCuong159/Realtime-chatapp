@@ -12,6 +12,7 @@ import { validateConversationParticipantsService } from "./conversation.service.
 export const sendMessageService = async (
   userId: string,
   body: sendMessageSchemaType,
+  originatingSocketId?: string,
 ) => {
   const { conversationId, content, image, replyTo } = body;
 
@@ -63,7 +64,11 @@ export const sendMessageService = async (
   await conversation.save();
 
   // websocket emit the new message to the conversation room
-  emitNewMessageToConversationRoom(userId, conversationId, newMessage);
+  emitNewMessageToConversationRoom(
+    conversationId,
+    newMessage,
+    originatingSocketId,
+  );
 
   // websocket emit the last message to members (personnal room user)
   const participantIds = conversation.participants.map((id) => id.toString());

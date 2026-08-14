@@ -127,18 +127,16 @@ export const emitNewConversationToParticipants = (
 };
 
 export const emitNewMessageToConversationRoom = (
-  senderId: string, // userId that sent the message
   conversationId: string,
   message: any,
+  originatingSocketId?: string,
 ) => {
   const io = getIO();
-  const userSockets = onlineUsers.get(senderId);
-  const senderSocketIds = userSockets ? Array.from(userSockets) : [];
 
-  // emit to all except ALL of the sender's tabs
-  if (senderSocketIds.length > 0) {
+  // emit to all except the originating socket (allowing other tabs of the sender to receive it)
+  if (originatingSocketId) {
     io.to(`conversation:${conversationId}`)
-      .except(senderSocketIds)
+      .except(originatingSocketId)
       .emit("message:new", message);
   } else {
     io.to(`conversation:${conversationId}`).emit("message:new", message);
