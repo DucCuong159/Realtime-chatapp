@@ -2,7 +2,7 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface ConversationDocument extends Document {
   participants: Types.ObjectId[];
-  lastMessage?: Types.ObjectId;
+  lastMessage?: Types.ObjectId | null;
   unreadCount: number;
   isGroup: boolean;
   groupName?: string;

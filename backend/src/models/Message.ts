@@ -9,7 +9,7 @@ export interface MessageDocument extends Document {
   conversationId: Types.ObjectId;
   sender: Types.ObjectId;
   receiver?: Types.ObjectId;
-  replyTo?: Types.ObjectId;
+  replyTo?: Types.ObjectId | null;
   content?: string;
   image?: string;
   contentType?: "text" | "image" | "video";
