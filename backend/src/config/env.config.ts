@@ -30,7 +30,7 @@ export const Env = {
   PORT: getEnv("PORT", "8080"),
   MONGO_URI: getEnv("MONGO_URI"),
   JWT_SECRET: jwtSecret,
-  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "15m"),
+  JWT_EXPIRES_IN: getEnv("JWT_EXPIRES_IN", "7d"),
   FRONTEND_ORIGIN: getEnv("FRONTEND_ORIGIN", "http://localhost:5173"),
 
   // Cloudinary
