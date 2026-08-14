@@ -61,25 +61,36 @@ const createSingleConversation = async (
     throw new NotFoundException("User not found");
   }
 
+  // Deterministic unique key for 1-1 conversation (order independent)
+  const directKey = [userId, participantId].sort().join("_");
   const allParticipantIds = [participantId, userId];
 
   const existingConversation = await ConversationModel.findOne({
-    isGroup: false,
-    participants: {
-      $all: allParticipantIds,
-      $size: 2,
-    },
+    directKey,
   }).populate("participants", "name avatar");
 
   if (existingConversation) return existingConversation;
 
-  const conversation = await ConversationModel.create({
-    participants: allParticipantIds,
-    isGroup: false,
-    createdBy: userId,
-  });
+  try {
+    const conversation = await ConversationModel.create({
+      participants: allParticipantIds,
+      isGroup: false,
+      directKey,
+      createdBy: userId,
+    });
 
-  return conversation.populate("participants", "name avatar");
+    return conversation.populate("participants", "name avatar");
+  } catch (error: any) {
+    // Handle race condition: duplicate key error (code 11000)
+    if (error?.code === 11000) {
+      const existing = await ConversationModel.findOne({
+        directKey,
+      }).populate("participants", "name avatar");
+
+      if (existing) return existing;
+    }
+    throw error;
+  }
 };
 
 export const createConversationService = async (
