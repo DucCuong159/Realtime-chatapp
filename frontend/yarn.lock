@@ -2527,6 +2527,9 @@ __metadata:
     vite: "npm:^8.2.0"
     zod: "npm:^4.4.3"
     zustand: "npm:^5.0.15"
+  dependenciesMeta:
+    esbuild:
+      built: true
   languageName: unknown
   linkType: soft
 
