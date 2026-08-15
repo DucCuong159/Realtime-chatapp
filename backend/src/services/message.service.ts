@@ -1,4 +1,9 @@
 import cloudinary from "../config/cloudinary.config.js";
+import {
+  emitLastMessageToParticipants,
+  emitNewMessageToConversationRoom,
+} from "../lib/socket.js";
+import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
 import { NotFoundException } from "../utils/app-error.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
@@ -7,6 +12,7 @@ import { validateConversationParticipantsService } from "./conversation.service.
 export const sendMessageService = async (
   userId: string,
   body: sendMessageSchemaType,
+  originatingSocketId?: string,
 ) => {
   const { conversationId, content, image, replyTo } = body;
 
@@ -54,7 +60,24 @@ export const sendMessageService = async (
     },
   ]);
 
-  // websocket implementation
+  const updatedConversation = await ConversationModel.findByIdAndUpdate(
+    conversationId,
+    { lastMessage: newMessage._id },
+    { new: true },
+  );
 
-  return { userMessage: newMessage, conversation };
+  // websocket emit the new message to the conversation room
+  emitNewMessageToConversationRoom(
+    conversationId,
+    newMessage,
+    originatingSocketId,
+  );
+
+  // websocket emit the last message to members (personnal room user)
+  const targetConversation = updatedConversation || conversation;
+  const participantIds = targetConversation.participants.map((id) =>
+    id.toString(),
+  );
+  emitLastMessageToParticipants(participantIds, conversationId, newMessage);
+  return { userMessage: newMessage, conversation: targetConversation };
 };

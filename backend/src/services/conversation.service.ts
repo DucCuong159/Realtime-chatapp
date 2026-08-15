@@ -1,4 +1,7 @@
-import ConversationModel from "../models/Conversation.js";
+import { emitNewConversationToParticipants } from "../lib/socket.js";
+import ConversationModel, {
+  ConversationDocument,
+} from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
 import UserModel from "../models/User.js";
 import { BadRequestException, NotFoundException } from "../utils/app-error.js";
@@ -30,6 +33,23 @@ const validateGroupParticipants = async (
   }
 };
 
+const populateAndEmitNewConversation = async (
+  conversation: ConversationDocument,
+) => {
+  const populatedConversation = await conversation.populate(
+    "participants",
+    "name avatar",
+  );
+  const participantIdStrings = populatedConversation.participants.map((p) =>
+    p._id.toString(),
+  );
+  emitNewConversationToParticipants(
+    participantIdStrings,
+    populatedConversation,
+  );
+  return populatedConversation;
+};
+
 const createGroupConversation = async (
   userId: string,
   participants: string[],
@@ -45,7 +65,7 @@ const createGroupConversation = async (
     createdBy: userId,
   });
 
-  return conversation.populate("participants", "name avatar");
+  return populateAndEmitNewConversation(conversation);
 };
 
 const createSingleConversation = async (
@@ -79,7 +99,7 @@ const createSingleConversation = async (
       createdBy: userId,
     });
 
-    return conversation.populate("participants", "name avatar");
+    return populateAndEmitNewConversation(conversation);
   } catch (error: any) {
     // Handle race condition: duplicate key error (code 11000)
     if (error?.code === 11000) {
