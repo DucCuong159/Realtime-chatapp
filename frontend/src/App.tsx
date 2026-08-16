@@ -8,14 +8,14 @@ import { isAuthRoute } from "./routes/routes";
 
 function App() {
   const { pathname } = useLocation();
-  const { user, isAuthStatus, isAuthStatusLoading } = useAuth();
+  const { isAuthStatus, isInitialized } = useAuth();
   const isAuth = isAuthRoute(pathname);
 
   useEffect(() => {
     isAuthStatus();
   }, [isAuthStatus]);
 
-  if (isAuthStatusLoading && !user && !isAuth)
+  if (!isInitialized && !isAuth)
     return (
       <div className="flex flex-col items-center justify-center h-screen w-screen">
         <Logo imgClass="size-20" />

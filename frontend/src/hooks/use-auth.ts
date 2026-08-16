@@ -1,15 +1,16 @@
 import { API } from "@/lib/axios-client";
 import type { LoginType, RegisterType, UserType } from "@/types/auth.type";
+import { toast } from "sonner";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useSocket } from "./use-socket";
-import { toast } from "sonner";
 
 interface AuthState {
   user: UserType | null;
   isLoggingIn: boolean;
   isSigningUp: boolean;
   isAuthStatusLoading: boolean;
+  isInitialized: boolean;
 
   register: (data: RegisterType) => Promise<void>;
   login: (data: LoginType) => Promise<void>;
@@ -24,6 +25,7 @@ export const useAuth = create<AuthState>()(
       isSigningUp: false,
       isLoggingIn: false,
       isAuthStatusLoading: false,
+      isInitialized: false,
 
       register: async (data: RegisterType) => {
         set({ isSigningUp: true });
@@ -64,10 +66,13 @@ export const useAuth = create<AuthState>()(
           useSocket.getState().connectSocket();
           toast.success("Authenticated successfully");
         } finally {
-          set({ isAuthStatusLoading: false });
+          set({ isAuthStatusLoading: false, isInitialized: true });
         }
       },
     }),
-    { name: "app:root" },
+    {
+      name: "app:root",
+      partialize: (state) => ({ user: state.user }),
+    },
   ),
 );
