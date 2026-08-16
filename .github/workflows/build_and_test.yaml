@@ -1,0 +1,103 @@
+name: PR Build and Test
+run-name: "PR #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - stg
+      - prd
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      # ─── BACKEND BUILD & TYPECHECK ─────────────────────────────────────────
+      - name: Setup Backend Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            backend/.yarn/cache
+            backend/node_modules
+          key: backend-yarn-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('backend/yarn.lock') }}
+          restore-keys: |
+            backend-yarn-${{ runner.os }}-${{ matrix.node-version }}-
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: yarn install --immutable
+
+      - name: Build Backend (TypeScript)
+        working-directory: ./backend
+        run: yarn build
+
+      # ─── FRONTEND BUILD, LINT & TYPECHECK ──────────────────────────────────
+      - name: Setup Frontend Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/.yarn/cache
+            frontend/node_modules
+          key: frontend-yarn-${{ runner.os }}-${{ matrix.node-version }}-${{ hashFiles('frontend/yarn.lock') }}
+          restore-keys: |
+            frontend-yarn-${{ runner.os }}-${{ matrix.node-version }}-
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: yarn install --immutable
+
+      - name: Run Frontend ESLint
+        working-directory: ./frontend
+        run: yarn lint
+        continue-on-error: false
+
+      - name: Build Frontend (Vite + TypeScript)
+        working-directory: ./frontend
+        run: yarn build
+        env:
+          CI: false
+
+      - name: Check Frontend bundle size
+        working-directory: ./frontend
+        run: |
+          echo "📦 Build Size Report:"
+          du -sh dist/
+          echo ""
+          echo "Top 10 largest files:"
+          find dist/assets -type f -exec du -h {} + | sort -hr | head -10
+
+      - name: Upload Frontend build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+          retention-days: 7
