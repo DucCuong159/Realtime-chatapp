@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+early_access: true
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: true
+  high_level_summary_in_walkthrough: true
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  related_issues: false
+  related_prs: false
+  auto_apply_labels: true
+  auto_assign_reviewers: true
+  auto_review:
+    enabled: true
+    auto_pause_after_reviewed_commits: 0
+
+summary:
+  auto_summary:
+    enabled: true
+    drafts: false
+  walkthrough:
+    enabled: true
+
+issue_enrichment:
+  auto_enrich:
+    enabled: true
