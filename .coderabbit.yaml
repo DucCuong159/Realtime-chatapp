@@ -4,7 +4,9 @@ early_access: true
 reviews:
   profile: "chill"
   request_changes_workflow: true
+  high_level_summary: true
   high_level_summary_in_walkthrough: true
+  changed_files_summary: true
   sequence_diagrams: false
   estimate_code_review_effort: false
   related_issues: false
@@ -13,14 +15,8 @@ reviews:
   auto_assign_reviewers: true
   auto_review:
     enabled: true
-    auto_pause_after_reviewed_commits: 0
-
-summary:
-  auto_summary:
-    enabled: true
     drafts: false
-  walkthrough:
-    enabled: true
+    auto_pause_after_reviewed_commits: 0
 
 issue_enrichment:
   auto_enrich:
