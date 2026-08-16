@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { Navigate, Outlet } from "react-router-dom";
 
 interface RouteGuardProps {
@@ -5,19 +6,13 @@ interface RouteGuardProps {
 }
 
 const RouteGuard = ({ requireAuth = false }: RouteGuardProps) => {
-  // TODO: Retrieve isAuthenticated from auth store (e.g., Zustand or Context)
-  // const { isAuthenticated } = useAuthStore();
-  const isAuthenticated = false; // Temporary placeholder for development
+  const { user } = useAuth();
 
   // 1. Protected route but user is not authenticated -> redirect to /sign-in
-  if (requireAuth && !isAuthenticated) {
-    return <Navigate to="/sign-in" replace />;
-  }
+  if (requireAuth && !user) return <Navigate to="/sign-in" replace />;
 
   // 2. Public auth route but user is already authenticated -> redirect to /chat
-  if (!requireAuth && isAuthenticated) {
-    return <Navigate to="/chat" replace />;
-  }
+  if (!requireAuth && user) return <Navigate to="/chat" replace />;
 
   return <Outlet />;
 };
