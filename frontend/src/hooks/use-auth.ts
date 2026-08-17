@@ -53,6 +53,8 @@ export const useAuth = create<AuthState>()(
         try {
           await API.post("api/auth/logout");
           toast.success("Logged out successfully");
+        } catch {
+          // handle error in interceptor
         } finally {
           set({ user: null });
           useSocket.getState().disconnectSocket();
@@ -65,6 +67,9 @@ export const useAuth = create<AuthState>()(
           if (response.status === 200) set({ user: response.data.user });
           useSocket.getState().connectSocket();
           toast.success("Authenticated successfully");
+        } catch {
+          set({ user: null });
+          useSocket.getState().disconnectSocket();
         } finally {
           set({ isAuthStatusLoading: false, isInitialized: true });
         }

@@ -1,4 +1,5 @@
 import { HTTPSTATUS } from "@/config/http.config";
+import { useAuth } from "@/hooks/use-auth";
 import type { ApiErrorResponse } from "@/types/api.type";
 import axios from "axios";
 import { toast } from "sonner";
@@ -37,6 +38,12 @@ export const getApiErrorMessage = (
 };
 
 // ─── Response interceptor ────────────────────────────────────────────
+const authRoutes = [
+  "api/auth/status",
+  "api/auth/login",
+  "api/auth/register",
+  "api/auth/logout",
+];
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -49,8 +56,12 @@ API.interceptors.response.use(
     }
 
     switch (error.response?.status) {
-      case HTTPSTATUS.UNAUTHORIZED:
+      case HTTPSTATUS.UNAUTHORIZED: {
+        const url = error.config?.url || "";
+        const isAuthRoute = authRoutes.some((route) => url.includes(route));
+        if (!isAuthRoute) useAuth.getState().logout();
         break;
+      }
       case HTTPSTATUS.FORBIDDEN:
         toast.error("You do not have permission to perform this action!");
         break;
