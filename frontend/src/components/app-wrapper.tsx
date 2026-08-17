@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import AsideBar from "./aside-bar";
 
 interface AppWrapperProps {
   children: ReactNode;
@@ -7,7 +8,7 @@ interface AppWrapperProps {
 const AppWrapper = ({ children }: AppWrapperProps) => {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Toolbar */}
+      <AsideBar />
       <main className="flex-1">{children}</main>
     </div>
   );

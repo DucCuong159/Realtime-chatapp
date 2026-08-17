@@ -3,12 +3,12 @@ import SignUp from "@/pages/auth/sign-up";
 import Conversation from "@/pages/conversation";
 import SingleConversation from "@/pages/conversation/conversationId";
 
-const AUTH_ROUTES = {
+export const AUTH_ROUTES = {
   SIGN_IN: "/sign-in",
   SIGN_UP: "/sign-up",
 };
 
-const PROTECTED_ROUTES = {
+export const PROTECTED_ROUTES = {
   CONVERSATION: "/conversation",
   SINGLE_CONVERSATION: "/conversation/:conversationId",
 };
