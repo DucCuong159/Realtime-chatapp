@@ -27,6 +27,7 @@ export const NewConversationPopover = memo(() => {
   const [isOpen, setIsOpen] = useState(false);
   const [isGroupMode, setIsGroupMode] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
@@ -50,8 +51,14 @@ export const NewConversationPopover = memo(() => {
   const resetState = () => {
     setIsGroupMode(false);
     setGroupName("");
+    setUserSearch("");
     setSelectedUsers([]);
   };
+
+  const filteredUsers =
+    users?.filter((user) =>
+      user.name.toLowerCase().includes(userSearch.trim().toLowerCase()),
+    ) || [];
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -117,13 +124,20 @@ export const NewConversationPopover = memo(() => {
           </div>
 
           <InputGroup>
-            <InputGroupInput
-              value={isGroupMode ? groupName : ""}
-              onChange={
-                isGroupMode ? (e) => setGroupName(e.target.value) : undefined
-              }
-              placeholder={isGroupMode ? "Enter group name" : "Search name"}
-            />
+            {isGroupMode ? (
+              <InputGroupInput
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                placeholder="Enter group name"
+              />
+            ) : (
+              <InputGroupInput
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Enter user name"
+              />
+            )}
+
             <InputGroupAddon>
               {isGroupMode ? <UsersIcon /> : <Search />}
             </InputGroupAddon>
@@ -133,7 +147,7 @@ export const NewConversationPopover = memo(() => {
         <div className="flex-1 justify-center overflow-y-auto px-1 py-1 space-y-1">
           {isUsersLoading ? (
             <Spinner className="w-6 h-6" />
-          ) : users && users?.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="text-center text-muted-foreground">
               No users found
             </div>
@@ -143,7 +157,7 @@ export const NewConversationPopover = memo(() => {
                 disabled={isCreatingConversation}
                 onClick={() => setIsGroupMode(true)}
               />
-              {users?.map((user) => (
+              {filteredUsers.map((user) => (
                 <ConversationUserItem
                   key={user._id}
                   user={user}
@@ -154,7 +168,7 @@ export const NewConversationPopover = memo(() => {
               ))}
             </>
           ) : (
-            users?.map((user) => (
+            filteredUsers.map((user) => (
               <GroupUserItem
                 key={user._id}
                 user={user}
