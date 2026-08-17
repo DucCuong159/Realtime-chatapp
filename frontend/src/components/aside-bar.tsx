@@ -36,9 +36,12 @@ const AsideBar = () => {
           <Moon className="absolute size-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         </Button>
         <DropdownMenu>
-          <DropdownMenuTrigger className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <DropdownMenuTrigger
+            className="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Account menu"
+          >
             <AvatarWithBadge
-              name={user?.name || "unKnown"}
+              name={user?.name || "Unknown"}
               src={user?.avatar || ""}
               isOnline={isOnline}
               size="size-9"
