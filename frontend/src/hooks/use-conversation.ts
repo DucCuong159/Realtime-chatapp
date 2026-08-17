@@ -41,6 +41,8 @@ interface ConversationState {
   addNewMessage: (conversationId: string, message: MessageType) => void;
 }
 
+let activeFetchingConversationId: string | null = null;
+
 export const useConversation = create<ConversationState>()((set, get) => ({
   conversations: [],
   users: [],
@@ -98,17 +100,22 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   },
 
   fetchSingleConversation: async (conversationId: string) => {
+    activeFetchingConversationId = conversationId;
     set({ isSingleConversationLoading: true });
     try {
       const { data } = await API.get(`/api/conversation/${conversationId}`);
-      set({
-        singleConversation: {
-          conversation: data.conversation,
-          messages: data.messages,
-        },
-      });
+      if (activeFetchingConversationId === conversationId) {
+        set({
+          singleConversation: {
+            conversation: data.conversation,
+            messages: data.messages,
+          },
+        });
+      }
     } finally {
-      set({ isSingleConversationLoading: false });
+      if (activeFetchingConversationId === conversationId) {
+        set({ isSingleConversationLoading: false });
+      }
     }
   },
 
