@@ -54,7 +54,7 @@ const AsideBar = () => {
           >
             <DropdownMenuGroup>
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuItem onClick={logout} className="cursor-pointer">
+              <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
                 Logout
               </DropdownMenuItem>
             </DropdownMenuGroup>
