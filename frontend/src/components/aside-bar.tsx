@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { isUserOnline } from "@/lib/helper";
+import { useIsUserOnline } from "@/hooks/use-is-user-online";
 import { PROTECTED_ROUTES } from "@/routes/routes";
 import { Moon, Sun } from "lucide-react";
 import AvatarWithBadge from "./avatar-with-badge";
@@ -19,7 +19,7 @@ const AsideBar = () => {
   const { user, logout } = useAuth();
   const { toggleTheme } = useTheme();
 
-  const isOnline = isUserOnline(user?._id);
+  const isOnline = useIsUserOnline(user?._id);
 
   return (
     <aside className="fixed inset-y-0 left-0 flex w-14 flex-col items-center justify-between border-r border-border bg-sidebar py-3.5">
