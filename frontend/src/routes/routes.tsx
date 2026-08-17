@@ -1,7 +1,7 @@
 import SignIn from "@/pages/auth/sign-in";
 import SignUp from "@/pages/auth/sign-up";
-import Chat from "@/pages/chat";
-import SingleChat from "@/pages/chat/chatId";
+import Conversation from "@/pages/conversation";
+import SingleConversation from "@/pages/conversation/conversationId";
 
 const AUTH_ROUTES = {
   SIGN_IN: "/sign-in",
@@ -9,8 +9,8 @@ const AUTH_ROUTES = {
 };
 
 const PROTECTED_ROUTES = {
-  CHAT: "/chat",
-  SINGLE_CHAT: "/chat/:chatId",
+  CONVERSATION: "/conversation",
+  SINGLE_CONVERSATION: "/conversation/:conversationId",
 };
 
 export const authRoutesPath = [
@@ -26,12 +26,12 @@ export const authRoutesPath = [
 
 export const protectedRoutesPath = [
   {
-    path: PROTECTED_ROUTES.CHAT,
-    component: <Chat />,
+    path: PROTECTED_ROUTES.CONVERSATION,
+    component: <Conversation />,
   },
   {
-    path: PROTECTED_ROUTES.SINGLE_CHAT,
-    component: <SingleChat />,
+    path: PROTECTED_ROUTES.SINGLE_CONVERSATION,
+    component: <SingleConversation />,
   },
 ];
 

@@ -33,7 +33,7 @@ const AppRoutes = () => {
         </Route>
       </Route>
 
-      {/* Redirect root "/" to "/sign-in" (or "/chat" when authenticated) */}
+      {/* Redirect root "/" to "/sign-in" (or "/conversation" when authenticated) */}
       <Route path="/" element={<Navigate to="/sign-in" replace />} />
       {/* 404 Catch-all fallback */}
       <Route path="*" element={<Navigate to="/sign-in" replace />} />
