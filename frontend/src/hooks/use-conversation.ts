@@ -68,7 +68,16 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     set({ isConversationsLoading: true });
     try {
       const { data } = await API.get("/api/conversation/all");
-      set({ conversations: data.conversations });
+      set((state) => {
+        const fetchedConversations: ConversationType[] =
+          data.conversations || [];
+        const newSocketConversations = state.conversations.filter(
+          (c) => !fetchedConversations.some((f) => f._id === c._id),
+        );
+        return {
+          conversations: [...newSocketConversations, ...fetchedConversations],
+        };
+      });
     } finally {
       set({ isConversationsLoading: false });
     }
