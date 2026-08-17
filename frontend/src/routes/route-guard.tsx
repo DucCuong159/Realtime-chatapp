@@ -11,8 +11,8 @@ const RouteGuard = ({ requireAuth = false }: RouteGuardProps) => {
   // 1. Protected route but user is not authenticated -> redirect to /sign-in
   if (requireAuth && !user) return <Navigate to="/sign-in" replace />;
 
-  // 2. Public auth route but user is already authenticated -> redirect to /chat
-  if (!requireAuth && user) return <Navigate to="/chat" replace />;
+  // 2. Public auth route but user is already authenticated -> redirect to /conversation
+  if (!requireAuth && user) return <Navigate to="/conversation" replace />;
 
   return <Outlet />;
 };
