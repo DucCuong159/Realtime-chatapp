@@ -1,0 +1,199 @@
+name: Cleanup Old Branches
+
+on:
+  schedule:
+    # Runs at 02:00 UTC every Sunday
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Delete branches older than X days"
+        required: false
+        default: "30"
+        type: string
+      dry_run:
+        description: "Dry run (preview only, no deletion)"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete Old Branches
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete old branches
+        id: cleanup
+        env:
+          DAYS_OLD: ${{ github.event.inputs.days || '30' }}
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.dry_run || 'true' }}
+        run: |
+          echo "🔍 Configuration:"
+          echo "   Days threshold: $DAYS_OLD days"
+          echo "   Dry run mode: $DRY_RUN"
+          echo ""
+
+          # Calculate threshold date
+          current_date=$(date +%s)
+          threshold_date=$((current_date - DAYS_OLD*24*60*60))
+          threshold_display=$(date -d @$threshold_date '+%Y-%m-%d')
+
+          echo "📅 Deleting branches with last commit before: $threshold_display"
+          echo ""
+
+          # Fetch and prune
+          git fetch --prune --quiet
+
+          # Counters
+          deleted_count=0
+          kept_count=0
+          failed_count=0
+
+          # Arrays to store branch info
+          declare -a branches_to_delete
+          declare -a branches_to_keep
+
+          # Protected branches pattern
+          PROTECTED_PATTERN='HEAD|origin/main|origin/prd|origin/stg|origin/dev'
+
+          # Collect branches
+          while IFS= read -r branch; do
+            branch=$(echo "$branch" | sed 's/origin\///' | xargs)
+            
+            # Get last commit date
+            last_commit_date=$(git log -1 --format=%ct "origin/$branch" 2>/dev/null || echo 0)
+            last_commit_display=$(date -d @$last_commit_date '+%Y-%m-%d' 2>/dev/null || echo "unknown")
+            
+            # Check if merged
+            if git branch -r --merged origin/main | grep -q "origin/$branch"; then
+              merge_status="✔ merged"
+            else
+              merge_status="⏳ unmerged"
+            fi
+            
+            if [ "$last_commit_date" -lt "$threshold_date" ] && [ "$last_commit_date" -gt 0 ]; then
+              branches_to_delete+=("$branch|$last_commit_display|$merge_status")
+            else
+              branches_to_keep+=("$branch|$last_commit_display|$merge_status")
+            fi
+          done < <(git branch -r | grep -v -E "$PROTECTED_PATTERN")
+
+          # Display branches to delete
+          if [ ${#branches_to_delete[@]} -gt 0 ]; then
+            echo "🗑️  Branches to delete (${#branches_to_delete[@]}):"
+            for item in "${branches_to_delete[@]}"; do
+              IFS='|' read -r branch date status <<< "$item"
+              echo "   - $branch ($status, last: $date)"
+            done
+            echo ""
+          fi
+
+          # Display branches to keep
+          if [ ${#branches_to_keep[@]} -gt 0 ]; then
+            echo "🛡️ Branches to keep (${#branches_to_keep[@]}):"
+            for item in "${branches_to_keep[@]}"; do
+              IFS='|' read -r branch date status <<< "$item"
+              echo "   - $branch ($status, last: $date)"
+            done
+            echo ""
+          fi
+
+          # Delete branches (if not dry run)
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "🚀 Starting deletion..."
+            for item in "${branches_to_delete[@]}"; do
+              IFS='|' read -r branch date status <<< "$item"
+              if git push origin --delete "$branch" 2>/dev/null; then
+                echo "   ✅ Deleted: $branch"
+                deleted_count=$((deleted_count + 1))
+              else
+                echo "   ❌ Failed: $branch"
+                failed_count=$((failed_count + 1))
+              fi
+            done
+          else
+            echo "⚠️ DRY RUN MODE - No branches were deleted"
+            echo "   Set dry_run=false to actually delete branches"
+          fi
+
+          # Summary
+          echo ""
+          echo "📊 Summary:"
+          echo "   Threshold: $DAYS_OLD days (before $threshold_display)"
+          echo "   Branches to delete: ${#branches_to_delete[@]}"
+          echo "   Branches to keep: ${#branches_to_keep[@]}"
+
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "   Successfully deleted: $deleted_count"
+            echo "   Failed to delete: $failed_count"
+          else
+            echo "   Mode: DRY RUN (preview only)"
+          fi
+
+          # Save to output
+          echo "deleted_count=$deleted_count" >> $GITHUB_OUTPUT
+          echo "failed_count=$failed_count" >> $GITHUB_OUTPUT
+          echo "kept_count=${#branches_to_keep[@]}" >> $GITHUB_OUTPUT
+
+          # Save branch lists to env for summary
+          {
+            echo "BRANCHES_TO_DELETE<<EOF"
+            for item in "${branches_to_delete[@]}"; do
+              echo "$item"
+            done
+            echo "EOF"
+          } >> $GITHUB_ENV
+
+      - name: Create summary
+        env:
+          DAYS_OLD: ${{ github.event.inputs.days || '30' }}
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'true' || github.event.inputs.dry_run || 'true' }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          echo "### 🧹 Branch Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "**Mode:** ⚠️ DRY RUN (Preview Only)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode:** 🚀 LIVE (Branches Deleted)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "**Threshold:** Branches older than $DAYS_OLD days" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Protected branches:** main, dev, stg, prd" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Display branches older than threshold
+          if [ -n "$BRANCHES_TO_DELETE" ]; then
+            echo "### 🗑️ Branches Older Than $DAYS_OLD Days" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Branch | Status | Last Commit | Link |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|--------|-------------|------|" >> $GITHUB_STEP_SUMMARY
+            
+            while IFS= read -r item; do
+              if [ -n "$item" ]; then
+                IFS='|' read -r branch date status <<< "$item"
+                branch_url="$REPO_URL/tree/$branch"
+                echo "| \`$branch\` | $status | $date | [View]($branch_url) |" >> $GITHUB_STEP_SUMMARY
+              fi
+            done <<< "$BRANCHES_TO_DELETE"
+            
+            echo "" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✨ **No branches older than $DAYS_OLD days found!**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "$DRY_RUN" = "false" ]; then
+            echo "⚠️ **Warning:** This workflow deletes both merged and unmerged branches!" >> $GITHUB_STEP_SUMMARY
+          fi

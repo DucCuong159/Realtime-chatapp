@@ -12,3 +12,11 @@ temp/
 # Database dumps & backups
 *.dump
 *.sql.gz
+
+# Yarn Berry
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
