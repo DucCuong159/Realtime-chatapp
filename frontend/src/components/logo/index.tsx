@@ -17,7 +17,7 @@ const Logo = ({
 }: LogoProps) => {
   return (
     <Link to={url} className="flex items-center gap-2 w-fit">
-      <img src={logoSvg} alt="Whop" className={cn(imgClass)} />
+      <img src={logoSvg} alt="Messenger" className={cn(imgClass)} />
       {text && (
         <span className={cn("font-semibold text-lg leading-tight", textClass)}>
           {text}
