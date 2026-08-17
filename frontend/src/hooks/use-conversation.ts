@@ -120,11 +120,12 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   },
 
   sendMessage: async (payload: CreateMessageType) => {
-    set({ isSendingMsg: true });
     const { conversationId, replyTo, content, image } = payload;
     const { user } = useAuth.getState();
 
     if (!conversationId || !user?._id) return;
+
+    set({ isSendingMsg: true });
 
     const tempUserId = generateUUID();
 
@@ -171,6 +172,19 @@ export const useConversation = create<ConversationState>()((set, get) => ({
             ...state.singleConversation,
             messages: state.singleConversation.messages.map((msg) =>
               msg._id === tempUserId ? userMessage : msg,
+            ),
+          },
+        };
+      });
+    } catch {
+      // remove the temp user message on failure so it does not remain stuck
+      set((state) => {
+        if (!state.singleConversation) return state;
+        return {
+          singleConversation: {
+            ...state.singleConversation,
+            messages: state.singleConversation.messages.filter(
+              (msg) => msg._id !== tempUserId,
             ),
           },
         };
