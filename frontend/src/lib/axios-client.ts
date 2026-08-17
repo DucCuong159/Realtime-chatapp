@@ -44,6 +44,16 @@ const authRoutes = [
   "api/auth/register",
   "api/auth/logout",
 ];
+
+const normalizePath = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl, "http://localhost");
+    return parsed.pathname.replace(/^\/+|\/+$/g, "");
+  } catch {
+    return rawUrl.replace(/^\/+|\/+$/g, "").split("?")[0].split("#")[0];
+  }
+};
+
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -57,8 +67,8 @@ API.interceptors.response.use(
 
     switch (error.response?.status) {
       case HTTPSTATUS.UNAUTHORIZED: {
-        const url = error.config?.url || "";
-        const isAuthRoute = authRoutes.some((route) => url.includes(route));
+        const pathname = normalizePath(error.config?.url || "");
+        const isAuthRoute = authRoutes.includes(pathname);
         if (!isAuthRoute) useAuth.getState().logout();
         break;
       }
