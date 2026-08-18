@@ -25,11 +25,10 @@ export const useSocket = create<SocketState>((set, get) => ({
     });
 
     newSocket.on("connect", () => {
-      console.log("Connected to WebSocket server");
+      // Connected to WebSocket server
     });
 
     newSocket.on("online:users", (userIds: string[]) => {
-      console.log("online:users", userIds);
       set({ onlineUsers: userIds });
     });
     set({ socket: newSocket });
