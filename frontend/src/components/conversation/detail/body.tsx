@@ -182,12 +182,25 @@ const ConversationBody = ({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleScrollToMessage = useCallback((targetMessageId: string) => {
     const element = document.getElementById(`message-${targetMessageId}`);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
       element.classList.add("bg-primary/20", "ring-2", "ring-primary/40");
-      setTimeout(() => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+      highlightTimeoutRef.current = setTimeout(() => {
         element.classList.remove("bg-primary/20", "ring-2", "ring-primary/40");
       }, 1500);
     }

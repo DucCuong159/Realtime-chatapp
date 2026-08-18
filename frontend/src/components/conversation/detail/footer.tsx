@@ -63,6 +63,7 @@ const ConversationFooter = ({
 
     const reader = new FileReader();
     reader.onloadend = () => setImage(reader.result as string);
+    reader.onerror = () => toast.error("Failed to read the image file");
     reader.readAsDataURL(file);
   };
 
