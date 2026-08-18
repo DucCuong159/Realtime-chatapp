@@ -123,7 +123,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     const { conversationId, replyTo, content, image } = payload;
     const { user } = useAuth.getState();
 
-    if (!conversationId || !user?._id) return;
+    if (!conversationId || !user?._id || (!content?.trim() && !image)) return;
 
     set({ isSendingMsg: true });
 
