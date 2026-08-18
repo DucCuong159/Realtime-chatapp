@@ -21,3 +21,7 @@ export const formatConversationTime = (date?: string | Date | null) => {
   if (isThisWeek(newDate)) return format(newDate, "EEEE");
   return format(newDate, "M/d");
 };
+
+export const isArrayEmpty = (arr?: unknown[] | null): boolean => {
+  return !Array.isArray(arr) || arr.length === 0;
+};
