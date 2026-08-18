@@ -33,10 +33,11 @@ const ConversationListItem = ({
     if (lastMessage.image) return "📷 Photo";
 
     if (isGroup && lastMessage.sender) {
-      return `${lastMessage.sender._id === currentUserId
-        ? "You"
-        : lastMessage.sender.name
-        }: ${lastMessage.content}`;
+      return `${
+        lastMessage.sender._id === currentUserId
+          ? "You"
+          : lastMessage.sender.name
+      }: ${lastMessage.content}`;
     }
 
     return lastMessage.content;
@@ -46,8 +47,9 @@ const ConversationListItem = ({
     <button
       onClick={onClick}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-sidebar-accent",
-        pathname.includes(conversation._id) && "bg-sidebar-accent",
+        "flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-sidebar-accent/70",
+        pathname.includes(conversation._id) &&
+          "bg-black/8 dark:bg-sidebar-accent shadow-xs font-medium",
       )}
     >
       <AvatarWithBadge
