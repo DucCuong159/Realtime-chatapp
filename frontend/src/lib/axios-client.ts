@@ -1,16 +1,35 @@
 import { HTTPSTATUS } from "@/config/http.config";
 import { useAuth } from "@/hooks/use-auth";
+import { useSocket } from "@/hooks/use-socket";
 import type { ApiErrorResponse } from "@/types/api.type";
 import axios from "axios";
 import { toast } from "sonner";
 
-export const API = axios.create({
-  baseURL:
-    import.meta.env.MODE === "development"
-      ? import.meta.env.VITE_API_URL
-      : "/api",
-  withCredentials: true,
-});
+// ─── Constants ───────────────────────────────────────────────────────
+const BASE_URL =
+  import.meta.env.MODE === "development"
+    ? import.meta.env.VITE_API_URL
+    : "/api";
+
+const AUTH_ROUTES = [
+  "api/auth/status",
+  "api/auth/login",
+  "api/auth/register",
+  "api/auth/logout",
+];
+
+// ─── Helper Functions ────────────────────────────────────────────────
+const normalizePath = (rawUrl: string): string => {
+  try {
+    const parsed = new URL(rawUrl, "http://localhost");
+    return parsed.pathname.replace(/^\/+|\/+$/g, "");
+  } catch {
+    return rawUrl
+      .replace(/^\/+|\/+$/g, "")
+      .split("?")[0]
+      .split("#")[0];
+  }
+};
 
 /**
  * Extract a human-readable error message from an unknown error.
@@ -37,23 +56,22 @@ export const getApiErrorMessage = (
   return fallback;
 };
 
-// ─── Response interceptor ────────────────────────────────────────────
-const authRoutes = [
-  "api/auth/status",
-  "api/auth/login",
-  "api/auth/register",
-  "api/auth/logout",
-];
+// ─── Axios Instance ──────────────────────────────────────────────────
+export const API = axios.create({
+  baseURL: BASE_URL,
+  withCredentials: true,
+});
 
-const normalizePath = (rawUrl: string): string => {
-  try {
-    const parsed = new URL(rawUrl, "http://localhost");
-    return parsed.pathname.replace(/^\/+|\/+$/g, "");
-  } catch {
-    return rawUrl.replace(/^\/+|\/+$/g, "").split("?")[0].split("#")[0];
+// ─── Request Interceptor ─────────────────────────────────────────────
+API.interceptors.request.use((config) => {
+  const socket = useSocket.getState().socket;
+  if (socket?.id) {
+    config.headers.set("x-socket-id", socket.id);
   }
-};
+  return config;
+});
 
+// ─── Response Interceptor ────────────────────────────────────────────
 API.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -68,7 +86,7 @@ API.interceptors.response.use(
     switch (error.response?.status) {
       case HTTPSTATUS.UNAUTHORIZED: {
         const pathname = normalizePath(error.config?.url || "");
-        const isAuthRoute = authRoutes.includes(pathname);
+        const isAuthRoute = AUTH_ROUTES.includes(pathname);
         if (!isAuthRoute) useAuth.getState().logout();
         break;
       }
