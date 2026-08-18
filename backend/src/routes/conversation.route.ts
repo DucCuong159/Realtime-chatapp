@@ -10,7 +10,7 @@ import { sendMessageController } from "../controllers/message.controller.js";
 const conversationRouters = Router()
   .use(passportAuthenticateJwt)
   .post("/create", createConversationController)
-  .post("/message/send", express.json({ limit: "10mb" }), sendMessageController)
+  .post("/message/send", express.json({ limit: "15mb" }), sendMessageController)
   .get("/all", getUserConversationsController)
   .get("/:conversationId", getSingleConversationsController);
 
