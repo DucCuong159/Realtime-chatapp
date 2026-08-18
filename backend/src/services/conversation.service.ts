@@ -68,6 +68,18 @@ const createGroupConversation = async (
   return populateAndEmitNewConversation(conversation);
 };
 
+const findDirectConversation = async (directKey: string) => {
+  return ConversationModel.findOne({ directKey })
+    .populate("participants", "name avatar")
+    .populate({
+      path: "lastMessage",
+      populate: {
+        path: "sender",
+        select: "name avatar",
+      },
+    });
+};
+
 const createSingleConversation = async (
   userId: string,
   participantId: string,
@@ -85,10 +97,7 @@ const createSingleConversation = async (
   const directKey = [userId, participantId].sort().join("_");
   const allParticipantIds = [participantId, userId];
 
-  const existingConversation = await ConversationModel.findOne({
-    directKey,
-  }).populate("participants", "name avatar");
-
+  const existingConversation = await findDirectConversation(directKey);
   if (existingConversation) return existingConversation;
 
   try {
@@ -103,10 +112,7 @@ const createSingleConversation = async (
   } catch (error: any) {
     // Handle race condition: duplicate key error (code 11000)
     if (error?.code === 11000) {
-      const existing = await ConversationModel.findOne({
-        directKey,
-      }).populate("participants", "name avatar");
-
+      const existing = await findDirectConversation(directKey);
       if (existing) return existing;
     }
     throw error;
@@ -160,10 +166,10 @@ export const validateConversationParticipantsService = async (
     participants: {
       $in: [userId],
     },
-  });
+  }).populate("participants", "name avatar");
 
   if (!conversation) {
-    throw new BadRequestException("Conversation not found or unauthorized");
+    throw new NotFoundException("Conversation not found or unauthorized");
   }
 
   return conversation;
@@ -193,6 +199,6 @@ export const getSingleConversationService = async (
 
   return {
     conversation,
-    messages,
+    messages: messages.reverse(),
   };
 };
