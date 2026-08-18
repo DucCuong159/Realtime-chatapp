@@ -194,11 +194,11 @@ export const getSingleConversationService = async (
         select: "name avatar",
       },
     })
-    .sort({ createdAt: 1 })
+    .sort({ createdAt: -1 })
     .limit(50);
 
   return {
     conversation,
-    messages,
+    messages: messages.reverse(),
   };
 };
