@@ -98,11 +98,7 @@ export const NewConversationPopover = memo(() => {
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         render={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 cursor-pointer rounded-lg"
-          />
+          <Button variant="ghost" size="icon" className="size-8 rounded-lg" />
         }
       >
         <PenBoxIcon className="size-4" />
