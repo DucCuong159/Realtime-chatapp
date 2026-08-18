@@ -3,6 +3,8 @@ import { Server as HTTPServer } from "http";
 import jwt from "jsonwebtoken";
 import { Server as SocketServer, type Socket } from "socket.io";
 import { Env } from "../config/env.config.js";
+import type { ConversationDocument } from "../models/Conversation.js";
+import type { MessageDocument } from "../models/Message.js";
 import { validateConversationParticipantsService } from "../services/conversation.service.js";
 
 interface AuthenticatedSocket extends Socket {
@@ -118,7 +120,7 @@ export const getIO = () => {
 
 export const emitNewConversationToParticipants = (
   participants: string[] = [],
-  conversation: any,
+  conversation: ConversationDocument | Record<string, unknown>,
 ) => {
   const io = getIO();
   participants.forEach((participantId) => {
@@ -128,7 +130,7 @@ export const emitNewConversationToParticipants = (
 
 export const emitNewMessageToConversationRoom = (
   conversationId: string,
-  message: any,
+  message: MessageDocument | Record<string, unknown>,
   originatingSocketId?: string,
 ) => {
   const io = getIO();
@@ -146,7 +148,7 @@ export const emitNewMessageToConversationRoom = (
 export const emitLastMessageToParticipants = (
   participantIds: string[],
   conversationId: string,
-  lastMessage: any,
+  lastMessage: MessageDocument | Record<string, unknown>,
 ) => {
   const io = getIO();
   const payload = { conversationId, lastMessage };
