@@ -25,13 +25,13 @@ interface ConversationState {
   isSingleConversationLoading: boolean;
   isSendingMsg: boolean;
 
-  fetchAllUsers: () => void;
-  fetchConversations: () => void;
+  fetchAllUsers: () => Promise<void>;
+  fetchConversations: () => Promise<void>;
   createConversation: (
     payload: CreateConversationType,
   ) => Promise<ConversationType | null>;
-  fetchSingleConversation: (conversationId: string) => void;
-  sendMessage: (payload: CreateMessageType) => void;
+  fetchSingleConversation: (conversationId: string) => Promise<void>;
+  sendMessage: (payload: CreateMessageType) => Promise<void>;
 
   addNewConversation: (newConversation: ConversationType) => void;
   updateConversationLastMessage: (
@@ -54,8 +54,6 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   isSingleConversationLoading: false,
   isSendingMsg: false,
 
-  currentAIStreamId: null,
-
   fetchAllUsers: async () => {
     set({ isUsersLoading: true });
     try {
@@ -70,15 +68,14 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     set({ isConversationsLoading: true });
     try {
       const { data } = await API.get("/api/conversation/all");
+      const fetched: ConversationType[] = data.conversations || [];
+
       set((state) => {
-        const fetchedConversations: ConversationType[] =
-          data.conversations || [];
-        const newSocketConversations = state.conversations.filter(
-          (c) => !fetchedConversations.some((f) => f._id === c._id),
+        // Keep any socket-created conversations not yet returned in the API list
+        const socketOnly = state.conversations.filter(
+          (c) => !fetched.some((f) => f._id === c._id),
         );
-        return {
-          conversations: [...newSocketConversations, ...fetchedConversations],
-        };
+        return { conversations: [...socketOnly, ...fetched] };
       });
     } finally {
       set({ isConversationsLoading: false });
@@ -88,12 +85,11 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   createConversation: async (payload: CreateConversationType) => {
     set({ isCreatingConversation: true });
     try {
-      const response = await API.post("/api/conversation/create", {
-        ...payload,
-      });
-      get().addNewConversation(response.data.conversation);
+      const response = await API.post("/api/conversation/create", payload);
+      const newConversation: ConversationType = response.data.conversation;
+      get().addNewConversation(newConversation);
       toast.success("Conversation created successfully");
-      return response.data.conversation;
+      return newConversation;
     } finally {
       set({ isCreatingConversation: false });
     }
@@ -127,64 +123,72 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
     set({ isSendingMsg: true });
 
-    const tempUserId = generateUUID();
+    const tempMsgId = generateUUID();
+    const now = new Date().toISOString();
 
-    const tempMessage = {
-      _id: tempUserId,
+    const tempMessage: MessageType = {
+      _id: tempMsgId,
       conversationId,
       content: content || "",
       image: image || null,
       sender: user,
       replyTo: replyTo || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       status: "sending...",
     };
 
-    // if (isAI) {
-    //  // AI Feature Source code link =>
-    // }
-
+    // 1. Optimistically append message to active conversation
     set((state) => {
-      if (state.singleConversation?.conversation._id !== conversationId)
+      if (state.singleConversation?.conversation._id !== conversationId) {
         return state;
+      }
       return {
         singleConversation: {
-          conversation: state.singleConversation.conversation,
+          ...state.singleConversation,
           messages: [...state.singleConversation.messages, tempMessage],
         },
       };
     });
+
+    // 2. Optimistically bump conversation to top of list
+    get().updateConversationLastMessage(conversationId, tempMessage);
 
     try {
       const { data } = await API.post("/api/conversation/message/send", {
         conversationId,
         content,
         image,
-        replyToId: replyTo?._id,
+        replyTo: replyTo?._id,
       });
-      const { userMessage } = data;
-      //replace the temp user message
+      const userMessage: MessageType = data.userMessage;
+
+      // 3. Replace temp message with server response
       set((state) => {
         if (!state.singleConversation) return state;
+        const { messages } = state.singleConversation;
+        const isAlreadyAdded = messages.some((m) => m._id === userMessage._id);
+
         return {
           singleConversation: {
             ...state.singleConversation,
-            messages: state.singleConversation.messages.map((msg) =>
-              msg._id === tempUserId ? userMessage : msg,
-            ),
+            messages: isAlreadyAdded
+              ? messages.filter((m) => m._id !== tempMsgId)
+              : messages.map((m) => (m._id === tempMsgId ? userMessage : m)),
           },
         };
       });
+
+      get().updateConversationLastMessage(conversationId, userMessage);
     } catch {
-      // remove the temp user message on failure so it does not remain stuck
+      // Revert optimistic message on failure
       set((state) => {
         if (!state.singleConversation) return state;
         return {
           singleConversation: {
             ...state.singleConversation,
             messages: state.singleConversation.messages.filter(
-              (msg) => msg._id !== tempUserId,
+              (m) => m._id !== tempMsgId,
             ),
           },
         };
@@ -195,23 +199,12 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   },
 
   addNewConversation: (newConversation: ConversationType) => {
-    set((state) => {
-      const existingIndex = state.conversations.findIndex(
-        (c) => c._id === newConversation._id,
-      );
-      if (existingIndex !== -1) {
-        return {
-          conversations: [
-            newConversation,
-            ...state.conversations.filter((c) => c._id !== newConversation._id),
-          ],
-        };
-      } else {
-        return {
-          conversations: [newConversation, ...state.conversations],
-        };
-      }
-    });
+    set((state) => ({
+      conversations: [
+        newConversation,
+        ...state.conversations.filter((c) => c._id !== newConversation._id),
+      ],
+    }));
   },
 
   updateConversationLastMessage: (
@@ -219,22 +212,35 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     lastMessage: MessageType,
   ) => {
     set((state) => {
-      const updatedConversations = state.conversations.map((c) =>
-        c._id === conversationId ? { ...c, lastMessage } : c,
+      const target = state.conversations.find((c) => c._id === conversationId);
+      if (!target) return state;
+
+      const updatedTarget: ConversationType = {
+        ...target,
+        lastMessage,
+        updatedAt: lastMessage.createdAt || new Date().toISOString(),
+      };
+      const remaining = state.conversations.filter(
+        (c) => c._id !== conversationId,
       );
-      return { conversations: updatedConversations };
+
+      // Always bump the updated conversation to the top (newest first)
+      return { conversations: [updatedTarget, ...remaining] };
     });
   },
 
-  addNewMessage: (conversationId, message) => {
-    const conversation = get().singleConversation;
-    if (conversation?.conversation._id === conversationId) {
-      set({
+  addNewMessage: (conversationId: string, message: MessageType) => {
+    set((state) => {
+      const single = state.singleConversation;
+      if (!single || single.conversation._id !== conversationId) return state;
+      if (single.messages.some((m) => m._id === message._id)) return state;
+
+      return {
         singleConversation: {
-          conversation: conversation.conversation,
-          messages: [...conversation.messages, message],
+          ...single,
+          messages: [...single.messages, message],
         },
-      });
-    }
+      };
+    });
   },
 }));
