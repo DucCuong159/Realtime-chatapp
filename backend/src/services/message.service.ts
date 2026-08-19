@@ -2,6 +2,7 @@ import cloudinary from "../config/cloudinary.config.js";
 import {
   emitLastMessageToParticipants,
   emitNewMessageToConversationRoom,
+  isSocketOwnedByUser,
 } from "../lib/socket.js";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
@@ -66,11 +67,15 @@ export const sendMessageService = async (
     { new: true },
   );
 
-  // websocket emit the new message to the conversation room
+  // websocket emit the new message to the conversation room (excluding verified sender socket)
+  const verifiedSocketId = isSocketOwnedByUser(userId, originatingSocketId)
+    ? originatingSocketId
+    : undefined;
+
   emitNewMessageToConversationRoom(
     conversationId,
     newMessage,
-    originatingSocketId,
+    verifiedSocketId,
   );
 
   // websocket emit the last message to members (personnal room user)
