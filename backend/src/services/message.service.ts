@@ -13,6 +13,7 @@ import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
 import UserModel from "../models/User.js";
 import { NotFoundException } from "../utils/app-error.js";
+import { getImageFileInfo } from "../utils/image.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
 import { validateConversationParticipantsService } from "./conversation.service.js";
 
@@ -145,11 +146,12 @@ const getAIResponse = async (conversationId: string, userId: string) => {
       const parts: any[] = [];
 
       if (message.image) {
+        const { mediaType, ext } = getImageFileInfo(message.image);
         parts.push({
           type: "file",
           data: message.image,
-          mediaType: "image/png",
-          fileName: "image.png",
+          mediaType,
+          fileName: `image.${ext}`,
         });
         if (!message.content) {
           parts.push({
