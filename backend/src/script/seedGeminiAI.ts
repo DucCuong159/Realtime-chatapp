@@ -1,5 +1,7 @@
 import "dotenv/config";
 import connectDatabase from "../config/database.config.js";
+import ConversationModel from "../models/Conversation.js";
+import MessageModel from "../models/Message.js";
 import UserModel from "../models/User.js";
 
 export const CreateGeminiAI = async () => {
@@ -21,8 +23,23 @@ export const CreateGeminiAI = async () => {
 
     if (duplicateAIs.length > 0) {
       const duplicateIds = duplicateAIs.map((u) => u._id);
+
+      // Reassign orphaned messages and conversation participants to primaryAI
+      await MessageModel.updateMany(
+        { sender: { $in: duplicateIds } },
+        { sender: primaryAI._id },
+      );
+      await ConversationModel.updateMany(
+        { participants: { $in: duplicateIds } },
+        { $addToSet: { participants: primaryAI._id } },
+      );
+      await ConversationModel.updateMany(
+        { participants: { $in: duplicateIds } },
+        { $pull: { participants: { $in: duplicateIds } } },
+      );
+
       await UserModel.deleteMany({ _id: { $in: duplicateIds } });
-      console.log(`Cleaned up ${duplicateIds.length} duplicate AI user(s).`);
+      console.log(`Cleaned up ${duplicateIds.length} duplicate AI user(s) and reassigned references.`);
     }
 
     console.log("Gemini AI updated in place:", primaryAI);

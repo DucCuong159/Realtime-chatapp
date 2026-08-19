@@ -142,7 +142,7 @@ const getAIResponse = async (conversationId: string, userId: string) => {
     const conversationHistory = await getConversationHistory(conversationId);
     const formattedMessages: ModelMessage[] = conversationHistory.map(
       (message: any) => {
-        const role = message.sender.isAI ? "assistant" : "user";
+        const role = message.sender?.isAI ? "assistant" : "user";
         const parts: any[] = [];
 
         if (message.image) {
