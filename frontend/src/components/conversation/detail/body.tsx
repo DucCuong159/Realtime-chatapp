@@ -1,21 +1,19 @@
 import AvatarWithBadge from "@/components/avatar-with-badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { useConversation } from "@/hooks/use-conversation";
-import { useSocket } from "@/hooks/use-socket";
 import { cn, formatConversationTime } from "@/lib/utils";
 import type { MessageType } from "@/types/conversation.type";
 import { Reply } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
 
 interface ConversationBodyProps {
-  conversationId: string | null;
   messages: MessageType[];
   onReply: (message: MessageType) => void;
 }
 
 interface MessageItemProps {
   message: MessageType;
+  currentUserId: string | null;
   isCurrentUser: boolean;
   isLastFromUser: boolean;
   onReply: (message: MessageType) => void;
@@ -25,6 +23,7 @@ interface MessageItemProps {
 const MessageItem = memo(
   ({
     message,
+    currentUserId,
     isCurrentUser,
     isLastFromUser,
     onReply,
@@ -34,15 +33,12 @@ const MessageItem = memo(
     const formattedTime = formatConversationTime(message.createdAt);
 
     const replySenderName =
-      message.replyTo?.sender?._id === message.sender?._id
+      message.replyTo?.sender?._id === currentUserId
         ? "You"
         : message.replyTo?.sender?.name || "User";
 
     return (
-      <div
-        id={`message-${message._id}`}
-        className="flex flex-col w-full transition-colors duration-500 rounded-2xl"
-      >
+      <div className="flex flex-col w-full transition-colors duration-500 rounded-2xl">
         <div
           className={cn(
             "group relative flex items-end gap-2 px-2 py-0.5 w-full",
@@ -76,6 +72,7 @@ const MessageItem = memo(
           )}
 
           <div
+            id={`message-${message._id}`}
             className={cn(
               "relative flex max-w-[80%] flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 text-sm shadow-xs break-words [overflow-wrap:anywhere]",
               isCurrentUser
@@ -154,35 +151,19 @@ const MessageItem = memo(
 
 MessageItem.displayName = "MessageItem";
 
-const ConversationBody = ({
-  conversationId,
-  messages,
-  onReply,
-}: ConversationBodyProps) => {
+const ConversationBody = ({ messages, onReply }: ConversationBodyProps) => {
   const { user } = useAuth();
   const currentUserId = user?._id || null;
-  const { socket } = useSocket();
-  const { addNewMessage } = useConversation();
   const bottomRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!conversationId || !socket) return;
-
-    const handleNewMessage = (msg: MessageType) =>
-      addNewMessage(conversationId, msg);
-
-    socket.on("message:new", handleNewMessage);
-    return () => {
-      socket.off("message:new", handleNewMessage);
-    };
-  }, [socket, conversationId, addNewMessage]);
 
   useEffect(() => {
     if (!messages.length) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -196,12 +177,12 @@ const ConversationBody = ({
     const element = document.getElementById(`message-${targetMessageId}`);
     if (element) {
       element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("bg-primary/20", "ring-2", "ring-primary/40");
+      element.classList.add("border-2", "border-secondary-foreground");
       if (highlightTimeoutRef.current) {
         clearTimeout(highlightTimeoutRef.current);
       }
       highlightTimeoutRef.current = setTimeout(() => {
-        element.classList.remove("bg-primary/20", "ring-2", "ring-primary/40");
+        element.classList.remove("border-2", "border-secondary-foreground");
       }, 1500);
     }
   }, []);
@@ -216,6 +197,7 @@ const ConversationBody = ({
           <MessageItem
             key={message._id}
             message={message}
+            currentUserId={currentUserId}
             isCurrentUser={isCurrentUser}
             isLastFromUser={isLastFromUser}
             onReply={onReply}

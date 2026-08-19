@@ -17,6 +17,7 @@ const SingleConversation = () => {
     fetchSingleConversation,
     isSingleConversationLoading,
     singleConversation,
+    addNewMessage,
   } = useConversation();
 
   const { socket } = useSocket();
@@ -35,14 +36,39 @@ const SingleConversation = () => {
 
   useEffect(() => {
     if (!conversationId || !socket) return;
-    socket.emit("conversation:join", conversationId);
+
+    const handleJoin = () => {
+      socket.emit("conversation:join", conversationId);
+    };
+
+    if (socket.connected) {
+      handleJoin();
+    }
+
+    socket.on("connect", handleJoin);
 
     return () => {
+      socket.off("connect", handleJoin);
       socket.emit("conversation:leave", conversationId);
     };
   }, [conversationId, socket]);
 
-  if (isSingleConversationLoading) {
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = (msg: MessageType) =>
+      addNewMessage(msg.conversationId, msg);
+
+    socket.on("message:new", handleNewMessage);
+    return () => {
+      socket.off("message:new", handleNewMessage);
+    };
+  }, [socket, addNewMessage]);
+
+  if (
+    isSingleConversationLoading ||
+    (conversation && conversation._id !== conversationId)
+  ) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Spinner className="size-11 text-primary!" />
@@ -50,7 +76,7 @@ const SingleConversation = () => {
     );
   }
 
-  if (!conversation) {
+  if (!conversation || conversation._id !== conversationId) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p className="text-lg">Conversation not found</p>
@@ -72,11 +98,7 @@ const SingleConversation = () => {
             description="No messages yet. Send the first message"
           />
         ) : (
-          <ConversationBody
-            conversationId={conversationId}
-            messages={messages}
-            onReply={setReplyTo}
-          />
+          <ConversationBody messages={messages} onReply={setReplyTo} />
         )}
       </div>
 

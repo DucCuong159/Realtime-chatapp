@@ -6,6 +6,13 @@ const objectIdRegex = /^[0-9a-fA-F]{24}$/;
 // Base64 image Data URI pattern (supports png, jpeg, jpg, webp, gif)
 const imageDataUriRegex = /^data:image\/(png|jpeg|jpg|webp|gif);base64,/;
 
+/**
+ * Maximum encoded image payload size in characters/bytes (15MB).
+ * Client allows up to 10MB raw binary files, which expand to ~13.33MB in Base64 Data URI format.
+ * 15MB provides sufficient headroom for the encoded string.
+ */
+export const MAX_IMAGE_BASE64_SIZE = 15 * 1024 * 1024; // 15MB
+
 export const sendMessageSchema = z
   .object({
     conversationId: z
@@ -20,7 +27,10 @@ export const sendMessageSchema = z
         imageDataUriRegex,
         "Invalid image format. Must be a valid image Data URI",
       )
-      .max(15 * 1024 * 1024, "Image payload is too large (max 15MB)")
+      .max(
+        MAX_IMAGE_BASE64_SIZE,
+        "Image payload is too large (max 15MB Base64)",
+      )
       .optional(),
     replyTo: z
       .string()

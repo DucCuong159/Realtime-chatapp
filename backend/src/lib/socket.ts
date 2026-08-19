@@ -113,6 +113,15 @@ export const initializeSocket = (httpServer: HTTPServer) => {
   return io;
 };
 
+export const isSocketOwnedByUser = (
+  userId: string,
+  socketId?: string,
+): boolean => {
+  if (!socketId) return false;
+  const userSockets = onlineUsers.get(userId);
+  return Boolean(userSockets?.has(socketId));
+};
+
 export const getIO = () => {
   if (!io) throw new Error("Socket not initialized");
   return io;

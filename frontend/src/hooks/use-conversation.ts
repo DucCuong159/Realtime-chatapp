@@ -13,6 +13,7 @@ import { useAuth } from "./use-auth";
 
 interface ConversationState {
   conversations: ConversationType[];
+  pendingSocketConversationIds: string[];
   users: UserType[];
   singleConversation: {
     conversation: ConversationType;
@@ -43,8 +44,56 @@ interface ConversationState {
 
 let activeFetchingConversationId: string | null = null;
 
+function replaceTempMessage(
+  messages: MessageType[],
+  tempMsgId: string,
+  serverMessage: MessageType,
+): MessageType[] {
+  const isAlreadyAdded = messages.some((m) => m._id === serverMessage._id);
+  return isAlreadyAdded
+    ? messages.filter((m) => m._id !== tempMsgId)
+    : messages.map((m) => (m._id === tempMsgId ? serverMessage : m));
+}
+
+function rollbackFailedConversation(
+  currentConversations: ConversationType[],
+  priorConversations: ConversationType[],
+  conversationId: string,
+  failedMsgId: string,
+): ConversationType[] {
+  const current = currentConversations.find((c) => c._id === conversationId);
+  if (current?.lastMessage?._id !== failedMsgId) {
+    return currentConversations;
+  }
+
+  const prior = priorConversations.find((c) => c._id === conversationId);
+  if (!prior) return currentConversations;
+
+  const restored: ConversationType = {
+    ...current,
+    lastMessage: prior.lastMessage,
+    updatedAt: prior.updatedAt,
+  };
+
+  const remaining = currentConversations.filter(
+    (c) => c._id !== conversationId,
+  );
+  const priorIndex = priorConversations.findIndex(
+    (c) => c._id === conversationId,
+  );
+  const insertIndex =
+    priorIndex >= 0 ? Math.min(priorIndex, remaining.length) : 0;
+
+  return [
+    ...remaining.slice(0, insertIndex),
+    restored,
+    ...remaining.slice(insertIndex),
+  ];
+}
+
 export const useConversation = create<ConversationState>()((set, get) => ({
   conversations: [],
+  pendingSocketConversationIds: [],
   users: [],
   singleConversation: null,
 
@@ -71,11 +120,18 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       const fetched: ConversationType[] = data.conversations || [];
 
       set((state) => {
-        // Keep any socket-created conversations not yet returned in the API list
-        const socketOnly = state.conversations.filter(
-          (c) => !fetched.some((f) => f._id === c._id),
+        const fetchedIds = new Set(fetched.map((f) => f._id));
+        const stillPendingIds = state.pendingSocketConversationIds.filter(
+          (id) => !fetchedIds.has(id),
         );
-        return { conversations: [...socketOnly, ...fetched] };
+        const pendingConversations = state.conversations.filter((c) =>
+          stillPendingIds.includes(c._id),
+        );
+
+        return {
+          conversations: [...pendingConversations, ...fetched],
+          pendingSocketConversationIds: stillPendingIds,
+        };
       });
     } finally {
       set({ isConversationsLoading: false });
@@ -108,6 +164,10 @@ export const useConversation = create<ConversationState>()((set, get) => ({
           },
         });
       }
+    } catch {
+      if (activeFetchingConversationId === conversationId) {
+        set({ singleConversation: null });
+      }
     } finally {
       if (activeFetchingConversationId === conversationId) {
         set({ isSingleConversationLoading: false });
@@ -138,23 +198,22 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       status: "sending...",
     };
 
-    // 1. Optimistically append message to active conversation
-    set((state) => {
-      if (state.singleConversation?.conversation._id !== conversationId) {
-        return state;
-      }
-      return {
-        singleConversation: {
-          ...state.singleConversation,
-          messages: [...state.singleConversation.messages, tempMessage],
-        },
-      };
-    });
+    const priorConversations = get().conversations;
 
-    // 2. Optimistically bump conversation to top of list
+    // 1. Optimistically append message to active conversation & bump list
+    set((state) => ({
+      singleConversation:
+        state.singleConversation?.conversation._id === conversationId
+          ? {
+              ...state.singleConversation,
+              messages: [...state.singleConversation.messages, tempMessage],
+            }
+          : state.singleConversation,
+    }));
     get().updateConversationLastMessage(conversationId, tempMessage);
 
     try {
+      // 2. Call API
       const { data } = await API.post("/api/conversation/message/send", {
         conversationId,
         content,
@@ -164,35 +223,37 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       const userMessage: MessageType = data.userMessage;
 
       // 3. Replace temp message with server response
-      set((state) => {
-        if (!state.singleConversation) return state;
-        const { messages } = state.singleConversation;
-        const isAlreadyAdded = messages.some((m) => m._id === userMessage._id);
-
-        return {
-          singleConversation: {
-            ...state.singleConversation,
-            messages: isAlreadyAdded
-              ? messages.filter((m) => m._id !== tempMsgId)
-              : messages.map((m) => (m._id === tempMsgId ? userMessage : m)),
-          },
-        };
-      });
-
+      set((state) => ({
+        singleConversation: state.singleConversation
+          ? {
+              ...state.singleConversation,
+              messages: replaceTempMessage(
+                state.singleConversation.messages,
+                tempMsgId,
+                userMessage,
+              ),
+            }
+          : null,
+      }));
       get().updateConversationLastMessage(conversationId, userMessage);
     } catch {
-      // Revert optimistic message on failure
-      set((state) => {
-        if (!state.singleConversation) return state;
-        return {
-          singleConversation: {
-            ...state.singleConversation,
-            messages: state.singleConversation.messages.filter(
-              (m) => m._id !== tempMsgId,
-            ),
-          },
-        };
-      });
+      // 4. Revert optimistic message and restore list state on failure
+      set((state) => ({
+        singleConversation: state.singleConversation
+          ? {
+              ...state.singleConversation,
+              messages: state.singleConversation.messages.filter(
+                (m) => m._id !== tempMsgId,
+              ),
+            }
+          : null,
+        conversations: rollbackFailedConversation(
+          state.conversations,
+          priorConversations,
+          conversationId,
+          tempMsgId,
+        ),
+      }));
     } finally {
       set({ isSendingMsg: false });
     }
@@ -204,6 +265,11 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         newConversation,
         ...state.conversations.filter((c) => c._id !== newConversation._id),
       ],
+      pendingSocketConversationIds: state.pendingSocketConversationIds.includes(
+        newConversation._id,
+      )
+        ? state.pendingSocketConversationIds
+        : [...state.pendingSocketConversationIds, newConversation._id],
     }));
   },
 

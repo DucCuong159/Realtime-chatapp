@@ -65,7 +65,8 @@ export const API = axios.create({
 // ─── Request Interceptor ─────────────────────────────────────────────
 API.interceptors.request.use((config) => {
   const socket = useSocket.getState().socket;
-  if (socket?.id) {
+  const user = useAuth.getState().user;
+  if (socket?.id && user?._id) {
     config.headers.set("x-socket-id", socket.id);
   }
   return config;
