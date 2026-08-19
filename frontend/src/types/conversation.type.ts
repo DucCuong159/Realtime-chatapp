@@ -39,3 +39,11 @@ export type CreateMessageType = {
   image?: string;
   replyTo?: MessageType | null;
 };
+
+export type AIStreamPayload = {
+  conversationId: string;
+  chunk: string | null;
+  done: boolean;
+  message: MessageType | null;
+  sender?: UserType;
+};

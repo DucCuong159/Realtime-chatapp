@@ -17,6 +17,7 @@ export type UserType = {
   email: string;
   avatar?: string | null;
   about?: string | null;
+  isAI?: boolean;
   createdAt: string;
   updatedAt: string;
 };
