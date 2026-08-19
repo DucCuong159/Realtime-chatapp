@@ -174,12 +174,14 @@ export const emitConversationAI = ({
   sender,
   done = false,
   message = null,
+  error,
 }: {
   conversationId: string;
   chunk?: string | null;
   sender?: any;
   done?: boolean;
   message?: any;
+  error?: string;
 }) => {
   const io = getIO();
   if (chunk !== null && chunk !== undefined && !done) {
@@ -200,6 +202,7 @@ export const emitConversationAI = ({
       sender,
       done: true,
       message,
+      ...(error !== undefined && { error }),
     });
     return;
   }

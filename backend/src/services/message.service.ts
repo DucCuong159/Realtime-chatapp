@@ -183,17 +183,39 @@ const getAIResponse = async (conversationId: string, userId: string) => {
 
   let fullResponse = "";
 
-  for await (const chunk of result.textStream) {
+  try {
+    for await (const chunk of result.textStream) {
+      emitConversationAI({
+        conversationId,
+        chunk,
+        sender: geminiAI,
+        done: false,
+        message: null,
+      });
+      fullResponse += chunk;
+    }
+  } catch (streamError) {
     emitConversationAI({
       conversationId,
-      chunk,
+      chunk: null,
       sender: geminiAI,
-      done: false,
+      done: true,
+      message: null,
+      error: streamError instanceof Error ? streamError.message : "Stream error",
+    });
+    throw streamError;
+  }
+
+  if (!fullResponse.trim()) {
+    emitConversationAI({
+      conversationId,
+      chunk: null,
+      sender: geminiAI,
+      done: true,
       message: null,
     });
-    fullResponse += chunk;
+    return null;
   }
-  if (!fullResponse.trim()) return "";
 
   const aiMessage = await MessageModel.create({
     conversationId,
