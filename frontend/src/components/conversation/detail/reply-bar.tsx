@@ -12,25 +12,27 @@ const ConversationReplyBar = ({ replyTo, currentUserId, onCancel }: Props) => {
   if (!replyTo) return null;
 
   const senderName =
-    replyTo.sender?._id === currentUserId ? "You" : replyTo.sender?.name;
+    replyTo.sender?._id === currentUserId ? "You" : replyTo.sender?.name || "User";
   return (
-    <div className="absolute bottom-16 left-0 right-0 bg-card border-t border-border animate-in slide-in-from-bottom pb-4 px-6">
-      <div className="flex flex-1 justify-between mt-2 p-3 text-sm border-l-4 border-l-primary bg-primary/10 rounded-md shadow-sm">
-        <div className="flex-1 min-w-0">
-          <h5 className="font-medium">{senderName}</h5>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2.5 animate-in slide-in-from-bottom">
+      <div className="flex flex-1 justify-between items-center p-2.5 text-sm border-l-4 border-l-primary bg-primary/10 rounded-md shadow-xs">
+        <div className="flex-1 min-w-0 mr-2">
+          <h5 className="font-medium text-xs text-primary">{senderName}</h5>
           {replyTo?.image ? (
-            <p className="text-muted-foreground">📷 Photo</p>
+            <p className="text-muted-foreground text-xs">📷 Photo</p>
           ) : (
-            <p className="truncate">{replyTo.content}</p>
+            <p className="truncate text-xs text-foreground/80">{replyTo.content}</p>
           )}
         </div>
         <Button
+          type="button"
           variant="ghost"
-          size="icon"
+          size="icon-xs"
           onClick={onCancel}
-          className="shrink-0 size-6"
+          className="shrink-0 size-6 rounded-full hover:bg-primary/20 text-muted-foreground hover:text-foreground"
+          aria-label="Cancel reply"
         >
-          <X size={14} />
+          <X className="size-3.5" />
         </Button>
       </div>
     </div>
