@@ -54,16 +54,16 @@ const SingleConversation = () => {
   }, [conversationId, socket]);
 
   useEffect(() => {
-    if (!conversationId || !socket) return;
+    if (!socket) return;
 
     const handleNewMessage = (msg: MessageType) =>
-      addNewMessage(conversationId, msg);
+      addNewMessage(msg.conversationId, msg);
 
     socket.on("message:new", handleNewMessage);
     return () => {
       socket.off("message:new", handleNewMessage);
     };
-  }, [socket, conversationId, addNewMessage]);
+  }, [socket, addNewMessage]);
 
   if (
     isSingleConversationLoading ||
