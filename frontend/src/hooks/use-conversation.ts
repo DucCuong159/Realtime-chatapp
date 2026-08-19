@@ -13,6 +13,7 @@ import { useAuth } from "./use-auth";
 
 interface ConversationState {
   conversations: ConversationType[];
+  pendingSocketConversationIds: string[];
   users: UserType[];
   singleConversation: {
     conversation: ConversationType;
@@ -45,6 +46,7 @@ let activeFetchingConversationId: string | null = null;
 
 export const useConversation = create<ConversationState>()((set, get) => ({
   conversations: [],
+  pendingSocketConversationIds: [],
   users: [],
   singleConversation: null,
 
@@ -71,11 +73,18 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       const fetched: ConversationType[] = data.conversations || [];
 
       set((state) => {
-        // Keep any socket-created conversations not yet returned in the API list
-        const socketOnly = state.conversations.filter(
-          (c) => !fetched.some((f) => f._id === c._id),
+        const fetchedIds = new Set(fetched.map((f) => f._id));
+        const stillPendingIds = state.pendingSocketConversationIds.filter(
+          (id) => !fetchedIds.has(id),
         );
-        return { conversations: [...socketOnly, ...fetched] };
+        const pendingConversations = state.conversations.filter((c) =>
+          stillPendingIds.includes(c._id),
+        );
+
+        return {
+          conversations: [...pendingConversations, ...fetched],
+          pendingSocketConversationIds: stillPendingIds,
+        };
       });
     } finally {
       set({ isConversationsLoading: false });
@@ -204,6 +213,11 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         newConversation,
         ...state.conversations.filter((c) => c._id !== newConversation._id),
       ],
+      pendingSocketConversationIds: state.pendingSocketConversationIds.includes(
+        newConversation._id,
+      )
+        ? state.pendingSocketConversationIds
+        : [...state.pendingSocketConversationIds, newConversation._id],
     }));
   },
 
