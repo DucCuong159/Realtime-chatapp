@@ -76,11 +76,11 @@ const ConversationList = () => {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-14 flex w-full max-w-[calc(100%-56px)] flex-col border-r border-border bg-sidebar pb-20 md:max-w-94.75 md:pb-0">
+    <aside className="fixed inset-y-0 left-14 flex w-full max-w-[calc(100%-56px)] flex-col border-r border-border bg-sidebar md:max-w-94.75">
       <ConversationListHeader onSearch={setSearchQuery} />
 
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="space-y-1 p-2 pb-10">
+        <div className="space-y-1 p-2">
           {isConversationsLoading ? (
             <div className="flex items-center justify-center py-8">
               <Spinner className="size-7" />

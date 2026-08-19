@@ -28,7 +28,7 @@ const AsideBar = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 rounded-full cursor-pointer"
+          className="size-9 rounded-full"
           aria-label="Toggle theme"
           onClick={toggleTheme}
         >

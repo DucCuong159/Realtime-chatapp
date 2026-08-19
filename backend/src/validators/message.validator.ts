@@ -20,7 +20,7 @@ export const sendMessageSchema = z
         imageDataUriRegex,
         "Invalid image format. Must be a valid image Data URI",
       )
-      .max(15 * 1024 * 1024, "Image payload is too large")
+      .max(15 * 1024 * 1024, "Image payload is too large (max 15MB)")
       .optional(),
     replyTo: z
       .string()
