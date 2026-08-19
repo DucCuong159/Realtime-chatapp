@@ -96,7 +96,7 @@ export const sendMessageService = async (
   emitLastMessageToParticipants(participantIds, conversationId, newMessage);
 
   if (targetConversation.isAiConversation) {
-    queueAIResponse(conversationId, userId).catch((error) => {
+    queueAIResponse(conversationId, participantIds).catch((error) => {
       console.error(
         `Failed to generate AI response for conversation ${conversationId}:`,
         error,
@@ -112,13 +112,16 @@ export const sendMessageService = async (
 
 const aiConversationQueues = new Map<string, Promise<any>>();
 
-const queueAIResponse = async (conversationId: string, userId: string) => {
+const queueAIResponse = async (
+  conversationId: string,
+  participantIds: string[],
+) => {
   const currentTask =
     aiConversationQueues.get(conversationId) || Promise.resolve();
 
   const nextTask = currentTask
     .catch(() => {})
-    .then(() => getAIResponse(conversationId, userId));
+    .then(() => getAIResponse(conversationId, participantIds));
 
   aiConversationQueues.set(conversationId, nextTask);
 
@@ -131,7 +134,10 @@ const queueAIResponse = async (conversationId: string, userId: string) => {
   }
 };
 
-const getAIResponse = async (conversationId: string, userId: string) => {
+const getAIResponse = async (
+  conversationId: string,
+  participantIds: string[],
+) => {
   let geminiAI: any = null;
   try {
     geminiAI = await UserModel.findOne({ isAI: true });
@@ -226,7 +232,7 @@ const getAIResponse = async (conversationId: string, userId: string) => {
       message: aiMessage,
     });
 
-    emitLastMessageToParticipants([userId], conversationId, aiMessage);
+    emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
     return aiMessage;
   } catch (error) {
     emitConversationAI({
