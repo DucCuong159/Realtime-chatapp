@@ -85,11 +85,7 @@ const SingleConversation = () => {
             description="No messages yet. Send the first message"
           />
         ) : (
-          <ConversationBody
-            conversationId={conversationId}
-            messages={messages}
-            onReply={setReplyTo}
-          />
+          <ConversationBody messages={messages} onReply={setReplyTo} />
         )}
       </div>
 

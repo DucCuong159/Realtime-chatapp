@@ -13,6 +13,7 @@ interface ConversationBodyProps {
 
 interface MessageItemProps {
   message: MessageType;
+  currentUserId: string | null;
   isCurrentUser: boolean;
   isLastFromUser: boolean;
   onReply: (message: MessageType) => void;
@@ -22,6 +23,7 @@ interface MessageItemProps {
 const MessageItem = memo(
   ({
     message,
+    currentUserId,
     isCurrentUser,
     isLastFromUser,
     onReply,
@@ -31,7 +33,7 @@ const MessageItem = memo(
     const formattedTime = formatConversationTime(message.createdAt);
 
     const replySenderName =
-      message.replyTo?.sender?._id === message.sender?._id
+      message.replyTo?.sender?._id === currentUserId
         ? "You"
         : message.replyTo?.sender?.name || "User";
 
@@ -195,6 +197,7 @@ const ConversationBody = ({ messages, onReply }: ConversationBodyProps) => {
           <MessageItem
             key={message._id}
             message={message}
+            currentUserId={currentUserId}
             isCurrentUser={isCurrentUser}
             isLastFromUser={isLastFromUser}
             onReply={onReply}
