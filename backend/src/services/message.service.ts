@@ -97,7 +97,7 @@ export const sendMessageService = async (
 
   let aiResponse: any = null;
   if (targetConversation.isAiConversation) {
-    aiResponse = await getAIResponse(conversationId, userId);
+    aiResponse = await queueAIResponse(conversationId, userId);
     if (aiResponse) {
       conversation.lastMessage = aiResponse._id as mongoose.Types.ObjectId;
       await conversation.save();
@@ -109,6 +109,27 @@ export const sendMessageService = async (
     conversation: targetConversation,
     aiResponse,
   };
+};
+
+const aiConversationQueues = new Map<string, Promise<any>>();
+
+const queueAIResponse = async (conversationId: string, userId: string) => {
+  const currentTask =
+    aiConversationQueues.get(conversationId) || Promise.resolve();
+
+  const nextTask = currentTask
+    .catch(() => {})
+    .then(() => getAIResponse(conversationId, userId));
+
+  aiConversationQueues.set(conversationId, nextTask);
+
+  try {
+    return await nextTask;
+  } finally {
+    if (aiConversationQueues.get(conversationId) === nextTask) {
+      aiConversationQueues.delete(conversationId);
+    }
+  }
 };
 
 const getAIResponse = async (conversationId: string, userId: string) => {
