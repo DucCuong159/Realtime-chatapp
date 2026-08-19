@@ -1,6 +1,5 @@
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { ModelMessage, streamText } from "ai";
-import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.config.js";
 import { Env } from "../config/env.config.js";
 import {
@@ -96,19 +95,18 @@ export const sendMessageService = async (
   );
   emitLastMessageToParticipants(participantIds, conversationId, newMessage);
 
-  let aiResponse: any = null;
   if (targetConversation.isAiConversation) {
-    aiResponse = await queueAIResponse(conversationId, userId);
-    if (aiResponse) {
-      conversation.lastMessage = aiResponse._id as mongoose.Types.ObjectId;
-      await conversation.save();
-    }
+    queueAIResponse(conversationId, userId).catch((error) => {
+      console.error(
+        `Failed to generate AI response for conversation ${conversationId}:`,
+        error,
+      );
+    });
   }
 
   return {
     userMessage: newMessage,
     conversation: targetConversation,
-    aiResponse,
   };
 };
 
@@ -134,56 +132,59 @@ const queueAIResponse = async (conversationId: string, userId: string) => {
 };
 
 const getAIResponse = async (conversationId: string, userId: string) => {
-  const geminiAI = await UserModel.findOne({ isAI: true });
-  if (!geminiAI) {
-    throw new NotFoundException("AI model not found");
-  }
+  let geminiAI: any = null;
+  try {
+    geminiAI = await UserModel.findOne({ isAI: true });
+    if (!geminiAI) {
+      throw new NotFoundException("AI model not found");
+    }
 
-  const conversationHistory = await getConversationHistory(conversationId);
-  const formattedMessages: ModelMessage[] = conversationHistory.map(
-    (message: any) => {
-      const role = message.sender.isAI ? "assistant" : "user";
-      const parts: any[] = [];
+    const conversationHistory = await getConversationHistory(conversationId);
+    const formattedMessages: ModelMessage[] = conversationHistory.map(
+      (message: any) => {
+        const role = message.sender.isAI ? "assistant" : "user";
+        const parts: any[] = [];
 
-      if (message.image) {
-        const { mediaType, ext } = getImageFileInfo(message.image);
-        parts.push({
-          type: "file",
-          data: message.image,
-          mediaType,
-          fileName: `image.${ext}`,
-        });
-        if (!message.content) {
+        if (message.image) {
+          const { mediaType, ext } = getImageFileInfo(message.image);
+          parts.push({
+            type: "file",
+            data: message.image,
+            mediaType,
+            fileName: `image.${ext}`,
+          });
+          if (!message.content) {
+            parts.push({
+              type: "text",
+              text: "Describe what you see in the image",
+            });
+          }
+        }
+        if (message.content) {
           parts.push({
             type: "text",
-            text: "Describe what you see in the image",
+            text: message.replyTo
+              ? `[Replying to: "${message.replyTo.content}"]\n${message.content}`
+              : message.content,
           });
         }
-      }
-      if (message.content) {
-        parts.push({
-          type: "text",
-          text: message.replyTo
-            ? `[Replying to: "${message.replyTo.content}"]\n${message.content}`
-            : message.content,
-        });
-      }
-      return { role, content: parts };
-    },
-  );
-  const result = await streamText({
-    model: google("gemini-3.6-flash"),
-    messages: formattedMessages,
-    system: `
-    You are a helpful and friendly AI assistant. 
-    Your name is ${geminiAI.name}. 
-    Respond only with text and attend to the last user message only.
-    `,
-  });
+        return { role, content: parts };
+      },
+    );
 
-  let fullResponse = "";
+    const result = await streamText({
+      model: google("gemini-3.6-flash"),
+      messages: formattedMessages,
+      abortSignal: AbortSignal.timeout(60000),
+      system: `
+      You are a helpful and friendly AI assistant. 
+      Your name is ${geminiAI.name}. 
+      Respond only with text and attend to the last user message only.
+      `,
+    });
 
-  try {
+    let fullResponse = "";
+
     for await (const chunk of result.textStream) {
       emitConversationAI({
         conversationId,
@@ -194,46 +195,50 @@ const getAIResponse = async (conversationId: string, userId: string) => {
       });
       fullResponse += chunk;
     }
-  } catch (streamError) {
+
+    if (!fullResponse.trim()) {
+      emitConversationAI({
+        conversationId,
+        chunk: null,
+        sender: geminiAI,
+        done: true,
+        message: null,
+      });
+      return null;
+    }
+
+    const aiMessage = await MessageModel.create({
+      conversationId,
+      sender: geminiAI._id,
+      content: fullResponse,
+    });
+    await aiMessage.populate("sender", "name avatar isAI");
+
+    await ConversationModel.findByIdAndUpdate(conversationId, {
+      lastMessage: aiMessage._id,
+    });
+
     emitConversationAI({
       conversationId,
       chunk: null,
       sender: geminiAI,
       done: true,
-      message: null,
-      error: streamError instanceof Error ? streamError.message : "Stream error",
+      message: aiMessage,
     });
-    throw streamError;
-  }
 
-  if (!fullResponse.trim()) {
+    emitLastMessageToParticipants([userId], conversationId, aiMessage);
+    return aiMessage;
+  } catch (error) {
     emitConversationAI({
       conversationId,
       chunk: null,
-      sender: geminiAI,
+      sender: geminiAI || undefined,
       done: true,
       message: null,
+      error: error instanceof Error ? error.message : "AI generation failed",
     });
-    return null;
+    throw error;
   }
-
-  const aiMessage = await MessageModel.create({
-    conversationId,
-    sender: geminiAI._id,
-    content: fullResponse,
-  });
-  await aiMessage.populate("sender", "name avatar isAI");
-
-  emitConversationAI({
-    conversationId,
-    chunk: null,
-    sender: geminiAI,
-    done: true,
-    message: aiMessage,
-  });
-
-  emitLastMessageToParticipants([userId], conversationId, aiMessage);
-  return aiMessage;
 };
 
 const getConversationHistory = async (conversationId: string) => {
