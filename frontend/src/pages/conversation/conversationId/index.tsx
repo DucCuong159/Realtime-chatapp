@@ -17,6 +17,7 @@ const SingleConversation = () => {
     fetchSingleConversation,
     isSingleConversationLoading,
     singleConversation,
+    addNewMessage,
   } = useConversation();
 
   const { socket } = useSocket();
@@ -41,6 +42,18 @@ const SingleConversation = () => {
       socket.emit("conversation:leave", conversationId);
     };
   }, [conversationId, socket]);
+
+  useEffect(() => {
+    if (!conversationId || !socket) return;
+
+    const handleNewMessage = (msg: MessageType) =>
+      addNewMessage(conversationId, msg);
+
+    socket.on("message:new", handleNewMessage);
+    return () => {
+      socket.off("message:new", handleNewMessage);
+    };
+  }, [socket, conversationId, addNewMessage]);
 
   if (isSingleConversationLoading) {
     return (

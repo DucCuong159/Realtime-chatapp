@@ -3,7 +3,7 @@ import { useConversation } from "@/hooks/use-conversation";
 import type { MessageType } from "@/types/conversation.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Image as ImageIcon, SendHorizontal, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -33,6 +33,15 @@ const ConversationFooter = ({
   const [image, setImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (image || replyTo) {
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [image, replyTo]);
 
   const form = useForm<MessageFormType>({
     resolver: zodResolver(messageSchema),
