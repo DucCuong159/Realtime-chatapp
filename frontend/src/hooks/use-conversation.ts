@@ -44,6 +44,53 @@ interface ConversationState {
 
 let activeFetchingConversationId: string | null = null;
 
+function replaceTempMessage(
+  messages: MessageType[],
+  tempMsgId: string,
+  serverMessage: MessageType,
+): MessageType[] {
+  const isAlreadyAdded = messages.some((m) => m._id === serverMessage._id);
+  return isAlreadyAdded
+    ? messages.filter((m) => m._id !== tempMsgId)
+    : messages.map((m) => (m._id === tempMsgId ? serverMessage : m));
+}
+
+function rollbackFailedConversation(
+  currentConversations: ConversationType[],
+  priorConversations: ConversationType[],
+  conversationId: string,
+  failedMsgId: string,
+): ConversationType[] {
+  const current = currentConversations.find((c) => c._id === conversationId);
+  if (current?.lastMessage?._id !== failedMsgId) {
+    return currentConversations;
+  }
+
+  const prior = priorConversations.find((c) => c._id === conversationId);
+  if (!prior) return currentConversations;
+
+  const restored: ConversationType = {
+    ...current,
+    lastMessage: prior.lastMessage,
+    updatedAt: prior.updatedAt,
+  };
+
+  const remaining = currentConversations.filter(
+    (c) => c._id !== conversationId,
+  );
+  const priorIndex = priorConversations.findIndex(
+    (c) => c._id === conversationId,
+  );
+  const insertIndex =
+    priorIndex >= 0 ? Math.min(priorIndex, remaining.length) : 0;
+
+  return [
+    ...remaining.slice(0, insertIndex),
+    restored,
+    ...remaining.slice(insertIndex),
+  ];
+}
+
 export const useConversation = create<ConversationState>()((set, get) => ({
   conversations: [],
   pendingSocketConversationIds: [],
@@ -149,23 +196,20 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
     const priorConversations = get().conversations;
 
-    // 1. Optimistically append message to active conversation
-    set((state) => {
-      if (state.singleConversation?.conversation._id !== conversationId) {
-        return state;
-      }
-      return {
-        singleConversation: {
-          ...state.singleConversation,
-          messages: [...state.singleConversation.messages, tempMessage],
-        },
-      };
-    });
-
-    // 2. Optimistically bump conversation to top of list
+    // 1. Optimistically append message to active conversation & bump list
+    set((state) => ({
+      singleConversation:
+        state.singleConversation?.conversation._id === conversationId
+          ? {
+              ...state.singleConversation,
+              messages: [...state.singleConversation.messages, tempMessage],
+            }
+          : state.singleConversation,
+    }));
     get().updateConversationLastMessage(conversationId, tempMessage);
 
     try {
+      // 2. Call API
       const { data } = await API.post("/api/conversation/message/send", {
         conversationId,
         content,
@@ -175,71 +219,37 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       const userMessage: MessageType = data.userMessage;
 
       // 3. Replace temp message with server response
-      set((state) => {
-        if (!state.singleConversation) return state;
-        const { messages } = state.singleConversation;
-        const isAlreadyAdded = messages.some((m) => m._id === userMessage._id);
-
-        return {
-          singleConversation: {
-            ...state.singleConversation,
-            messages: isAlreadyAdded
-              ? messages.filter((m) => m._id !== tempMsgId)
-              : messages.map((m) => (m._id === tempMsgId ? userMessage : m)),
-          },
-        };
-      });
-
+      set((state) => ({
+        singleConversation: state.singleConversation
+          ? {
+              ...state.singleConversation,
+              messages: replaceTempMessage(
+                state.singleConversation.messages,
+                tempMsgId,
+                userMessage,
+              ),
+            }
+          : null,
+      }));
       get().updateConversationLastMessage(conversationId, userMessage);
     } catch {
-      // Revert optimistic message and list state on failure
-      set((state) => {
-        const nextSingleConversation = state.singleConversation
+      // 4. Revert optimistic message and restore list state on failure
+      set((state) => ({
+        singleConversation: state.singleConversation
           ? {
               ...state.singleConversation,
               messages: state.singleConversation.messages.filter(
                 (m) => m._id !== tempMsgId,
               ),
             }
-          : null;
-
-        const currentConv = state.conversations.find(
-          (c) => c._id === conversationId,
-        );
-        let nextConversations = state.conversations;
-
-        // Restore prior lastMessage and list ordering only if current lastMessage is still the failed tempMessage
-        if (currentConv?.lastMessage?._id === tempMsgId) {
-          const priorConv = priorConversations.find(
-            (c) => c._id === conversationId,
-          );
-          if (priorConv) {
-            const restoredConv: ConversationType = {
-              ...currentConv,
-              lastMessage: priorConv.lastMessage,
-              updatedAt: priorConv.updatedAt,
-            };
-            const remaining = state.conversations.filter(
-              (c) => c._id !== conversationId,
-            );
-            const priorIndex = priorConversations.findIndex(
-              (c) => c._id === conversationId,
-            );
-            const insertIndex =
-              priorIndex >= 0 ? Math.min(priorIndex, remaining.length) : 0;
-            nextConversations = [
-              ...remaining.slice(0, insertIndex),
-              restoredConv,
-              ...remaining.slice(insertIndex),
-            ];
-          }
-        }
-
-        return {
-          singleConversation: nextSingleConversation,
-          conversations: nextConversations,
-        };
-      });
+          : null,
+        conversations: rollbackFailedConversation(
+          state.conversations,
+          priorConversations,
+          conversationId,
+          tempMsgId,
+        ),
+      }));
     } finally {
       set({ isSendingMsg: false });
     }
