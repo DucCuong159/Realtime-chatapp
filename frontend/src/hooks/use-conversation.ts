@@ -164,6 +164,10 @@ export const useConversation = create<ConversationState>()((set, get) => ({
           },
         });
       }
+    } catch {
+      if (activeFetchingConversationId === conversationId) {
+        set({ singleConversation: null });
+      }
     } finally {
       if (activeFetchingConversationId === conversationId) {
         set({ isSingleConversationLoading: false });

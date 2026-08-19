@@ -65,7 +65,10 @@ const SingleConversation = () => {
     };
   }, [socket, conversationId, addNewMessage]);
 
-  if (isSingleConversationLoading) {
+  if (
+    isSingleConversationLoading ||
+    (conversation && conversation._id !== conversationId)
+  ) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Spinner className="size-11 text-primary!" />
@@ -73,7 +76,7 @@ const SingleConversation = () => {
     );
   }
 
-  if (!conversation) {
+  if (!conversation || conversation._id !== conversationId) {
     return (
       <div className="flex h-screen items-center justify-center">
         <p className="text-lg">Conversation not found</p>
