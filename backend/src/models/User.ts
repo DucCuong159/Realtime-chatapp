@@ -20,6 +20,7 @@ const userSchema = new Schema<UserDocument>(
     email: {
       type: String,
       unique: true,
+      sparse: true,
       trim: true,
       lowercase: true,
       required: function (this: UserDocument) {
