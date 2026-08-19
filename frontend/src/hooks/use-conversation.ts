@@ -147,6 +147,8 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       status: "sending...",
     };
 
+    const priorConversations = get().conversations;
+
     // 1. Optimistically append message to active conversation
     set((state) => {
       if (state.singleConversation?.conversation._id !== conversationId) {
@@ -190,16 +192,52 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
       get().updateConversationLastMessage(conversationId, userMessage);
     } catch {
-      // Revert optimistic message on failure
+      // Revert optimistic message and list state on failure
       set((state) => {
-        if (!state.singleConversation) return state;
+        const nextSingleConversation = state.singleConversation
+          ? {
+              ...state.singleConversation,
+              messages: state.singleConversation.messages.filter(
+                (m) => m._id !== tempMsgId,
+              ),
+            }
+          : null;
+
+        const currentConv = state.conversations.find(
+          (c) => c._id === conversationId,
+        );
+        let nextConversations = state.conversations;
+
+        // Restore prior lastMessage and list ordering only if current lastMessage is still the failed tempMessage
+        if (currentConv?.lastMessage?._id === tempMsgId) {
+          const priorConv = priorConversations.find(
+            (c) => c._id === conversationId,
+          );
+          if (priorConv) {
+            const restoredConv: ConversationType = {
+              ...currentConv,
+              lastMessage: priorConv.lastMessage,
+              updatedAt: priorConv.updatedAt,
+            };
+            const remaining = state.conversations.filter(
+              (c) => c._id !== conversationId,
+            );
+            const priorIndex = priorConversations.findIndex(
+              (c) => c._id === conversationId,
+            );
+            const insertIndex =
+              priorIndex >= 0 ? Math.min(priorIndex, remaining.length) : 0;
+            nextConversations = [
+              ...remaining.slice(0, insertIndex),
+              restoredConv,
+              ...remaining.slice(insertIndex),
+            ];
+          }
+        }
+
         return {
-          singleConversation: {
-            ...state.singleConversation,
-            messages: state.singleConversation.messages.filter(
-              (m) => m._id !== tempMsgId,
-            ),
-          },
+          singleConversation: nextSingleConversation,
+          conversations: nextConversations,
         };
       });
     } finally {
