@@ -36,9 +36,19 @@ const SingleConversation = () => {
 
   useEffect(() => {
     if (!conversationId || !socket) return;
-    socket.emit("conversation:join", conversationId);
+
+    const handleJoin = () => {
+      socket.emit("conversation:join", conversationId);
+    };
+
+    if (socket.connected) {
+      handleJoin();
+    }
+
+    socket.on("connect", handleJoin);
 
     return () => {
+      socket.off("connect", handleJoin);
       socket.emit("conversation:leave", conversationId);
     };
   }, [conversationId, socket]);
