@@ -194,8 +194,7 @@ export const getSingleConversationService = async (
         select: "name avatar isAI",
       },
     })
-    .sort({ createdAt: -1 })
-    .limit(50);
+    .sort({ createdAt: -1 });
 
   return {
     conversation,
