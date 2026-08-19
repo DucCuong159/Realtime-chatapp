@@ -56,7 +56,7 @@ export const HeaderGroupInfo = memo(
         <DropdownMenuTrigger
           openOnHover
           className="cursor-pointer rounded-lg text-left outline-none transition-opacity hover:opacity-90"
-          aria-label="Member list"
+          aria-label={name ? `Members of ${name}` : "Member list"}
         >
           <HeaderUserInfo
             name={name}
