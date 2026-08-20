@@ -23,7 +23,16 @@ initializeSocket(server);
 
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
+        connectSrc: ["'self'", "https://res.cloudinary.com", "wss:", "ws:"],
+        fontSrc: ["'self'", "data:"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
   }),
 );
