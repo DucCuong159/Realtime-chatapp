@@ -308,37 +308,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   },
 
   addNewMessage: (conversationId: string, message: MessageType) => {
-    set((state) => {
-      const single = state.singleConversation;
-      if (!single || single.conversation._id !== conversationId) return state;
-      if (single.messages.some((m) => m._id === message._id)) return state;
-
-      // If message is from current user and we have an optimistic temp message, reconcile it
-      const tempIndex = single.messages.findIndex(
-        (m) =>
-          m.sender?._id === message.sender?._id &&
-          m.content === message.content &&
-          Boolean(m.status),
-      );
-
-      if (tempIndex !== -1) {
-        return {
-          singleConversation: {
-            ...single,
-            messages: single.messages.map((m, i) =>
-              i === tempIndex ? message : m,
-            ),
-          },
-        };
-      }
-
-      return {
-        singleConversation: {
-          ...single,
-          messages: [...single.messages, message],
-        },
-      };
-    });
+    get().addOrUpdateMessage(conversationId, message);
   },
 
   addOrUpdateMessage: (
