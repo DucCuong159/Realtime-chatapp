@@ -6,13 +6,23 @@ import { Streamdown } from "streamdown";
 
 type ResponseProps = ComponentProps<typeof Streamdown>;
 
+const ALLOWED_LINK_PREFIXES = ["https://", "http://", "mailto:"];
+const ALLOWED_IMAGE_PREFIXES = ["https://", "http://"];
+
 const Response = memo(
-  ({ className, ...props }: ResponseProps) => (
+  ({
+    className,
+    allowedLinkPrefixes = ALLOWED_LINK_PREFIXES,
+    allowedImagePrefixes = ALLOWED_IMAGE_PREFIXES,
+    ...props
+  }: ResponseProps) => (
     <Streamdown
       className={cn(
         "size-full [&> *: first-child] :mt-0 [&> *: last-child] :mb-0",
         className,
       )}
+      allowedLinkPrefixes={allowedLinkPrefixes}
+      allowedImagePrefixes={allowedImagePrefixes}
       {...props}
     />
   ),
