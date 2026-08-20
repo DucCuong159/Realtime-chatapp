@@ -27,5 +27,10 @@ export const setJwtAuthCookie = (
 };
 
 export const clearJwtAuthCookie = (res: Response) => {
-  return res.clearCookie("accessToken", { path: "/" });
+  return res.clearCookie("accessToken", {
+    path: "/",
+    httpOnly: true,
+    secure: Env.NODE_ENV === "production",
+    sameSite: Env.NODE_ENV === "production" ? "strict" : "lax",
+  });
 };

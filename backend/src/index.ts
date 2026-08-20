@@ -21,7 +21,12 @@ const server = http.createServer(app);
 // Attach Socket.IO to HTTP server
 initializeSocket(server);
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 // TODO: We will use multer later to handle large file uploads and limit sizes.
 // For now, bypass the global JSON body limit for the message send route.
 app.use((req, res, next) => {
