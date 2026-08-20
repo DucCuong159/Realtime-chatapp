@@ -5,6 +5,7 @@ import express, { Request, Response } from "express";
 import helmet from "helmet";
 import http from "http";
 import passport from "passport";
+import path from "path";
 import connectDatabase from "./config/database.config.js";
 import { Env } from "./config/env.config.js";
 import { HTTPSTATUS } from "./config/http.config.js";
@@ -50,6 +51,17 @@ app.get(
 );
 
 app.use("/api", router);
+
+if (Env.NODE_ENV === "production") {
+  const clientPath = path.resolve(import.meta.dirname, "../../frontend/dist");
+
+  // Serve static files
+  app.use(express.static(clientPath));
+
+  app.get(/^(?!\/api).*/, (req: Request, res: Response) => {
+    res.sendFile(path.join(clientPath, "index.html"));
+  });
+}
 
 async function startServer() {
   try {
