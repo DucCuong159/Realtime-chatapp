@@ -386,7 +386,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       const lastIndex = messages.length - 1;
       const lastMsg = messages[lastIndex];
 
-      if (lastMsg && (lastMsg.streaming || lastMsg.sender?.isAI)) {
+      if (lastMsg && Boolean(lastMsg.streaming)) {
         const updatedMessages = messages.map((m, i) =>
           i === lastIndex
             ? { ...m, content: (m.content || "") + chunk, streaming: true }
