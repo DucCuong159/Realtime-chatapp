@@ -1,7 +1,4 @@
-import SignIn from "@/pages/auth/sign-in";
-import SignUp from "@/pages/auth/sign-up";
-import Conversation from "@/pages/conversation";
-import SingleConversation from "@/pages/conversation/conversationId";
+import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 
 export const AUTH_ROUTES = {
   SIGN_IN: "/sign-in",
@@ -13,28 +10,34 @@ export const PROTECTED_ROUTES = {
   SINGLE_CONVERSATION: "/conversation/:conversationId",
 };
 
-export const authRoutesPath = [
+export interface RouteConfig {
+  path: string;
+  Component: LazyExoticComponent<ComponentType<unknown>>;
+}
+
+export const authRoutesPath: RouteConfig[] = [
   {
     path: AUTH_ROUTES.SIGN_IN,
-    component: <SignIn />,
+    Component: lazy(() => import("@/pages/auth/sign-in")),
   },
   {
     path: AUTH_ROUTES.SIGN_UP,
-    component: <SignUp />,
+    Component: lazy(() => import("@/pages/auth/sign-up")),
   },
 ];
 
-export const protectedRoutesPath = [
+export const protectedRoutesPath: RouteConfig[] = [
   {
     path: PROTECTED_ROUTES.CONVERSATION,
-    component: <Conversation />,
+    Component: lazy(() => import("@/pages/conversation")),
   },
   {
     path: PROTECTED_ROUTES.SINGLE_CONVERSATION,
-    component: <SingleConversation />,
+    Component: lazy(() => import("@/pages/conversation/conversationId")),
   },
 ];
 
-export const isAuthRoute = (pathname: string) => {
-  return Object.values(AUTH_ROUTES).includes(pathname);
+export const isAuthRoute = (pathname: string): boolean => {
+  const routes: string[] = Object.values(AUTH_ROUTES);
+  return routes.includes(pathname);
 };
