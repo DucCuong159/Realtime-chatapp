@@ -327,20 +327,12 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       } else {
         msgIndex = messages.findIndex((m) => m._id === msg._id);
         if (msgIndex === -1 && msg.sender?.isAI && !msg.streaming) {
-          // Find the relevant streaming AI placeholder anywhere in the conversation
-          msgIndex = messages.findLastIndex
-            ? messages.findLastIndex(
-                (m) =>
-                  Boolean(m.streaming) &&
-                  (m.sender?._id === msg.sender?._id ||
-                    Boolean(m.sender?.isAI)),
-              )
-            : messages.findIndex(
-                (m) =>
-                  Boolean(m.streaming) &&
-                  (m.sender?._id === msg.sender?._id ||
-                    Boolean(m.sender?.isAI)),
-              );
+          // Find the active streaming AI placeholder in the conversation
+          msgIndex = messages.findIndex(
+            (m) =>
+              Boolean(m.streaming) &&
+              (m.sender?._id === msg.sender?._id || Boolean(m.sender?.isAI)),
+          );
         }
       }
 
@@ -383,12 +375,11 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       if (!single || single.conversation._id !== conversationId) return state;
 
       const messages = single.messages;
-      const lastIndex = messages.length - 1;
-      const lastMsg = messages[lastIndex];
+      const streamIndex = messages.findIndex((m) => Boolean(m.streaming));
 
-      if (lastMsg && Boolean(lastMsg.streaming)) {
+      if (streamIndex !== -1) {
         const updatedMessages = messages.map((m, i) =>
-          i === lastIndex
+          i === streamIndex
             ? { ...m, content: (m.content || "") + chunk, streaming: true }
             : m,
         );

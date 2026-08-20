@@ -30,7 +30,11 @@ const ConversationFooter = ({
   isAiConversation,
   onCancelReply,
 }: Props) => {
-  const { sendMessage, isSendingMsg } = useConversation();
+  const { sendMessage, isSendingMsg, singleConversation } = useConversation();
+  const isAIStreaming = Boolean(
+    singleConversation?.messages.some((m) => m.streaming),
+  );
+  const isBusy = isSendingMsg || isAIStreaming;
 
   const [image, setImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -84,7 +88,7 @@ const ConversationFooter = ({
   };
 
   const onSubmit = (values: MessageFormType) => {
-    if (isSendingMsg) return;
+    if (isBusy) return;
     const messageContent = values.message?.trim();
     const currentImage = image;
 
@@ -171,7 +175,7 @@ const ConversationFooter = ({
             className="rounded-full shrink-0 text-muted-foreground hover:text-foreground size-9"
             onClick={() => imageInputRef.current?.click()}
             aria-label="Attach image"
-            disabled={isSendingMsg}
+            disabled={isBusy}
           >
             <ImageIcon className="size-5" />
           </Button>
@@ -180,7 +184,7 @@ const ConversationFooter = ({
             className="hidden"
             accept="image/*"
             ref={imageInputRef}
-            disabled={isSendingMsg}
+            disabled={isBusy}
             onChange={handleImageChange}
           />
         </div>
@@ -204,7 +208,7 @@ const ConversationFooter = ({
           size="icon"
           className="rounded-full size-9 shrink-0 bg-[#2a7bff] hover:bg-[#2066d9] text-white"
           aria-label="Send message"
-          disabled={isSendingMsg}
+          disabled={isBusy}
         >
           <SendHorizontal className="size-4" />
         </Button>
