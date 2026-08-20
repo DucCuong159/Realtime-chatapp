@@ -1,0 +1,61 @@
+name: "⚡ Improvement & Refactor"
+description: "Propose an optimization, refactoring, UX polish, or developer experience enhancement"
+title: "refactor: [Short summary of the improvement]"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to suggest improvements to existing functionality, code architecture, performance, security, or developer experience.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Area of Improvement"
+      description: "Which part of the project does this improvement target?"
+      options:
+        - "⚡ Performance & Optimization"
+        - "🎨 UI / UX Polish & Accessibility"
+        - "🛠️ Code Refactoring & Architecture"
+        - "🔒 Security & Authentication"
+        - "🗄️ Database & Query Performance"
+        - "📦 DevOps, CI/CD & Build Pipeline"
+        - "🧪 Testing & Developer Experience"
+        - "📖 Documentation"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_state
+    attributes:
+      label: "Current State"
+      description: "How does the current implementation or workflow work?"
+      placeholder: "Currently, the system handles this by..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_improvement
+    attributes:
+      label: "Proposed Improvement"
+      description: "Describe the specific changes, design pattern, or refactoring you propose."
+      placeholder: "We can improve this by refactoring / optimizing / upgrading..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_benefits
+    attributes:
+      label: "Expected Benefits & Impact"
+      description: "What measurable or qualitative benefits will this bring? (e.g. faster response times, reduced memory usage, cleaner code, better maintainability)"
+      placeholder: "This will reduce bundle size / improve query speed / make the code easier to extend..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_notes
+    attributes:
+      label: "Additional Context / References"
+      description: "Add any benchmarks, profiling results, library references, or sample code."
+    validations:
+      required: false
