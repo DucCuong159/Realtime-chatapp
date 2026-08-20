@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "💬 Community & Questions"
+    url: "https://github.com/DucCuong159/Realtime-chatapp/discussions"
+    about: "Ask questions, share ideas, and discuss with the community"
+  - name: "🌐 Live Application Demo"
+    url: "https://realtime-chatapp-vn.onrender.com/conversation"
+    about: "Test out the live deployed application on Render"
+  - name: "🔒 Security Vulnerability Report"
+    url: "mailto:cuong.pd192732@gmail.com"
+    about: "Privately report security vulnerabilities directly to the maintainer"
