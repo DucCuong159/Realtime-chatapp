@@ -146,9 +146,11 @@ const getAIResponse = async (
     }
 
     const conversationHistory = await getConversationHistory(conversationId);
-    const formattedMessages: ModelMessage[] = conversationHistory.map(
-      (message: any) => {
-        const role = message.sender?.isAI ? "assistant" : "user";
+    const formattedMessages: ModelMessage[] = conversationHistory
+      .map((message: any) => {
+        const role: "assistant" | "user" = message.sender?.isAI
+          ? "assistant"
+          : "user";
         const parts: any[] = [];
 
         if (message.image) {
@@ -175,8 +177,8 @@ const getAIResponse = async (
           });
         }
         return { role, content: parts };
-      },
-    );
+      })
+      .filter((msg) => msg.content.length > 0);
 
     const result = await streamText({
       model: google("gemini-3.6-flash"),
