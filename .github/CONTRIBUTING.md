@@ -8,15 +8,15 @@ Following these guidelines helps to communicate that you respect the time of the
 
 ## 📖 Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
-- [How Can I Contribute?](#how-can-i-contribute)
+- [Code of Conduct](#-code-of-conduct)
+- [How Can I Contribute?](#-how-can-i-contribute)
   - [Reporting Bugs](#reporting-bugs)
   - [Suggesting Enhancements](#suggesting-enhancements)
   - [Pull Requests](#pull-requests)
-- [Development Setup](#development-setup)
-- [Branching Strategy](#branching-strategy)
-- [Git Commit Guidelines](#git-commit-guidelines)
-- [Code Style & Best Practices](#code-style--best-practices)
+- [Development Setup](#-development-setup)
+- [Branching Strategy](#-branching-strategy)
+- [Git Commit Guidelines](#-git-commit-guidelines)
+- [Code Style & Best Practices](#-code-style--best-practices)
 
 ---
 
