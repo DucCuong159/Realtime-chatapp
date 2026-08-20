@@ -4,7 +4,7 @@ contact_links:
     url: "https://github.com/DucCuong159/Realtime-chatapp/discussions"
     about: "Ask questions, share ideas, and discuss with the community"
   - name: "🌐 Live Application Demo"
-    url: "https://realtime-chatapp-kgjk.onrender.com/conversation"
+    url: "https://realtime-chatapp-vn.onrender.com/conversation"
     about: "Test out the live deployed application on Render"
   - name: "🔒 Security Vulnerability Report"
     url: "mailto:cuong.pd192732@gmail.com"
