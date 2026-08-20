@@ -58,7 +58,6 @@ interface ConversationState {
 
 let activeFetchingConversationId: string | null = null;
 
-
 function rollbackFailedConversation(
   currentConversations: ConversationType[],
   priorConversations: ConversationType[],
@@ -328,11 +327,20 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       } else {
         msgIndex = messages.findIndex((m) => m._id === msg._id);
         if (msgIndex === -1 && msg.sender?.isAI && !msg.streaming) {
-          // Replace trailing streaming AI message if present
-          const lastIdx = messages.length - 1;
-          if (lastIdx >= 0 && messages[lastIdx].streaming) {
-            msgIndex = lastIdx;
-          }
+          // Find the relevant streaming AI placeholder anywhere in the conversation
+          msgIndex = messages.findLastIndex
+            ? messages.findLastIndex(
+                (m) =>
+                  Boolean(m.streaming) &&
+                  (m.sender?._id === msg.sender?._id ||
+                    Boolean(m.sender?.isAI)),
+              )
+            : messages.findIndex(
+                (m) =>
+                  Boolean(m.streaming) &&
+                  (m.sender?._id === msg.sender?._id ||
+                    Boolean(m.sender?.isAI)),
+              );
         }
       }
 
