@@ -38,7 +38,7 @@ const populateAndEmitNewConversation = async (
 ) => {
   const populatedConversation = await conversation.populate(
     "participants",
-    "name avatar",
+    "name avatar isAI",
   );
   const participantIdStrings = populatedConversation.participants.map((p) =>
     p._id.toString(),
@@ -70,12 +70,12 @@ const createGroupConversation = async (
 
 const findDirectConversation = async (directKey: string) => {
   return ConversationModel.findOne({ directKey })
-    .populate("participants", "name avatar")
+    .populate("participants", "name avatar isAI")
     .populate({
       path: "lastMessage",
       populate: {
         path: "sender",
-        select: "name avatar",
+        select: "name avatar isAI",
       },
     });
 };
@@ -144,12 +144,12 @@ export const getUserConversationsService = async (userId: string) => {
       $in: [userId],
     },
   })
-    .populate("participants", "name avatar")
+    .populate("participants", "name avatar isAI")
     .populate({
       path: "lastMessage",
       populate: {
         path: "sender",
-        select: "name avatar",
+        select: "name avatar isAI",
       },
     })
     .sort({ updatedAt: -1 });
@@ -166,7 +166,7 @@ export const validateConversationParticipantsService = async (
     participants: {
       $in: [userId],
     },
-  }).populate("participants", "name avatar");
+  }).populate("participants", "name avatar isAI");
 
   if (!conversation) {
     throw new NotFoundException("Conversation not found or unauthorized");
@@ -185,17 +185,16 @@ export const getSingleConversationService = async (
   );
 
   const messages = await MessageModel.find({ conversationId })
-    .populate("sender", "name avatar")
+    .populate("sender", "name avatar isAI")
     .populate({
       path: "replyTo",
       select: "_id content image sender",
       populate: {
         path: "sender",
-        select: "name avatar",
+        select: "name avatar isAI",
       },
     })
-    .sort({ createdAt: -1 })
-    .limit(50);
+    .sort({ createdAt: -1 });
 
   return {
     conversation,

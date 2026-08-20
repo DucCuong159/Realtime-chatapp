@@ -114,11 +114,12 @@ export const initializeSocket = (httpServer: HTTPServer) => {
 };
 
 export const isSocketOwnedByUser = (
-  userId: string,
+  userId: string | any,
   socketId?: string,
 ): boolean => {
-  if (!socketId) return false;
-  const userSockets = onlineUsers.get(userId);
+  if (!socketId || !userId) return false;
+  const uid = typeof userId === "string" ? userId : String(userId);
+  const userSockets = onlineUsers.get(uid);
   return Boolean(userSockets?.has(socketId));
 };
 
@@ -165,4 +166,44 @@ export const emitLastMessageToParticipants = (
   participantIds.forEach((participantId) => {
     io.to(`user:${participantId}`).emit("conversation:updated", payload);
   });
+};
+
+export const emitConversationAI = ({
+  conversationId,
+  chunk = null,
+  sender,
+  done = false,
+  message = null,
+  error,
+}: {
+  conversationId: string;
+  chunk?: string | null;
+  sender?: any;
+  done?: boolean;
+  message?: any;
+  error?: string;
+}) => {
+  const io = getIO();
+  if (chunk !== null && chunk !== undefined && !done) {
+    io.to(`conversation:${conversationId}`).emit("conversation:ai", {
+      conversationId,
+      chunk,
+      sender,
+      done: false,
+      message: null,
+    });
+    return;
+  }
+
+  if (done) {
+    io.to(`conversation:${conversationId}`).emit("conversation:ai", {
+      conversationId,
+      chunk: null,
+      sender,
+      done: true,
+      message,
+      ...(error !== undefined && { error }),
+    });
+    return;
+  }
 };

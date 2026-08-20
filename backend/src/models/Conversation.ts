@@ -1,4 +1,5 @@
-import mongoose, { Document, Schema, Types } from "mongoose";
+import mongoose, { Document, Model, Schema, Types } from "mongoose";
+import { UserDocument } from "./User.js";
 
 export interface ConversationDocument extends Document {
   participants: Types.ObjectId[];
@@ -7,6 +8,7 @@ export interface ConversationDocument extends Document {
   isGroup: boolean;
   groupName?: string;
   directKey?: string | null;
+  isAiConversation: boolean;
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -40,6 +42,10 @@ const conversationSchema = new Schema<ConversationDocument>(
       type: String,
       default: null,
     },
+    isAiConversation: {
+      type: Boolean,
+      default: false,
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -56,6 +62,20 @@ conversationSchema.index(
     partialFilterExpression: { directKey: { $type: "string" } },
   },
 );
+
+conversationSchema.pre("save", async function () {
+  if (this.isNew && !this.isGroup) {
+    const User = mongoose.model("User") as Model<UserDocument>;
+    const participants = await User.find({
+      _id: { $in: this.participants },
+      isAI: true,
+    });
+
+    if (participants.length > 0) {
+      this.isAiConversation = true;
+    }
+  }
+});
 
 const ConversationModel = mongoose.model<ConversationDocument>(
   "Conversation",

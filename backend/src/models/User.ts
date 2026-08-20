@@ -3,14 +3,11 @@ import { compareValue, hashValue } from "../utils/bcrypt.js";
 
 export interface UserDocument extends Document {
   name: string;
-  email: string;
-  password: string;
+  email?: string;
+  password?: string;
   avatar?: string | null;
-
   about?: string;
-  lastSeen?: Date;
-  isOnline: boolean;
-  agreed?: boolean;
+  isAI: boolean;
   createdAt: Date;
   updatedAt: Date;
 
@@ -22,18 +19,23 @@ const userSchema = new Schema<UserDocument>(
     name: { type: String, required: true },
     email: {
       type: String,
-      required: true,
       unique: true,
+      sparse: true,
       trim: true,
       lowercase: true,
+      required: function (this: UserDocument) {
+        return !this.isAI;
+      },
     },
-    password: { type: String, required: true },
+    password: {
+      type: String,
+      required: function (this: UserDocument) {
+        return !this.isAI;
+      },
+    },
     avatar: { type: String, default: null },
-
     about: { type: String },
-    lastSeen: { type: Date },
-    isOnline: { type: Boolean, default: false },
-    agreed: { type: Boolean },
+    isAI: { type: Boolean, default: false },
   },
   {
     timestamps: true,
@@ -55,6 +57,7 @@ userSchema.pre("save", async function () {
 });
 
 userSchema.methods.comparePassword = async function (password: string) {
+  if (!this.password) return false;
   return await compareValue(password, this.password);
 };
 
