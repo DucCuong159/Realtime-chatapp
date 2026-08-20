@@ -4,7 +4,7 @@
 
 **A production-ready, full-stack real-time messaging platform powered by React 19, Express 5, Socket.IO, and Google Gemini AI.**
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-008080?style=for-the-badge&logo=render&logoColor=white)](https://realtime-chatapp-kgjk.onrender.com/conversation)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-008080?style=for-the-badge&logo=render&logoColor=white)](https://realtime-chatapp-vn.onrender.com/conversation)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React 19](https://img.shields.io/badge/React-19.x-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Express 5](https://img.shields.io/badge/Express-5.x-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
@@ -12,7 +12,7 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/TailwindCSS-v4.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge)](LICENSE)
 
-[🌐 **Explore Live Demo**](https://realtime-chatapp-kgjk.onrender.com/conversation) · [🐛 Report Bug](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 Request Feature](https://github.com/DucCuong159/Realtime-chatapp/issues)
+[🌐 **Explore Live Demo**](https://realtime-chatapp-vn.onrender.com/conversation) · [🐛 Report Bug](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 Request Feature](https://github.com/DucCuong159/Realtime-chatapp/issues)
 
 </div>
 
