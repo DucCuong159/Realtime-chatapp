@@ -46,4 +46,5 @@ export type AIStreamPayload = {
   done: boolean;
   message: MessageType | null;
   sender?: UserType;
+  error?: string;
 };
