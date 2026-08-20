@@ -7,7 +7,7 @@ import { Streamdown } from "streamdown";
 type ResponseProps = ComponentProps<typeof Streamdown>;
 
 const ALLOWED_LINK_PREFIXES = ["https://", "http://", "mailto:"];
-const ALLOWED_IMAGE_PREFIXES = ["https://", "http://"];
+const ALLOWED_IMAGE_PREFIXES = ["https://res.cloudinary.com"];
 
 const Response = memo(
   ({
