@@ -109,7 +109,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   fetchAllUsers: async () => {
     set({ isUsersLoading: true });
     try {
-      const { data } = await API.get("/api/user/all");
+      const { data } = await API.get("/user/all");
       set({ users: data.users });
     } finally {
       set({ isUsersLoading: false });
@@ -119,7 +119,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   fetchConversations: async () => {
     set({ isConversationsLoading: true });
     try {
-      const { data } = await API.get("/api/conversation/all");
+      const { data } = await API.get("/conversation/all");
       const fetched: ConversationType[] = data.conversations || [];
 
       set((state) => {
@@ -144,7 +144,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   createConversation: async (payload: CreateConversationType) => {
     set({ isCreatingConversation: true });
     try {
-      const response = await API.post("/api/conversation/create", payload);
+      const response = await API.post("/conversation/create", payload);
       const newConversation: ConversationType = response.data.conversation;
       get().addNewConversation(newConversation);
       toast.success("Conversation created successfully");
@@ -158,7 +158,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     activeFetchingConversationId = conversationId;
     set({ isSingleConversationLoading: true });
     try {
-      const { data } = await API.get(`/api/conversation/${conversationId}`);
+      const { data } = await API.get(`/conversation/${conversationId}`);
       if (activeFetchingConversationId === conversationId) {
         set({
           singleConversation: {
@@ -232,7 +232,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
     try {
       // 2. Call API
-      const { data } = await API.post("/api/conversation/message/send", {
+      const { data } = await API.post("/conversation/message/send", {
         conversationId,
         content,
         image,

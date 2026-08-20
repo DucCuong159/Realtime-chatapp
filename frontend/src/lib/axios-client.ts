@@ -8,14 +8,14 @@ import { toast } from "sonner";
 // ─── Constants ───────────────────────────────────────────────────────
 const BASE_URL =
   import.meta.env.MODE === "development"
-    ? import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api`
     : "/api";
 
 const AUTH_ROUTES = [
-  "api/auth/status",
-  "api/auth/login",
-  "api/auth/register",
-  "api/auth/logout",
+  "auth/status",
+  "auth/login",
+  "auth/register",
+  "auth/logout",
 ];
 
 // ─── Helper Functions ────────────────────────────────────────────────
