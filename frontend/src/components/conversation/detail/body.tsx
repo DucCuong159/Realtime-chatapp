@@ -137,7 +137,14 @@ const MessageItem = memo(
               />
             )}
 
-            {message.content && <Response>{message.content}</Response>}
+            {message.content &&
+              (message.sender?.isAI ? (
+                <Response>{message.content}</Response>
+              ) : (
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {message.content}
+                </p>
+              ))}
 
             {message.streaming && (
               <span>
