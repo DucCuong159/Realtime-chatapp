@@ -237,13 +237,17 @@ const getAIResponse = async (
     emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
     return aiMessage;
   } catch (error) {
+    console.error(
+      `AI generation error for conversation ${conversationId}:`,
+      error,
+    );
     emitConversationAI({
       conversationId,
       chunk: null,
       sender: geminiAI || undefined,
       done: true,
       message: null,
-      error: error instanceof Error ? error.message : "AI generation failed",
+      error: "Failed to generate AI response. Please try again later.",
     });
     throw error;
   }
