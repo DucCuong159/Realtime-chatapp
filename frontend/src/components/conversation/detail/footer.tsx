@@ -13,6 +13,7 @@ interface Props {
   conversationId: string | null;
   currentUserId: string | null;
   replyTo: MessageType | null;
+  isAiConversation: boolean;
   onCancelReply: () => void;
 }
 
@@ -26,9 +27,14 @@ const ConversationFooter = ({
   conversationId,
   currentUserId,
   replyTo,
+  isAiConversation,
   onCancelReply,
 }: Props) => {
-  const { sendMessage } = useConversation();
+  const { sendMessage, isSendingMsg, singleConversation } = useConversation();
+  const isAIStreaming = Boolean(
+    singleConversation?.messages.some((m) => m.streaming),
+  );
+  const isBusy = isSendingMsg || isAIStreaming;
 
   const [image, setImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +88,7 @@ const ConversationFooter = ({
   };
 
   const onSubmit = (values: MessageFormType) => {
+    if (isBusy) return;
     const messageContent = values.message?.trim();
     const currentImage = image;
 
@@ -96,13 +103,14 @@ const ConversationFooter = ({
       textareaRef.current.style.overflowY = "hidden";
     }
 
-    // Send payload in background (non-blocking)
-    sendMessage({
+    const payload = {
       conversationId,
       content: messageContent,
       image: currentImage || undefined,
       replyTo: replyTo,
-    });
+    };
+    // Send payload in background (non-blocking)
+    sendMessage(payload, isAiConversation);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -132,8 +140,8 @@ const ConversationFooter = ({
         />
       )}
 
-      {image && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-2.5">
+      {image && !isSendingMsg && (
+        <div className="px-4 sm:px-6 pb-2.5">
           <div className="relative w-fit">
             <img
               src={image}
@@ -157,7 +165,7 @@ const ConversationFooter = ({
 
       <form
         onSubmit={(e) => form.handleSubmit(onSubmit)(e)}
-        className="max-w-6xl mx-auto px-4 sm:px-6 flex items-end gap-2"
+        className="px-4 sm:px-6 flex items-end gap-2"
       >
         <div className="flex items-center">
           <Button
@@ -167,6 +175,7 @@ const ConversationFooter = ({
             className="rounded-full shrink-0 text-muted-foreground hover:text-foreground size-9"
             onClick={() => imageInputRef.current?.click()}
             aria-label="Attach image"
+            disabled={isBusy}
           >
             <ImageIcon className="size-5" />
           </Button>
@@ -175,6 +184,7 @@ const ConversationFooter = ({
             className="hidden"
             accept="image/*"
             ref={imageInputRef}
+            disabled={isBusy}
             onChange={handleImageChange}
           />
         </div>
@@ -198,6 +208,7 @@ const ConversationFooter = ({
           size="icon"
           className="rounded-full size-9 shrink-0 bg-[#2a7bff] hover:bg-[#2066d9] text-white"
           aria-label="Send message"
+          disabled={isBusy}
         >
           <SendHorizontal className="size-4" />
         </Button>

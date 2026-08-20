@@ -7,8 +7,15 @@ export const useConversationDetails = (
 ) => {
   const isGroup = conversation?.isGroup ?? false;
 
-  const other = conversation?.participants?.find((p) => p._id !== currentUserId);
+  const other = conversation?.participants?.find(
+    (p) => p._id !== currentUserId,
+  );
   const isOnline = useIsUserOnline(other?._id);
+  const subheading = other?.isAI
+    ? "Assistant"
+    : isOnline
+      ? "Online"
+      : "Offline";
 
   if (isGroup) {
     return {
@@ -23,11 +30,12 @@ export const useConversationDetails = (
 
   return {
     name: other?.name || "Unknown",
-    subheading: isOnline ? "Online" : "Offline",
+    subheading,
     avatar: other?.avatar || "",
     isGroup: false,
     isOnline,
     otherUser: other ?? null,
+    isAI: other?.isAI ?? false,
   };
 };
 

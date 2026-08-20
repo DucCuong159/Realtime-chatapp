@@ -1,12 +1,20 @@
 import AvatarWithBadge from "@/components/avatar-with-badge";
+import Response from "@/components/ui/ai-response";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useConversation } from "@/hooks/use-conversation";
+import { useSocket } from "@/hooks/use-socket";
 import { cn, formatConversationTime } from "@/lib/utils";
-import type { MessageType } from "@/types/conversation.type";
+import type {
+  AIStreamPayload,
+  MessageType,
+} from "@/types/conversation.type";
+import { RiCircleFill } from "@remixicon/react";
 import { Reply } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
 
 interface ConversationBodyProps {
+  conversationId: string;
   messages: MessageType[];
   onReply: (message: MessageType) => void;
 }
@@ -16,6 +24,7 @@ interface MessageItemProps {
   currentUserId: string | null;
   isCurrentUser: boolean;
   isLastFromUser: boolean;
+  isSendingMsg: boolean;
   onReply: (message: MessageType) => void;
   onScrollToMessage: (targetId: string) => void;
 }
@@ -26,6 +35,7 @@ const MessageItem = memo(
     currentUserId,
     isCurrentUser,
     isLastFromUser,
+    isSendingMsg,
     onReply,
     onScrollToMessage,
   }: MessageItemProps) => {
@@ -37,11 +47,15 @@ const MessageItem = memo(
         ? "You"
         : message.replyTo?.sender?.name || "User";
 
+    const isImageOnly = Boolean(
+      message.image && !message.content && !message.replyTo,
+    );
+
     return (
       <div className="flex flex-col w-full transition-colors duration-500 rounded-2xl">
         <div
           className={cn(
-            "group relative flex items-end gap-2 px-2 py-0.5 w-full",
+            "group relative flex items-end gap-1.5 px-2 py-0.5 w-full",
             isCurrentUser ? "justify-end" : "justify-start",
           )}
         >
@@ -63,7 +77,8 @@ const MessageItem = memo(
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => onReply(message)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground"
+                disabled={isSendingMsg}
+                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
                 aria-label="Reply"
               >
                 <Reply className="size-3.5 scale-x-[-1]" />
@@ -74,10 +89,15 @@ const MessageItem = memo(
           <div
             id={`message-${message._id}`}
             className={cn(
-              "relative flex max-w-[80%] flex-col gap-1.5 rounded-2xl px-3.5 py-2.5 text-sm shadow-xs break-words [overflow-wrap:anywhere]",
-              isCurrentUser
-                ? "rounded-br-xs bg-[#3d61ff] text-white"
-                : "rounded-bl-xs bg-muted text-foreground",
+              "relative flex max-w-[80%] flex-col text-sm wrap-break-word wrap-anywhere",
+              isImageOnly
+                ? "bg-transparent p-0 shadow-none"
+                : cn(
+                    "gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-xs",
+                    isCurrentUser
+                      ? "rounded-br-xs bg-[#3d61ff] text-white"
+                      : "rounded-bl-xs bg-muted text-foreground",
+                  ),
             )}
           >
             {message.replyTo && (
@@ -108,14 +128,31 @@ const MessageItem = memo(
               <img
                 src={message.image}
                 alt="Attachment"
-                className="max-h-72 w-full rounded-xl object-cover"
+                className={cn(
+                  "max-h-80 object-cover",
+                  isImageOnly
+                    ? cn(
+                        "rounded-2xl max-w-sm w-auto",
+                        isCurrentUser ? "rounded-br-xs" : "rounded-bl-xs",
+                      )
+                    : "rounded-xl w-full",
+                )}
               />
             )}
 
-            {message.content && (
-              <p className="whitespace-pre-wrap leading-relaxed">
-                {message.content}
-              </p>
+            {message.content &&
+              (message.sender?.isAI ? (
+                <Response>{message.content}</Response>
+              ) : (
+                <p className="whitespace-pre-wrap leading-relaxed">
+                  {message.content}
+                </p>
+              ))}
+
+            {message.streaming && (
+              <span>
+                <RiCircleFill className="size-4 animate-bounce rounded-full dark:text-white mt-1" />
+              </span>
             )}
           </div>
 
@@ -125,7 +162,8 @@ const MessageItem = memo(
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => onReply(message)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground"
+                disabled={isSendingMsg}
+                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
                 aria-label="Reply"
               >
                 <Reply className="size-3.5" />
@@ -151,10 +189,43 @@ const MessageItem = memo(
 
 MessageItem.displayName = "MessageItem";
 
-const ConversationBody = ({ messages, onReply }: ConversationBodyProps) => {
+const ConversationBody = ({
+  conversationId,
+  messages,
+  onReply,
+}: ConversationBodyProps) => {
   const { user } = useAuth();
   const currentUserId = user?._id || null;
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const { socket } = useSocket();
+  const { addOrUpdateMessage, updateStreamingAIMessage } = useConversation();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleAIStream = ({
+      conversationId: streamConversationId,
+      chunk,
+      done,
+      message,
+      sender,
+    }: AIStreamPayload) => {
+      if (streamConversationId !== conversationId) return;
+
+      if (chunk && !done) {
+        updateStreamingAIMessage(conversationId, chunk, sender);
+      }
+      if (done && message) {
+        addOrUpdateMessage(conversationId, message);
+      }
+    };
+
+    socket.on("conversation:ai", handleAIStream);
+
+    return () => {
+      socket.off("conversation:ai", handleAIStream);
+    };
+  }, [socket, conversationId, updateStreamingAIMessage, addOrUpdateMessage]);
 
   useEffect(() => {
     if (!messages.length) return;
@@ -187,8 +258,10 @@ const ConversationBody = ({ messages, onReply }: ConversationBodyProps) => {
     }
   }, []);
 
+  const isSendingMsg = useConversation((state) => state.isSendingMsg);
+
   return (
-    <div className="flex flex-1 flex-col justify-end gap-1 p-3 max-w-6xl mx-auto w-full">
+    <div className="flex flex-1 flex-col justify-end gap-1 p-3 w-full">
       {messages.map((message, index) => {
         const isCurrentUser = message.sender?._id === currentUserId;
         const isLastFromUser = index === messages.length - 1 && isCurrentUser;
@@ -200,6 +273,7 @@ const ConversationBody = ({ messages, onReply }: ConversationBodyProps) => {
             currentUserId={currentUserId}
             isCurrentUser={isCurrentUser}
             isLastFromUser={isLastFromUser}
+            isSendingMsg={isSendingMsg}
             onReply={onReply}
             onScrollToMessage={handleScrollToMessage}
           />

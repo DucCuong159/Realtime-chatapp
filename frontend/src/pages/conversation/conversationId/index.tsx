@@ -23,11 +23,12 @@ const SingleConversation = () => {
   const { socket } = useSocket();
   const { user } = useAuth();
 
-  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
-
   const currentUserId = user?._id || null;
   const conversation = singleConversation?.conversation;
   const messages = singleConversation?.messages || [];
+  const isAiConversation = conversation?.isAiConversation ?? false;
+
+  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -54,7 +55,7 @@ const SingleConversation = () => {
   }, [conversationId, socket]);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !conversationId) return;
 
     const handleNewMessage = (msg: MessageType) =>
       addNewMessage(msg.conversationId, msg);
@@ -63,7 +64,7 @@ const SingleConversation = () => {
     return () => {
       socket.off("message:new", handleNewMessage);
     };
-  }, [socket, addNewMessage]);
+  }, [socket, addNewMessage, conversationId]);
 
   if (
     isSingleConversationLoading ||
@@ -98,7 +99,11 @@ const SingleConversation = () => {
             description="No messages yet. Send the first message"
           />
         ) : (
-          <ConversationBody messages={messages} onReply={setReplyTo} />
+          <ConversationBody
+            conversationId={conversationId}
+            messages={messages}
+            onReply={setReplyTo}
+          />
         )}
       </div>
 
@@ -106,6 +111,7 @@ const SingleConversation = () => {
         replyTo={replyTo}
         conversationId={conversationId}
         currentUserId={currentUserId}
+        isAiConversation={isAiConversation}
         onCancelReply={() => setReplyTo(null)}
       />
     </div>
