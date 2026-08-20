@@ -24,6 +24,7 @@ interface MessageItemProps {
   currentUserId: string | null;
   isCurrentUser: boolean;
   isLastFromUser: boolean;
+  isSendingMsg: boolean;
   onReply: (message: MessageType) => void;
   onScrollToMessage: (targetId: string) => void;
 }
@@ -34,6 +35,7 @@ const MessageItem = memo(
     currentUserId,
     isCurrentUser,
     isLastFromUser,
+    isSendingMsg,
     onReply,
     onScrollToMessage,
   }: MessageItemProps) => {
@@ -75,7 +77,8 @@ const MessageItem = memo(
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => onReply(message)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground"
+                disabled={isSendingMsg}
+                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
                 aria-label="Reply"
               >
                 <Reply className="size-3.5 scale-x-[-1]" />
@@ -159,7 +162,8 @@ const MessageItem = memo(
                 variant="ghost"
                 size="icon-xs"
                 onClick={() => onReply(message)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground"
+                disabled={isSendingMsg}
+                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
                 aria-label="Reply"
               >
                 <Reply className="size-3.5" />
@@ -254,6 +258,8 @@ const ConversationBody = ({
     }
   }, []);
 
+  const isSendingMsg = useConversation((state) => state.isSendingMsg);
+
   return (
     <div className="flex flex-1 flex-col justify-end gap-1 p-3 w-full">
       {messages.map((message, index) => {
@@ -267,6 +273,7 @@ const ConversationBody = ({
             currentUserId={currentUserId}
             isCurrentUser={isCurrentUser}
             isLastFromUser={isLastFromUser}
+            isSendingMsg={isSendingMsg}
             onReply={onReply}
             onScrollToMessage={handleScrollToMessage}
           />

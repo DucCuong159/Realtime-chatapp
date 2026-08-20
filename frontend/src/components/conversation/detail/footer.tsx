@@ -128,7 +128,7 @@ const ConversationFooter = ({
 
   return (
     <div className="sticky bottom-0 z-40 inset-x-0 bg-background border-t border-border py-2.5 sm:py-3">
-      {replyTo && !isSendingMsg && (
+      {replyTo && (
         <ConversationReplyBar
           replyTo={replyTo}
           currentUserId={currentUserId}
