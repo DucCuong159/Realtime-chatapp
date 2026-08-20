@@ -12,6 +12,9 @@ const ALLOWED_IMAGE_PREFIXES = ["https://", "http://"];
 const Response = memo(
   ({
     className,
+    defaultOrigin = typeof window !== "undefined"
+      ? window.location.origin
+      : undefined,
     allowedLinkPrefixes = ALLOWED_LINK_PREFIXES,
     allowedImagePrefixes = ALLOWED_IMAGE_PREFIXES,
     ...props
@@ -21,6 +24,7 @@ const Response = memo(
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className,
       )}
+      defaultOrigin={defaultOrigin}
       allowedLinkPrefixes={allowedLinkPrefixes}
       allowedImagePrefixes={allowedImagePrefixes}
       {...props}
