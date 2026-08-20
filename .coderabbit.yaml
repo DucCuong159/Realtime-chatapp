@@ -16,6 +16,8 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    base_branches:
+      - ".*"
     auto_pause_after_reviewed_commits: 0
 
 issue_enrichment:

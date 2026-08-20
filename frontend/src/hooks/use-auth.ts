@@ -30,7 +30,7 @@ export const useAuth = create<AuthState>()(
       register: async (data: RegisterType) => {
         set({ isSigningUp: true });
         try {
-          const response = await API.post("api/auth/register", data);
+          const response = await API.post("/auth/register", data);
           if (response.status === 201) set({ user: response.data.user });
           useSocket.getState().connectSocket();
           toast.success("Registered successfully");
@@ -41,7 +41,7 @@ export const useAuth = create<AuthState>()(
       login: async (data: LoginType) => {
         set({ isLoggingIn: true });
         try {
-          const response = await API.post("api/auth/login", data);
+          const response = await API.post("/auth/login", data);
           if (response.status === 200) set({ user: response.data.user });
           useSocket.getState().connectSocket();
           toast.success("Logged in successfully");
@@ -51,7 +51,7 @@ export const useAuth = create<AuthState>()(
       },
       logout: async () => {
         try {
-          await API.post("api/auth/logout");
+          await API.post("/auth/logout");
           toast.success("Logged out successfully");
         } catch {
           // handle error in interceptor
@@ -63,7 +63,7 @@ export const useAuth = create<AuthState>()(
       isAuthStatus: async () => {
         set({ isAuthStatusLoading: true });
         try {
-          const response = await API.get("api/auth/status");
+          const response = await API.get("/auth/status");
           if (response.status === 200) set({ user: response.data.user });
           useSocket.getState().connectSocket();
           toast.success("Authenticated successfully");

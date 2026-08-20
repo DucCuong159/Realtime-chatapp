@@ -5,6 +5,7 @@ import express, { Request, Response } from "express";
 import helmet from "helmet";
 import http from "http";
 import passport from "passport";
+import path from "path";
 import connectDatabase from "./config/database.config.js";
 import { Env } from "./config/env.config.js";
 import { HTTPSTATUS } from "./config/http.config.js";
@@ -20,7 +21,21 @@ const server = http.createServer(app);
 // Attach Socket.IO to HTTP server
 initializeSocket(server);
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com"],
+        connectSrc: ["'self'", "https://res.cloudinary.com", "wss:", "ws:"],
+        fontSrc: ["'self'", "data:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 // TODO: We will use multer later to handle large file uploads and limit sizes.
 // For now, bypass the global JSON body limit for the message send route.
 app.use((req, res, next) => {
@@ -50,6 +65,17 @@ app.get(
 );
 
 app.use("/api", router);
+
+if (Env.NODE_ENV === "production") {
+  const clientPath = path.resolve(import.meta.dirname, "../../frontend/dist");
+
+  // Serve static files
+  app.use(express.static(clientPath));
+
+  app.get(/^(?!\/api).*/, (req: Request, res: Response) => {
+    res.sendFile(path.join(clientPath, "index.html"));
+  });
+}
 
 async function startServer() {
   try {
