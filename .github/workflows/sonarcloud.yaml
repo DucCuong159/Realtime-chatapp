@@ -154,10 +154,10 @@ jobs:
           # ─── 3. Determine pass/fail status ─────────────────────────────────
           if [ "$TOTAL_ISSUES" -gt "$MAX_ISSUES" ]; then
             STATUS_ICON="❌"
-            STATUS_MSG="**FAILED** — Tổng số issue (\`${TOTAL_ISSUES}\`) vượt quá ngưỡng cho phép (\`${MAX_ISSUES}\`). Cần fix trước khi merge!"
+            STATUS_MSG="**FAILED** — Total issues (\`${TOTAL_ISSUES}\`) exceeded the allowed threshold (\`${MAX_ISSUES}\`). Please resolve issues before merging."
           else
             STATUS_ICON="✅"
-            STATUS_MSG="**PASSED** — Số lượng issue nằm trong ngưỡng cho phép (\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`)"
+            STATUS_MSG="**PASSED** — Total issues are within the acceptable threshold (\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`)."
           fi
 
           # ─── 4. Build and post PR comment ──────────────────────────────────
@@ -167,27 +167,27 @@ jobs:
 
           ### 📊 Issue Summary
 
-          | Loại | Số lượng |
+          | Type | Count |
           | :--- | :---: |
           | 🐛 Bugs | \`${BUGS}\` |
           | 🔓 Vulnerabilities | \`${VULNERABILITIES}\` |
           | 🧹 Code Smells | \`${CODE_SMELLS}\` |
-          | **🎯 Tổng cộng** | **\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`** |
+          | **🎯 Total** | **\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`** |
 
           ### 🔥 Severity Breakdown
 
-          | Mức độ | Số lượng |
+          | Severity | Count |
           | :--- | :---: |
           | 🚫 Blocker | \`${BLOCKER}\` |
           | 🔴 Critical | \`${CRITICAL}\` |
           | 🟠 Major | \`${MAJOR}\` |
 
           ---
-          🔍 [Xem chi tiết trên SonarCloud](https://sonarcloud.io/project/issues?id=${PROJECT_KEY}&pullRequest=${PR_NUMBER})
-          📋 [Dashboard tổng quan](https://sonarcloud.io/summary/overall?id=${PROJECT_KEY})"
+          🔍 [View issue details on SonarCloud](https://sonarcloud.io/project/issues?id=${PROJECT_KEY}&pullRequest=${PR_NUMBER})
+          📋 [Project Overview Dashboard](https://sonarcloud.io/summary/overall?id=${PROJECT_KEY})"
 
           gh pr comment "${PR_NUMBER}" --body "${COMMENT_BODY}"
-          echo "✅ Comment đã được gửi lên PR #${PR_NUMBER}"
+          echo "✅ Comment successfully posted to PR #${PR_NUMBER}"
 
           # ─── 5. Enforce quality gate ───────────────────────────────────────
           if [ "$TOTAL_ISSUES" -gt "$MAX_ISSUES" ]; then
