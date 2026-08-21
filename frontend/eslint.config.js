@@ -1,14 +1,14 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-import { defineConfig, globalIgnores } from 'eslint/config'
+import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import { defineConfig, globalIgnores } from "eslint/config";
+import globals from "globals";
+import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(['dist', '.yarn']),
+  globalIgnores(["dist", ".yarn"]),
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ["**/*.{ts,tsx}"],
     extends: [
       js.configs.recommended,
       tseslint.configs.recommended,
@@ -19,10 +19,22 @@ export default defineConfig([
       globals: globals.browser,
     },
     rules: {
-      'react-refresh/only-export-components': [
-        'warn',
+      "react-refresh/only-export-components": [
+        "warn",
         { allowConstantExport: true },
+      ],
+      // Trigger a warning if a function's Cyclomatic Complexity exceeds 10.
+      complexity: ["warn", { max: 10 }],
+      // Trigger a warning if a function exceeds 50 lines of code (FLOC).
+      "max-lines-per-function": [
+        "warn",
+        { max: 50, skipComments: true, skipBlankLines: true },
+      ],
+      // Trigger a warning if a file exceeds 400 lines of code (LOC).
+      "max-lines": [
+        "warn",
+        { max: 400, skipComments: true, skipBlankLines: true },
       ],
     },
   },
-])
+]);
