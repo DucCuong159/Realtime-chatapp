@@ -220,7 +220,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         content: "",
         image: null,
         sender: aiSender,
-        replyTo: replyTo || null,
+        replyTo: null,
         streaming: true,
         createdAt: now,
         updatedAt: now,
