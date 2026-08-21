@@ -48,7 +48,7 @@ jobs:
           node-version: 24.x
 
       - name: Install Yarn Classic
-        run: npm install -g yarn@1.22.22
+        run: npm install -g yarn@1.22.22 --ignore-scripts
 
       # ─── Install & Build Backend ─────────────────────────────────────────
       - name: Cache Backend dependencies
