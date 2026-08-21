@@ -94,7 +94,7 @@ const createSingleConversation = async (
   }
 
   // Deterministic unique key for 1-1 conversation (order independent)
-  const directKey = [userId, participantId].sort().join("_");
+  const directKey = [userId, participantId].sort((a, b) => a.localeCompare(b)).join("_");
   const allParticipantIds = [participantId, userId];
 
   const existingConversation = await findDirectConversation(directKey);
