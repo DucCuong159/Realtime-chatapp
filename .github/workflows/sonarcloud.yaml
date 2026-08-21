@@ -62,7 +62,7 @@ jobs:
 
       - name: Install Backend dependencies
         working-directory: ./backend
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Build Backend
         working-directory: ./backend
@@ -80,7 +80,7 @@ jobs:
 
       - name: Install Frontend dependencies
         working-directory: ./frontend
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Build Frontend
         working-directory: ./frontend
