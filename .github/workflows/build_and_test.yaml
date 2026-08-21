@@ -96,7 +96,7 @@ jobs:
           find dist/assets -type f -exec du -h {} + | sort -hr | head -10
 
       - name: Upload Frontend build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-dist
           path: frontend/dist/
