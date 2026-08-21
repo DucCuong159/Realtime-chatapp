@@ -1,0 +1,206 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SonarCloud Analysis Workflow
+# ═══════════════════════════════════════════════════════════════════════════════
+# Runs SonarCloud code analysis on push to main and on all pull requests.
+# Includes a custom PR bot that counts issues and blocks merge if total > 10.
+#
+# Prerequisites:
+#   - SONAR_TOKEN must be set in GitHub repo Settings → Secrets → Actions
+#     (Generate at: SonarCloud → My Account → Security → Generate Token)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+name: SonarCloud Analysis
+run-name: "SonarCloud - ${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+      - dev
+      - stg
+      - prd
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: sonarcloud-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# ─── Job 1: SonarCloud Scan ──────────────────────────────────────────────────
+jobs:
+  sonarcloud-scan:
+    name: 🔍 SonarCloud Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Full clone is REQUIRED for accurate SonarCloud "New Code" analysis
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: 24.x
+
+      - name: Install Yarn Classic
+        run: npm install -g yarn@1.22.22 --ignore-scripts
+
+      # ─── Install & Build Backend ─────────────────────────────────────────
+      - name: Cache Backend dependencies
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: |
+            backend/node_modules
+          key: backend-yarn-${{ runner.os }}-${{ hashFiles('backend/yarn.lock') }}
+          restore-keys: |
+            backend-yarn-${{ runner.os }}-
+
+      - name: Install Backend dependencies
+        working-directory: ./backend
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: yarn build
+
+      # ─── Install & Build Frontend ────────────────────────────────────────
+      - name: Cache Frontend dependencies
+        uses: actions/cache@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: |
+            frontend/node_modules
+          key: frontend-yarn-${{ runner.os }}-${{ hashFiles('frontend/yarn.lock') }}
+          restore-keys: |
+            frontend-yarn-${{ runner.os }}-
+
+      - name: Install Frontend dependencies
+        working-directory: ./frontend
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: yarn build
+        env:
+          CI: false
+
+      # ─── SonarCloud Analysis ─────────────────────────────────────────────
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Wait for SonarCloud server to process results and check Quality Gate
+      - name: SonarCloud Quality Gate Check
+        uses: sonarsource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ─── Job 2: Custom PR Bot (Issue Counter & Gate) ─────────────────────────
+  sonar-pr-bot:
+    name: 🤖 PR Quality Bot
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: sonarcloud-scan
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Fetch SonarCloud Issues & Comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PROJECT_KEY="DucCuong159_Realtime-chatapp"
+          MAX_ISSUES=10
+
+          echo "══════════════════════════════════════════════════"
+          echo "🤖 SonarCloud PR Bot - Fetching issues for PR #${PR_NUMBER}"
+          echo "══════════════════════════════════════════════════"
+
+          # ─── 1. Fetch issues from SonarCloud API ───────────────────────────
+          # Try PR-specific issues first, fallback to overall project issues
+          RESPONSE=$(curl -sf -u "${SONAR_TOKEN}:" \
+            "https://sonarcloud.io/api/issues/search?componentKeys=${PROJECT_KEY}&pullRequest=${PR_NUMBER}&resolved=false&ps=500" \
+            2>/dev/null || \
+            curl -sf -u "${SONAR_TOKEN}:" \
+            "https://sonarcloud.io/api/issues/search?componentKeys=${PROJECT_KEY}&resolved=false&ps=500")
+
+          # ─── 2. Parse issue counts by type and severity ────────────────────
+          TOTAL_ISSUES=$(echo "$RESPONSE" | jq '.total // 0')
+          BUGS=$(echo "$RESPONSE" | jq '[.issues[] | select(.type=="BUG")] | length')
+          VULNERABILITIES=$(echo "$RESPONSE" | jq '[.issues[] | select(.type=="VULNERABILITY")] | length')
+          CODE_SMELLS=$(echo "$RESPONSE" | jq '[.issues[] | select(.type=="CODE_SMELL")] | length')
+          BLOCKER=$(echo "$RESPONSE" | jq '[.issues[] | select(.severity=="BLOCKER")] | length')
+          CRITICAL=$(echo "$RESPONSE" | jq '[.issues[] | select(.severity=="CRITICAL")] | length')
+          MAJOR=$(echo "$RESPONSE" | jq '[.issues[] | select(.severity=="MAJOR")] | length')
+
+          echo "📊 Results: Total=${TOTAL_ISSUES} | Bugs=${BUGS} | Vulns=${VULNERABILITIES} | Smells=${CODE_SMELLS}"
+          echo "📊 Severity: Blocker=${BLOCKER} | Critical=${CRITICAL} | Major=${MAJOR}"
+
+          # ─── 3. Determine pass/fail status ─────────────────────────────────
+          if [ "$TOTAL_ISSUES" -gt "$MAX_ISSUES" ]; then
+            STATUS_ICON="❌"
+            STATUS_MSG="**FAILED** — Total issues (\`${TOTAL_ISSUES}\`) exceeded the allowed threshold (\`${MAX_ISSUES}\`). Please resolve issues before merging."
+          else
+            STATUS_ICON="✅"
+            STATUS_MSG="**PASSED** — Total issues are within the acceptable threshold (\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`)."
+          fi
+
+          # ─── 4. Build and post PR comment ──────────────────────────────────
+          COMMENT_BODY="${STATUS_ICON} **SonarCloud Quality Report** — PR #${PR_NUMBER}
+
+          ${STATUS_MSG}
+
+          ### 📊 Issue Summary
+
+          | Type | Count |
+          | :--- | :---: |
+          | 🐛 Bugs | \`${BUGS}\` |
+          | 🔓 Vulnerabilities | \`${VULNERABILITIES}\` |
+          | 🧹 Code Smells | \`${CODE_SMELLS}\` |
+          | **🎯 Total** | **\`${TOTAL_ISSUES}\` / \`${MAX_ISSUES}\`** |
+
+          ### 🔥 Severity Breakdown
+
+          | Severity | Count |
+          | :--- | :---: |
+          | 🚫 Blocker | \`${BLOCKER}\` |
+          | 🔴 Critical | \`${CRITICAL}\` |
+          | 🟠 Major | \`${MAJOR}\` |
+
+          ---
+          🔍 [View issue details on SonarCloud](https://sonarcloud.io/project/issues?id=${PROJECT_KEY}&pullRequest=${PR_NUMBER})
+          📋 [Project Overview Dashboard](https://sonarcloud.io/summary/overall?id=${PROJECT_KEY})"
+
+          gh pr comment "${PR_NUMBER}" --body "${COMMENT_BODY}"
+          echo "✅ Comment successfully posted to PR #${PR_NUMBER}"
+
+          # ─── 5. Enforce quality gate ───────────────────────────────────────
+          if [ "$TOTAL_ISSUES" -gt "$MAX_ISSUES" ]; then
+            echo ""
+            echo "══════════════════════════════════════════════════"
+            echo "❌ QUALITY GATE FAILED"
+            echo "   Total issues: ${TOTAL_ISSUES} (max allowed: ${MAX_ISSUES})"
+            echo "   Please fix at least $((TOTAL_ISSUES - MAX_ISSUES)) issue(s) before merging."
+            echo "══════════════════════════════════════════════════"
+            exit 1
+          fi
+
+          echo ""
+          echo "══════════════════════════════════════════════════"
+          echo "✅ QUALITY GATE PASSED"
+          echo "══════════════════════════════════════════════════"
