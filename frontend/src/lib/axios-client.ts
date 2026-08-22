@@ -32,8 +32,8 @@ const normalizePath = (rawUrl: string): string => {
     const parsed = new URL(rawUrl, "http://localhost");
     return trimSlashes(parsed.pathname);
   } catch {
-    const cleaned = trimSlashes(rawUrl);
-    return cleaned.split("?")[0].split("#")[0];
+    const pathOnly = rawUrl.split("?")[0].split("#")[0];
+    return trimSlashes(pathOnly);
   }
 };
 
