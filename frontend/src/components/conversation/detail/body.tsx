@@ -101,7 +101,8 @@ const MessageItem = memo(
             )}
           >
             {message.replyTo && (
-              <div
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (message.replyTo?._id) {
@@ -115,13 +116,13 @@ const MessageItem = memo(
                     : "border-[#3d61ff] bg-[#3d61ff]/5 text-foreground",
                 )}
               >
-                <p className="font-medium text-[11px] opacity-90 truncate">
+                <span className="block font-medium text-[11px] opacity-90 truncate">
                   {replySenderName}
-                </p>
-                <p className="font-normal opacity-80 truncate">
+                </span>
+                <span className="block font-normal opacity-80 truncate">
                   {message.replyTo.image ? "📷 Photo" : message.replyTo.content}
-                </p>
-              </div>
+                </span>
+              </button>
             )}
 
             {message.image && (

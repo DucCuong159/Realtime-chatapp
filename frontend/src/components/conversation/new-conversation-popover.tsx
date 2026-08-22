@@ -214,6 +214,7 @@ UserAvatar.displayName = "UserAvatar";
 const NewGroupItem = memo(
   ({ disabled, onClick }: { disabled: boolean; onClick: () => void }) => (
     <button
+      type="button"
       onClick={onClick}
       disabled={disabled}
       className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-accent disabled:opacity-50"
@@ -241,6 +242,7 @@ const ConversationUserItem = memo(
     onClick: (id: string) => void;
   }) => (
     <button
+      type="button"
       className="relative flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-accent disabled:opacity-50"
       disabled={isLoading || disabled}
       onClick={() => onClick(user._id)}

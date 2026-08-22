@@ -19,15 +19,21 @@ const AUTH_ROUTES = [
 ];
 
 // ─── Helper Functions ────────────────────────────────────────────────
+const trimSlashes = (str: string): string => {
+  let start = 0;
+  let end = str.length;
+  while (start < end && str[start] === "/") start++;
+  while (end > start && str[end - 1] === "/") end--;
+  return str.slice(start, end);
+};
+
 const normalizePath = (rawUrl: string): string => {
   try {
     const parsed = new URL(rawUrl, "http://localhost");
-    return parsed.pathname.replace(/^\/+|\/+$/g, "");
+    return trimSlashes(parsed.pathname);
   } catch {
-    return rawUrl
-      .replace(/^\/+|\/+$/g, "")
-      .split("?")[0]
-      .split("#")[0];
+    const pathOnly = rawUrl.split("?")[0].split("#")[0];
+    return trimSlashes(pathOnly);
   }
 };
 

@@ -1,13 +1,15 @@
+import crypto from "node:crypto";
 import UserModel from "../models/User.js";
 import { UnauthorizedException } from "../utils/app-error.js";
-import { compareValue } from "../utils/bcrypt.js";
+import { compareValue, hashValue } from "../utils/bcrypt.js";
 import {
   LoginSchemaType,
   RegisterSchemaType,
 } from "../validators/auth.validator.js";
 
-const DUMMY_PASSWORD_HASH =
-  "$2b$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeg6Lruj3vjPGga31lW";
+// Generated dynamically at startup to mitigate timing attacks / user enumeration
+// without storing hardcoded hash strings in source code (resolves SonarCloud S2068 warning).
+const DUMMY_HASH = await hashValue(crypto.randomUUID(), 10);
 
 export const registerService = async (body: RegisterSchemaType) => {
   const { email } = body;
@@ -28,7 +30,7 @@ export const loginService = async (body: LoginSchemaType) => {
 
   const isPasswordValid = await compareValue(
     password,
-    user?.password || DUMMY_PASSWORD_HASH
+    user?.password || DUMMY_HASH,
   );
 
   if (!user || !isPasswordValid) {

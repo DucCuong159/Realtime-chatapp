@@ -45,6 +45,7 @@ const ConversationListItem = ({
 
   return (
     <button
+      type="button"
       onClick={onClick}
       className={cn(
         "flex w-full cursor-pointer items-center gap-2.5 rounded-lg p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-sidebar-accent/70",

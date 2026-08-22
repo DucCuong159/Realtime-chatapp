@@ -14,7 +14,7 @@ export function generateUUID(): string {
 export const formatConversationTime = (date?: string | Date | null) => {
   if (!date) return "";
   const newDate = new Date(date);
-  if (isNaN(newDate.getTime())) return "Invalid date";
+  if (Number.isNaN(newDate.getTime())) return "Invalid date";
 
   if (isToday(newDate)) return format(newDate, "h:mm a");
   if (isYesterday(newDate)) return "Yesterday";
