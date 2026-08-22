@@ -180,7 +180,7 @@ const getAIResponse = async (
       })
       .filter((msg) => msg.content.length > 0);
 
-    const result = await streamText({
+    const result = streamText({
       model: google("gemini-3.6-flash"),
       messages: formattedMessages,
       abortSignal: AbortSignal.timeout(60000),
