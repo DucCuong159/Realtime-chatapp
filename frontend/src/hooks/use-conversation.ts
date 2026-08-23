@@ -54,6 +54,7 @@ interface ConversationState {
     chunk: string,
     sender?: UserType,
   ) => void;
+  clearStreamingAIMessage: (conversationId: string) => void;
 }
 
 let activeFetchingConversationId: string | null = null;
@@ -308,6 +309,36 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
   addNewMessage: (conversationId: string, message: MessageType) => {
     get().addOrUpdateMessage(conversationId, message);
+
+    const single = get().singleConversation;
+    if (single && single.conversation._id === conversationId) {
+      const isAIConversation = Boolean(
+        single.conversation.isAiConversation ||
+          single.conversation.participants?.some((p) => p.isAI),
+      );
+      const aiSender = single.conversation.participants?.find((p) => p.isAI);
+
+      if (
+        isAIConversation &&
+        aiSender &&
+        !message.sender?.isAI &&
+        !message.streaming
+      ) {
+        const tempAIMessage: MessageType = {
+          _id: generateUUID(),
+          conversationId,
+          content: "",
+          image: null,
+          sender: aiSender,
+          replyTo: null,
+          streaming: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: "",
+        };
+        get().addOrUpdateMessage(conversationId, tempAIMessage);
+      }
+    }
   },
 
   addOrUpdateMessage: (
@@ -410,6 +441,24 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         };
       }
       return state;
+    });
+  },
+
+  clearStreamingAIMessage: (conversationId: string) => {
+    set((state) => {
+      const single = state.singleConversation;
+      if (!single || single.conversation._id !== conversationId) return state;
+
+      const updatedMessages = single.messages
+        .filter((m) => !(m.streaming && !m.content?.trim()))
+        .map((m) => (m.streaming ? { ...m, streaming: false } : m));
+
+      return {
+        singleConversation: {
+          ...single,
+          messages: updatedMessages,
+        },
+      };
     });
   },
 }));

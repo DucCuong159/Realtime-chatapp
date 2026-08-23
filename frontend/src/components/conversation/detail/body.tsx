@@ -12,6 +12,7 @@ import type {
 import { RiCircleFill } from "@remixicon/react";
 import { Reply } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
+import { toast } from "sonner";
 
 interface ConversationBodyProps {
   conversationId: string;
@@ -199,7 +200,11 @@ const ConversationBody = ({
   const currentUserId = user?._id || null;
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { socket } = useSocket();
-  const { addOrUpdateMessage, updateStreamingAIMessage } = useConversation();
+  const {
+    addOrUpdateMessage,
+    updateStreamingAIMessage,
+    clearStreamingAIMessage,
+  } = useConversation();
 
   useEffect(() => {
     if (!socket) return;
@@ -210,6 +215,7 @@ const ConversationBody = ({
       done,
       message,
       sender,
+      error,
     }: AIStreamPayload) => {
       if (streamConversationId !== conversationId) return;
 
@@ -218,6 +224,11 @@ const ConversationBody = ({
       }
       if (done && message) {
         addOrUpdateMessage(conversationId, message);
+      } else if (done && !message) {
+        clearStreamingAIMessage(conversationId);
+        if (error) {
+          toast.error(error);
+        }
       }
     };
 
@@ -226,7 +237,13 @@ const ConversationBody = ({
     return () => {
       socket.off("conversation:ai", handleAIStream);
     };
-  }, [socket, conversationId, updateStreamingAIMessage, addOrUpdateMessage]);
+  }, [
+    socket,
+    conversationId,
+    updateStreamingAIMessage,
+    addOrUpdateMessage,
+    clearStreamingAIMessage,
+  ]);
 
   useEffect(() => {
     if (!messages.length) return;

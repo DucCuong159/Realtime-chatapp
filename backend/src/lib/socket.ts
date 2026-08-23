@@ -63,7 +63,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
 
     const userId = socket.userId;
     const newSocketId = socket.id;
-    console.log("Socket connected:", { userId, newSocketId });
+    console.log(`Socket connected: ${userId} - ${newSocketId}`);
 
     // save socketId to userId's Set (supports multi-tab)
     if (!onlineUsers.has(userId)) {
@@ -107,7 +107,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
           io?.emit("online:users", Array.from(onlineUsers.keys()));
         }
       }
-      console.log("socket disconnected", { userId, newSocketId });
+      console.log(`Socket disconnected: ${userId} - ${newSocketId}`);
     });
   });
   return io;

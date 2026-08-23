@@ -9,7 +9,7 @@ import {
   isSocketOwnedByUser,
 } from "../lib/socket.js";
 import ConversationModel from "../models/Conversation.js";
-import MessageModel from "../models/Message.js";
+import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
 import { NotFoundException } from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
@@ -74,7 +74,7 @@ export const sendMessageService = async (
   const updatedConversation = await ConversationModel.findByIdAndUpdate(
     conversationId,
     { lastMessage: newMessage._id },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   // websocket emit the new message to the conversation room (excluding verified sender socket)
@@ -96,12 +96,14 @@ export const sendMessageService = async (
   emitLastMessageToParticipants(participantIds, conversationId, newMessage);
 
   if (targetConversation.isAiConversation) {
-    queueAIResponse(conversationId, participantIds).catch((error) => {
-      console.error(
-        `Failed to generate AI response for conversation ${conversationId}:`,
-        error,
-      );
-    });
+    queueAIResponse(conversationId, participantIds, newMessage).catch(
+      (error) => {
+        console.error(
+          `Failed to generate AI response for conversation ${conversationId}:`,
+          error,
+        );
+      },
+    );
   }
 
   return {
@@ -115,13 +117,14 @@ const aiConversationQueues = new Map<string, Promise<any>>();
 const queueAIResponse = async (
   conversationId: string,
   participantIds: string[],
+  triggerMessage: MessageDocument,
 ) => {
   const currentTask =
     aiConversationQueues.get(conversationId) || Promise.resolve();
 
   const nextTask = currentTask
     .catch(() => {})
-    .then(() => getAIResponse(conversationId, participantIds));
+    .then(() => getAIResponse(conversationId, participantIds, triggerMessage));
 
   aiConversationQueues.set(conversationId, nextTask);
 
@@ -137,6 +140,7 @@ const queueAIResponse = async (
 const getAIResponse = async (
   conversationId: string,
   participantIds: string[],
+  triggerMessage: MessageDocument,
 ) => {
   let geminiAI: any = null;
   try {
@@ -145,7 +149,10 @@ const getAIResponse = async (
       throw new NotFoundException("AI model not found");
     }
 
-    const conversationHistory = await getConversationHistory(conversationId);
+    const conversationHistory = await getConversationHistory(
+      conversationId,
+      triggerMessage,
+    );
     const formattedMessages: ModelMessage[] = conversationHistory
       .map((message: any) => {
         const role: "assistant" | "user" = message.sender?.isAI
@@ -180,7 +187,7 @@ const getAIResponse = async (
       })
       .filter((msg) => msg.content.length > 0);
 
-    const result = await streamText({
+    const result = streamText({
       model: google("gemini-3.6-flash"),
       messages: formattedMessages,
       abortSignal: AbortSignal.timeout(60000),
@@ -215,10 +222,15 @@ const getAIResponse = async (
       return null;
     }
 
+    const aiCreatedAt = triggerMessage?.createdAt
+      ? new Date(new Date(triggerMessage.createdAt).getTime() + 1)
+      : new Date();
+
     const aiMessage = await MessageModel.create({
       conversationId,
       sender: geminiAI._id,
       content: fullResponse,
+      createdAt: aiCreatedAt,
     });
     await aiMessage.populate("sender", "name avatar isAI");
 
@@ -253,11 +265,25 @@ const getAIResponse = async (
   }
 };
 
-const getConversationHistory = async (conversationId: string) => {
-  const messages = await MessageModel.find({ conversationId })
+const getConversationHistory = async (
+  conversationId: string,
+  triggerMessage?: MessageDocument,
+) => {
+  const query: any = { conversationId };
+  if (triggerMessage) {
+    query.$or = [
+      { createdAt: { $lt: triggerMessage.createdAt } },
+      {
+        createdAt: triggerMessage.createdAt,
+        _id: { $lte: triggerMessage._id },
+      },
+    ];
+  }
+
+  const messages = await MessageModel.find(query)
     .populate("sender", "isAI")
     .populate("replyTo", "content")
-    .sort({ createdAt: -1 })
+    .sort({ createdAt: -1, _id: -1 })
     .limit(5)
     .lean();
 
