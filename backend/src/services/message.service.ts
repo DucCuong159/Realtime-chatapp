@@ -74,7 +74,7 @@ export const sendMessageService = async (
   const updatedConversation = await ConversationModel.findByIdAndUpdate(
     conversationId,
     { lastMessage: newMessage._id },
-    { new: true },
+    { returnDocument: "after" },
   );
 
   // websocket emit the new message to the conversation room (excluding verified sender socket)
