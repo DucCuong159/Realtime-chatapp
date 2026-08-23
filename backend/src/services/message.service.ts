@@ -151,7 +151,7 @@ const getAIResponse = async (
 
     const conversationHistory = await getConversationHistory(
       conversationId,
-      triggerMessage?.createdAt,
+      triggerMessage,
     );
     const formattedMessages: ModelMessage[] = conversationHistory
       .map((message: any) => {
@@ -187,7 +187,7 @@ const getAIResponse = async (
       })
       .filter((msg) => msg.content.length > 0);
 
-    const result = await streamText({
+    const result = streamText({
       model: google("gemini-3.6-flash"),
       messages: formattedMessages,
       abortSignal: AbortSignal.timeout(60000),
@@ -267,17 +267,23 @@ const getAIResponse = async (
 
 const getConversationHistory = async (
   conversationId: string,
-  triggerMessageCreatedAt?: Date,
+  triggerMessage?: MessageDocument,
 ) => {
   const query: any = { conversationId };
-  if (triggerMessageCreatedAt) {
-    query.createdAt = { $lte: triggerMessageCreatedAt };
+  if (triggerMessage) {
+    query.$or = [
+      { createdAt: { $lt: triggerMessage.createdAt } },
+      {
+        createdAt: triggerMessage.createdAt,
+        _id: { $lte: triggerMessage._id },
+      },
+    ];
   }
 
   const messages = await MessageModel.find(query)
     .populate("sender", "isAI")
     .populate("replyTo", "content")
-    .sort({ createdAt: -1 })
+    .sort({ createdAt: -1, _id: -1 })
     .limit(5)
     .lean();
 
