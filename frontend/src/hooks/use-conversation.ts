@@ -308,6 +308,36 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
   addNewMessage: (conversationId: string, message: MessageType) => {
     get().addOrUpdateMessage(conversationId, message);
+
+    const single = get().singleConversation;
+    if (single && single.conversation._id === conversationId) {
+      const isAIConversation = Boolean(
+        single.conversation.isAiConversation ||
+          single.conversation.participants?.some((p) => p.isAI),
+      );
+      const aiSender = single.conversation.participants?.find((p) => p.isAI);
+
+      if (
+        isAIConversation &&
+        aiSender &&
+        !message.sender?.isAI &&
+        !message.streaming
+      ) {
+        const tempAIMessage: MessageType = {
+          _id: generateUUID(),
+          conversationId,
+          content: "",
+          image: null,
+          sender: aiSender,
+          replyTo: null,
+          streaming: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: "",
+        };
+        get().addOrUpdateMessage(conversationId, tempAIMessage);
+      }
+    }
   },
 
   addOrUpdateMessage: (
