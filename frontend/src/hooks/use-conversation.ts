@@ -54,6 +54,7 @@ interface ConversationState {
     chunk: string,
     sender?: UserType,
   ) => void;
+  clearStreamingAIMessage: (conversationId: string) => void;
 }
 
 let activeFetchingConversationId: string | null = null;
@@ -440,6 +441,24 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         };
       }
       return state;
+    });
+  },
+
+  clearStreamingAIMessage: (conversationId: string) => {
+    set((state) => {
+      const single = state.singleConversation;
+      if (!single || single.conversation._id !== conversationId) return state;
+
+      const updatedMessages = single.messages
+        .filter((m) => !(m.streaming && !m.content?.trim()))
+        .map((m) => (m.streaming ? { ...m, streaming: false } : m));
+
+      return {
+        singleConversation: {
+          ...single,
+          messages: updatedMessages,
+        },
+      };
     });
   },
 }));
