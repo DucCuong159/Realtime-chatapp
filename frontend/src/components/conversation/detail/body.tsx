@@ -5,10 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useConversation } from "@/hooks/use-conversation";
 import { useSocket } from "@/hooks/use-socket";
 import { cn, formatConversationTime } from "@/lib/utils";
-import type {
-  AIStreamPayload,
-  MessageType,
-} from "@/types/conversation.type";
+import type { AIStreamPayload, MessageType } from "@/types/conversation.type";
 import { RiCircleFill } from "@remixicon/react";
 import { Reply } from "lucide-react";
 import { memo, useCallback, useEffect, useRef } from "react";
@@ -152,9 +149,20 @@ const MessageItem = memo(
               ))}
 
             {message.streaming && (
-              <span>
-                <RiCircleFill className="size-4 animate-bounce rounded-full dark:text-white mt-1" />
-              </span>
+              <div className="flex items-center gap-2">
+                <RiCircleFill
+                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+                  style={{ animationDelay: "0s" }}
+                />
+                <RiCircleFill
+                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+                  style={{ animationDelay: "0.2s" }}
+                />
+                <RiCircleFill
+                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+                  style={{ animationDelay: "0.4s" }}
+                />
+              </div>
             )}
           </div>
 

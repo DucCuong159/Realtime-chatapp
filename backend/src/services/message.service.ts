@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { ModelMessage, streamText } from "ai";
 import cloudinary from "../config/cloudinary.config.js";
 import { Env } from "../config/env.config.js";
+import { HTTPSTATUS } from "../config/http.config.js";
 import {
   emitConversationAI,
   emitLastMessageToParticipants,
@@ -11,7 +12,8 @@ import {
 import ConversationModel from "../models/Conversation.js";
 import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
-import { NotFoundException } from "../utils/app-error.js";
+import { AIModelInfo, getAvailableTextOutModelsService } from "./ai.service.js";
+import { BadRequestException, NotFoundException } from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
 import { validateConversationParticipantsService } from "./conversation.service.js";
@@ -25,7 +27,7 @@ export const sendMessageService = async (
   body: sendMessageSchemaType,
   originatingSocketId?: string,
 ) => {
-  const { conversationId, content, image, replyTo } = body;
+  const { conversationId, content, image, replyTo, aiModelId } = body;
 
   const conversation = await validateConversationParticipantsService(
     conversationId,
@@ -96,14 +98,17 @@ export const sendMessageService = async (
   emitLastMessageToParticipants(participantIds, conversationId, newMessage);
 
   if (targetConversation.isAiConversation) {
-    queueAIResponse(conversationId, participantIds, newMessage).catch(
-      (error) => {
-        console.error(
-          `Failed to generate AI response for conversation ${conversationId}:`,
-          error,
-        );
-      },
-    );
+    queueAIResponse(
+      conversationId,
+      participantIds,
+      newMessage,
+      aiModelId,
+    ).catch((error) => {
+      console.error(
+        `Failed to generate AI response for conversation ${conversationId}:`,
+        error,
+      );
+    });
   }
 
   return {
@@ -118,13 +123,16 @@ const queueAIResponse = async (
   conversationId: string,
   participantIds: string[],
   triggerMessage: MessageDocument,
+  aiModelId?: string,
 ) => {
   const currentTask =
     aiConversationQueues.get(conversationId) || Promise.resolve();
 
   const nextTask = currentTask
     .catch(() => {})
-    .then(() => getAIResponse(conversationId, participantIds, triggerMessage));
+    .then(() =>
+      getAIResponse(conversationId, participantIds, triggerMessage, aiModelId),
+    );
 
   aiConversationQueues.set(conversationId, nextTask);
 
@@ -137,80 +145,225 @@ const queueAIResponse = async (
   }
 };
 
+/**
+ * Validate and resolve an available AI model ID.
+ */
+const resolveAIModel = async (aiModelId?: string): Promise<string> => {
+  const { models: availableModels } = await getAvailableTextOutModelsService();
+
+  if (aiModelId?.trim()) {
+    const matched = availableModels.find(
+      (m) => m.id === aiModelId.trim() && m.isAvailable,
+    );
+    if (!matched) {
+      throw new BadRequestException(
+        `AI model (${aiModelId.trim()}) is either unavailable or does not exist. Please select an available model from the toolbar.`,
+      );
+    }
+    return matched.id;
+  }
+
+  const bestAvailable = availableModels.find((m) => m.isAvailable);
+  if (!bestAvailable) {
+    throw new BadRequestException(
+      "No AI models are currently available. Please try again later.",
+    );
+  }
+  return bestAvailable.id;
+};
+
+/**
+ * Convert raw conversation history into formatted ModelMessage[] for AI SDK.
+ */
+const buildModelMessages = (conversationHistory: any[]): ModelMessage[] => {
+  return conversationHistory
+    .map((message: any) => {
+      const role: "assistant" | "user" = message.sender?.isAI
+        ? "assistant"
+        : "user";
+      const parts: any[] = [];
+
+      if (message.image) {
+        const { mediaType, ext } = getImageFileInfo(message.image);
+        parts.push({
+          type: "file",
+          data: message.image,
+          mediaType,
+          fileName: `image.${ext}`,
+        });
+        if (!message.content) {
+          parts.push({
+            type: "text",
+            text: "Describe what you see in the image",
+          });
+        }
+      }
+      if (message.content) {
+        parts.push({
+          type: "text",
+          text: message.replyTo
+            ? `[Replying to: "${message.replyTo.content}"]\n${message.content}`
+            : message.content,
+        });
+      }
+      return { role, content: parts };
+    })
+    .filter((msg) => msg.content.length > 0);
+};
+
+/**
+ * Stream text chunks from Google Gemini and emit them in realtime via Socket.IO.
+ */
+const streamAIChunks = async (
+  conversationId: string,
+  geminiAI: any,
+  targetModelId: string,
+  formattedMessages: ModelMessage[],
+): Promise<string> => {
+  const result = streamText({
+    model: google(targetModelId),
+    messages: formattedMessages,
+    abortSignal: AbortSignal.timeout(60000),
+    system: `
+    You are a helpful and friendly AI assistant. 
+    Your name is ${geminiAI.name}. 
+    Respond only with text and attend to the last user message only.
+    `,
+  });
+
+  let fullResponse = "";
+
+  for await (const chunk of result.textStream) {
+    emitConversationAI({
+      conversationId,
+      chunk,
+      sender: geminiAI,
+      done: false,
+      message: null,
+    });
+    fullResponse += chunk;
+  }
+
+  return fullResponse;
+};
+
+/**
+ * Persist generated AI response in database and broadcast final message.
+ */
+const persistAIMessage = async (
+  conversationId: string,
+  participantIds: string[],
+  geminiAI: any,
+  fullResponse: string,
+  triggerMessage?: MessageDocument,
+) => {
+  const aiCreatedAt = triggerMessage?.createdAt
+    ? new Date(new Date(triggerMessage.createdAt).getTime() + 1)
+    : new Date();
+
+  const aiMessage = await MessageModel.create({
+    conversationId,
+    sender: geminiAI._id,
+    content: fullResponse,
+    createdAt: aiCreatedAt,
+  });
+  await aiMessage.populate("sender", "name avatar isAI");
+
+  await ConversationModel.findByIdAndUpdate(conversationId, {
+    lastMessage: aiMessage._id,
+  });
+
+  emitConversationAI({
+    conversationId,
+    chunk: null,
+    sender: geminiAI,
+    done: true,
+    message: aiMessage,
+  });
+
+  emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
+  return aiMessage;
+};
+
+/**
+ * Format and emit AI error across Socket.IO.
+ */
+const handleAIError = (
+  error: any,
+  conversationId: string,
+  geminiAI: any,
+  targetModelId?: string,
+) => {
+  if (targetModelId) {
+    console.error(
+      `AI generation error with model ${targetModelId} for conversation ${conversationId}:`,
+      error,
+    );
+  } else {
+    console.error(
+      `AI model resolution error for conversation ${conversationId}:`,
+      error,
+    );
+  }
+
+  const errorMsg = (error?.message || "").toLowerCase();
+  const isQuotaExceeded =
+    error?.status === HTTPSTATUS.TOO_MANY_REQUESTS ||
+    error?.statusCode === HTTPSTATUS.TOO_MANY_REQUESTS ||
+    errorMsg.includes("quota") ||
+    errorMsg.includes("resource_exhausted") ||
+    errorMsg.includes("rate limit");
+
+  const errorMessage = targetModelId
+    ? isQuotaExceeded
+      ? `AI Model (${targetModelId}) has exceeded its rate limit quota (429). Please select another AI model from the toolbar.`
+      : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`
+    : error?.message ||
+      "Failed to resolve an available AI model. Please try again or select another model from the toolbar.";
+
+  emitConversationAI({
+    conversationId,
+    chunk: null,
+    sender: geminiAI || undefined,
+    done: true,
+    message: null,
+    error: errorMessage,
+  });
+};
+
 const getAIResponse = async (
   conversationId: string,
   participantIds: string[],
   triggerMessage: MessageDocument,
+  aiModelId?: string,
 ) => {
   let geminiAI: any = null;
+  let targetModelId: string | undefined = undefined;
+
   try {
     geminiAI = await UserModel.findOne({ isAI: true });
     if (!geminiAI) {
       throw new NotFoundException("AI model not found");
     }
+    // 1. Resolve available model
+    targetModelId = await resolveAIModel(aiModelId);
 
+    // 2. Retrieve and build the conversation history format
     const conversationHistory = await getConversationHistory(
       conversationId,
       triggerMessage,
     );
-    const formattedMessages: ModelMessage[] = conversationHistory
-      .map((message: any) => {
-        const role: "assistant" | "user" = message.sender?.isAI
-          ? "assistant"
-          : "user";
-        const parts: any[] = [];
+    const formattedMessages = buildModelMessages(conversationHistory);
 
-        if (message.image) {
-          const { mediaType, ext } = getImageFileInfo(message.image);
-          parts.push({
-            type: "file",
-            data: message.image,
-            mediaType,
-            fileName: `image.${ext}`,
-          });
-          if (!message.content) {
-            parts.push({
-              type: "text",
-              text: "Describe what you see in the image",
-            });
-          }
-        }
-        if (message.content) {
-          parts.push({
-            type: "text",
-            text: message.replyTo
-              ? `[Replying to: "${message.replyTo.content}"]\n${message.content}`
-              : message.content,
-          });
-        }
-        return { role, content: parts };
-      })
-      .filter((msg) => msg.content.length > 0);
+    // 3. Stream text chunks via Socket.IO
+    const fullResponse = await streamAIChunks(
+      conversationId,
+      geminiAI,
+      targetModelId,
+      formattedMessages,
+    );
 
-    const result = streamText({
-      model: google("gemini-3.6-flash"),
-      messages: formattedMessages,
-      abortSignal: AbortSignal.timeout(60000),
-      system: `
-      You are a helpful and friendly AI assistant. 
-      Your name is ${geminiAI.name}. 
-      Respond only with text and attend to the last user message only.
-      `,
-    });
-
-    let fullResponse = "";
-
-    for await (const chunk of result.textStream) {
-      emitConversationAI({
-        conversationId,
-        chunk,
-        sender: geminiAI,
-        done: false,
-        message: null,
-      });
-      fullResponse += chunk;
-    }
-
+    // 4. Save message to DB & emit broadcast
     if (!fullResponse.trim()) {
       emitConversationAI({
         conversationId,
@@ -222,45 +375,15 @@ const getAIResponse = async (
       return null;
     }
 
-    const aiCreatedAt = triggerMessage?.createdAt
-      ? new Date(new Date(triggerMessage.createdAt).getTime() + 1)
-      : new Date();
-
-    const aiMessage = await MessageModel.create({
+    return await persistAIMessage(
       conversationId,
-      sender: geminiAI._id,
-      content: fullResponse,
-      createdAt: aiCreatedAt,
-    });
-    await aiMessage.populate("sender", "name avatar isAI");
-
-    await ConversationModel.findByIdAndUpdate(conversationId, {
-      lastMessage: aiMessage._id,
-    });
-
-    emitConversationAI({
-      conversationId,
-      chunk: null,
-      sender: geminiAI,
-      done: true,
-      message: aiMessage,
-    });
-
-    emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
-    return aiMessage;
-  } catch (error) {
-    console.error(
-      `AI generation error for conversation ${conversationId}:`,
-      error,
+      participantIds,
+      geminiAI,
+      fullResponse,
+      triggerMessage,
     );
-    emitConversationAI({
-      conversationId,
-      chunk: null,
-      sender: geminiAI || undefined,
-      done: true,
-      message: null,
-      error: "Failed to generate AI response. Please try again later.",
-    });
+  } catch (error: any) {
+    handleAIError(error, conversationId, geminiAI, targetModelId);
     throw error;
   }
 };
