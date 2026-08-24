@@ -11,12 +11,8 @@ const BASE_URL =
     ? `${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api`
     : "/api";
 
-const AUTH_ROUTES = [
-  "auth/status",
-  "auth/login",
-  "auth/register",
-  "auth/logout",
-];
+const SILENT_AUTH_ROUTES = ["auth/status", "auth/logout"];
+const INTERACTIVE_AUTH_ROUTES = ["auth/login", "auth/register"];
 
 // ─── Helper Functions ────────────────────────────────────────────────
 const trimSlashes = (str: string): string => {
@@ -94,16 +90,23 @@ API.interceptors.response.use(
     switch (error.response?.status) {
       case HTTPSTATUS.UNAUTHORIZED: {
         const pathname = normalizePath(error.config?.url || "");
-        const isAuthRoute = AUTH_ROUTES.includes(pathname);
-        if (!isAuthRoute) {
-          useAuth.getState().logout();
-        } else if (pathname !== "auth/status") {
-          toast.error(getApiErrorMessage(error));
+        if (SILENT_AUTH_ROUTES.includes(pathname)) {
+          break;
         }
+        if (INTERACTIVE_AUTH_ROUTES.includes(pathname)) {
+          toast.error(getApiErrorMessage(error));
+          break;
+        }
+        useAuth.getState().logout();
         break;
       }
       case HTTPSTATUS.FORBIDDEN:
-        toast.error("You do not have permission to perform this action!");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "You do not have permission to perform this action!",
+          ),
+        );
         break;
       case HTTPSTATUS.TOO_MANY_REQUESTS:
         toast.error(
@@ -116,7 +119,12 @@ API.interceptors.response.use(
       case HTTPSTATUS.INTERNAL_SERVER_ERROR:
       case HTTPSTATUS.BAD_GATEWAY:
       case HTTPSTATUS.SERVICE_UNAVAILABLE:
-        toast.error("Internal server error. Please try again later!");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Internal server error. Please try again later!",
+          ),
+        );
         break;
       default:
         // 400, 404, 409, etc. — show the backend message
