@@ -217,8 +217,16 @@ export const getAvailableTextOutModelsService = async (
   inFlightFetchPromise = (async () => {
     try {
       const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-      const listRes = await fetch(listUrl);
-      const listData: ListModelsApiResponse = await listRes.json();
+      const listController = new AbortController();
+      const listTimeoutId = setTimeout(() => listController.abort(), 10000); // 10s deadline
+
+      let listData: ListModelsApiResponse;
+      try {
+        const listRes = await fetch(listUrl, { signal: listController.signal });
+        listData = await listRes.json();
+      } finally {
+        clearTimeout(listTimeoutId);
+      }
 
       if (listData.error) {
         throw new InternalServerException(
