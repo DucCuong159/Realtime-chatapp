@@ -1,0 +1,65 @@
+name: Release & Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-and-deploy:
+    name: Release Please & Render Deploy
+    runs-on: ubuntu-latest
+    steps:
+      # ─── 1. Release Please: tạo / cập nhật Release PR hoặc tạo GitHub Release ───
+      - name: Run Release Please
+        uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # ─── 2. Nếu Release vừa được tạo: Tự động đồng bộ main -> prd ─────────────
+      - name: Checkout repository
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sync main branch to prd
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin prd || true
+          git checkout -B prd origin/main
+          git push origin prd --force
+
+      # ─── 3. Nếu Release vừa được tạo: Trigger Render Deploy Hook ──────────────
+      - name: Trigger Render Deploy Hook
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        run: |
+          echo "🚀 Tag created: ${{ steps.release.outputs.tag_name }}"
+          echo "Triggering Render Deploy Hook..."
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "❌ Error: Secret RENDER_DEPLOY_HOOK_URL is not set!"
+            exit 1
+          fi
+          
+          response=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Render response: $body (HTTP $http_code)"
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Render deployment triggered successfully!"
+          else
+            echo "❌ Failed to trigger Render deploy. HTTP code: $http_code"
+            exit 1
+          fi
