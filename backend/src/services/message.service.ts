@@ -158,7 +158,7 @@ const getAIResponse = async (
   aiModelId?: string,
 ) => {
   let geminiAI: any = null;
-  let targetModelId = "gemini-2.5-flash";
+  let targetModelId: string | undefined = undefined;
 
   try {
     geminiAI = await UserModel.findOne({ isAI: true });
@@ -290,10 +290,17 @@ const getAIResponse = async (
     emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
     return aiMessage;
   } catch (error: any) {
-    console.error(
-      `AI generation error with model ${targetModelId} for conversation ${conversationId}:`,
-      error,
-    );
+    if (targetModelId) {
+      console.error(
+        `AI generation error with model ${targetModelId} for conversation ${conversationId}:`,
+        error,
+      );
+    } else {
+      console.error(
+        `AI model resolution error for conversation ${conversationId}:`,
+        error,
+      );
+    }
 
     const errorMsg = (error?.message || "").toLowerCase();
     const isQuotaExceeded =
@@ -303,9 +310,12 @@ const getAIResponse = async (
       errorMsg.includes("resource_exhausted") ||
       errorMsg.includes("rate limit");
 
-    const errorMessage = isQuotaExceeded
-      ? `AI Model (${targetModelId}) has exceeded its rate limit quota (429). Please select another AI model from the toolbar.`
-      : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`;
+    const errorMessage = targetModelId
+      ? isQuotaExceeded
+        ? `AI Model (${targetModelId}) has exceeded its rate limit quota (429). Please select another AI model from the toolbar.`
+        : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`
+      : error?.message ||
+        "Failed to resolve an available AI model. Please try again or select another model from the toolbar.";
 
     emitConversationAI({
       conversationId,
