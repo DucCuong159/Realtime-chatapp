@@ -8,20 +8,30 @@ import {
   registerController,
 } from "../controllers/auth.controller.js";
 
-// Limit to 5 authentication attempts per 15 minutes per IP address
-const authLimiter = rateLimit({
+const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true,
   message: {
-    message: "Too many attempts, please try again after 15 minutes.",
+    message: "Login limit reached (maximum 5 attempts).",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: {
+    message: "Sign up limit reached (maximum 5 attempts).",
   },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 const authRouters = Router()
-  .post("/register", authLimiter, registerController)
-  .post("/login", authLimiter, loginController)
+  .post("/register", registerLimiter, registerController)
+  .post("/login", loginLimiter, loginController)
   .post("/logout", logoutController)
   .get("/status", passportAuthenticateJwt, authStatusController);
 

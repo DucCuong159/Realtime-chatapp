@@ -94,14 +94,23 @@ API.interceptors.response.use(
       case HTTPSTATUS.UNAUTHORIZED: {
         const pathname = normalizePath(error.config?.url || "");
         const isAuthRoute = AUTH_ROUTES.includes(pathname);
-        if (!isAuthRoute) useAuth.getState().logout();
+        if (!isAuthRoute) {
+          useAuth.getState().logout();
+        } else if (pathname !== "auth/status") {
+          toast.error(getApiErrorMessage(error));
+        }
         break;
       }
       case HTTPSTATUS.FORBIDDEN:
         toast.error("You do not have permission to perform this action!");
         break;
       case HTTPSTATUS.TOO_MANY_REQUESTS:
-        toast.error("Too many requests. Please try again later!");
+        toast.error(
+          getApiErrorMessage(
+            error,
+            "Login limit reached (maximum 5 attempts).",
+          ),
+        );
         break;
       case HTTPSTATUS.INTERNAL_SERVER_ERROR:
       case HTTPSTATUS.BAD_GATEWAY:
