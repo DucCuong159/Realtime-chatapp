@@ -1,0 +1,29 @@
+# Changelog
+
+## [1.1.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.0.0...realtime-chatapp-v1.1.0) (2026-08-24)
+
+
+### Features
+
+* **auth:** add register, login, logout, and auth status APIs ([#3](https://github.com/DucCuong159/Realtime-chatapp/issues/3)) ([9e280a7](https://github.com/DucCuong159/Realtime-chatapp/commit/9e280a7e1a507559ca615a4e1c11d0dd546041ba))
+* **backend:** implement Gemini AI streaming response and seed script ([#19](https://github.com/DucCuong159/Realtime-chatapp/issues/19)) ([aa4e85d](https://github.com/DucCuong159/Realtime-chatapp/commit/aa4e85dc747a8bb5886ce4fe520b86542bf21e2e))
+* **conversation:** implement single conversation detail view with real-time replies, media support and optimistic sorting ([#14](https://github.com/DucCuong159/Realtime-chatapp/issues/14)) ([28483a6](https://github.com/DucCuong159/Realtime-chatapp/commit/28483a6eb1c9570e83746943737e39d7455adc83))
+* **frontend:** implement AsideBar navigation, avatar badge, and layout integration ([#12](https://github.com/DucCuong159/Realtime-chatapp/issues/12)) ([0572a97](https://github.com/DucCuong159/Realtime-chatapp/commit/0572a976ac34605e425685957fcfbe412eb8cba5))
+* **frontend:** implement authentication flow, auth state management, and route protection ([#8](https://github.com/DucCuong159/Realtime-chatapp/issues/8)) ([e34d095](https://github.com/DucCuong159/Realtime-chatapp/commit/e34d095036a0cdd3d60b11eafc1fa403da890a0c))
+* **frontend:** implement conversation list, creation flow, and responsive layout ([#13](https://github.com/DucCuong159/Realtime-chatapp/issues/13)) ([49b20d8](https://github.com/DucCuong159/Realtime-chatapp/commit/49b20d845b7f9b845ee8f68b1395b49afc2fa602))
+* **frontend:** implement real-time AI message streaming and UI components ([#21](https://github.com/DucCuong159/Realtime-chatapp/issues/21)) ([6741111](https://github.com/DucCuong159/Realtime-chatapp/commit/67411118bf9fdde68ef308e3efd66bdabacbc65c))
+* **frontend:** setup project architecture, shadcn/ui design system, layouts and routing ([#7](https://github.com/DucCuong159/Realtime-chatapp/issues/7)) ([dd350ec](https://github.com/DucCuong159/Realtime-chatapp/commit/dd350ecfe0763332a225629e5a357863d3324445))
+* implement conversation module with model, controller, service, and routes ([#5](https://github.com/DucCuong159/Realtime-chatapp/issues/5)) ([8aa8a88](https://github.com/DucCuong159/Realtime-chatapp/commit/8aa8a8898601830d72a8a540767b0c35847017c9))
+* implement single conversation detail view and real-time chat ([#15](https://github.com/DucCuong159/Realtime-chatapp/issues/15)) ([27abbbd](https://github.com/DucCuong159/Realtime-chatapp/commit/27abbbd33ee2dea717cf83e01a4c3b21c54188ec))
+* implement user module with model, controller, service, and routes for retrieving users ([#4](https://github.com/DucCuong159/Realtime-chatapp/issues/4)) ([59b33fe](https://github.com/DucCuong159/Realtime-chatapp/commit/59b33fe7b30292587ea8044137a9e82be6b060ae))
+* **setup:** Express server with MongoDB connection & Vite frontend ([#1](https://github.com/DucCuong159/Realtime-chatapp/issues/1)) ([65458c2](https://github.com/DucCuong159/Realtime-chatapp/commit/65458c2ab509b03485db98332b371f5c6f8c5631))
+* **socket:** implement socket.io server with authentication, multi-tab online tracking, and realtime event emissions ([#6](https://github.com/DucCuong159/Realtime-chatapp/issues/6)) ([297de2c](https://github.com/DucCuong159/Realtime-chatapp/commit/297de2c4cb2bbac992e5b52a41f633bdf69561ec))
+
+
+### Bug Fixes
+
+* **ai:** synchronize multi-tab streaming placeholders and preserve message queue ordering ([#48](https://github.com/DucCuong159/Realtime-chatapp/issues/48)) ([d1d4de6](https://github.com/DucCuong159/Realtime-chatapp/commit/d1d4de6fc1d42d80d271e0c87d85d21e5b617a06))
+* **ci:** use Yarn Classic v1.22.22 instead of Corepack/Yarn 4 ([#46](https://github.com/DucCuong159/Realtime-chatapp/issues/46)) ([80347ca](https://github.com/DucCuong159/Realtime-chatapp/commit/80347ca6d82342a9619cd792467779f948302521))
+* **conversation:** prevent AI placeholder from inheriting user reply context ([#33](https://github.com/DucCuong159/Realtime-chatapp/issues/33)) ([#39](https://github.com/DucCuong159/Realtime-chatapp/issues/39)) ([cd48112](https://github.com/DucCuong159/Realtime-chatapp/commit/cd48112b391429d57134da7c7e3732b9502f705d))
+* **conversation:** single conversation detail view and real-time chat ([#16](https://github.com/DucCuong159/Realtime-chatapp/issues/16)) ([1ba628c](https://github.com/DucCuong159/Realtime-chatapp/commit/1ba628ce0f6ea1937a88c09546cabb472d0fcd4e))
+* **quality:** resolve all SonarCloud issues across backend and frontend ([#47](https://github.com/DucCuong159/Realtime-chatapp/issues/47)) ([c18fe5c](https://github.com/DucCuong159/Realtime-chatapp/commit/c18fe5c9a098fa8812605303457e53af2dc2acad))
