@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useAiModels } from "@/hooks/use-ai-models";
 import { useConversation } from "@/hooks/use-conversation";
 import type { MessageType } from "@/types/conversation.type";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,6 +32,7 @@ const ConversationFooter = ({
   onCancelReply,
 }: Props) => {
   const { sendMessage, isSendingMsg } = useConversation();
+  const { selectedModelId } = useAiModels();
 
   const [image, setImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -104,6 +106,7 @@ const ConversationFooter = ({
       content: messageContent,
       image: currentImage || undefined,
       replyTo: replyTo,
+      aiModelId: isAiConversation ? selectedModelId : undefined,
     };
     // Send payload in background (non-blocking)
     sendMessage(payload, isAiConversation);

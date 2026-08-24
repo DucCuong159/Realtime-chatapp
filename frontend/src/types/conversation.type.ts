@@ -38,6 +38,7 @@ export type CreateMessageType = {
   content?: string;
   image?: string;
   replyTo?: MessageType | null;
+  aiModelId?: string;
 };
 
 export type AIStreamPayload = {

@@ -183,7 +183,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     payload: CreateMessageType,
     isAIConversation: boolean = false,
   ) => {
-    const { conversationId, replyTo, content, image } = payload;
+    const { conversationId, replyTo, content, image, aiModelId } = payload;
     const { user } = useAuth.getState();
 
     if (!conversationId || !user?._id || (!content?.trim() && !image)) return;
@@ -238,15 +238,12 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         content,
         image,
         replyTo: replyTo?._id,
+        aiModelId,
       });
-      const { userMessage, aiResponse } = data;
-
-      // 3. Replace temp message with server response
+      const { userMessage } = data;
+      // 3. Replace temp message with server response (inside conversation and update list)
+      // AI response handled via socket
       get().addOrUpdateMessage(conversationId, userMessage, tempMsgId);
-
-      if (isAIConversation && aiSender && aiResponse) {
-        get().addOrUpdateMessage(conversationId, aiResponse, tempAIId);
-      }
       get().updateConversationLastMessage(conversationId, userMessage);
     } catch {
       // 4. Revert optimistic message and restore list state on failure
@@ -314,7 +311,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
     if (single && single.conversation._id === conversationId) {
       const isAIConversation = Boolean(
         single.conversation.isAiConversation ||
-          single.conversation.participants?.some((p) => p.isAI),
+        single.conversation.participants?.some((p) => p.isAI),
       );
       const aiSender = single.conversation.participants?.find((p) => p.isAI);
 

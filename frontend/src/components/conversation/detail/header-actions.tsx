@@ -4,34 +4,44 @@ import { Phone, Video } from "lucide-react";
 import { memo } from "react";
 
 interface HeaderActionsProps {
+  isAiConversation?: boolean;
   onAudioCall?: () => void;
   onVideoCall?: () => void;
   onInfoClick?: () => void;
 }
 
 export const HeaderActions = memo(
-  ({ onAudioCall, onVideoCall, onInfoClick }: HeaderActionsProps) => {
+  ({
+    isAiConversation,
+    onAudioCall,
+    onVideoCall,
+    onInfoClick,
+  }: HeaderActionsProps) => {
     return (
       <div className="flex shrink-0 items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Audio call"
-          onClick={onAudioCall}
-          className="size-9 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          <Phone className="size-5 fill-[#2a7bff] text-[#2a7bff]" />
-        </Button>
+        {!isAiConversation && (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Audio call"
+              onClick={onAudioCall}
+              className="size-9 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Phone className="size-5 fill-[#2a7bff] text-[#2a7bff]" />
+            </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="Video call"
-          onClick={onVideoCall}
-          className="size-9 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
-        >
-          <Video className="size-5 fill-[#2a7bff] text-[#2a7bff]" />
-        </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Video call"
+              onClick={onVideoCall}
+              className="size-9 rounded-full hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Video className="size-5 fill-[#2a7bff] text-[#2a7bff]" />
+            </Button>
+          </>
+        )}
 
         <Button
           variant="ghost"

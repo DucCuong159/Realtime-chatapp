@@ -11,7 +11,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
         <App />
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" richColors closeButton />
       </ThemeProvider>
     </BrowserRouter>
   </StrictMode>,

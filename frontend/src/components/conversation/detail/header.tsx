@@ -5,6 +5,7 @@ import type { ConversationType } from "@/types/conversation.type";
 import { ArrowLeft } from "lucide-react";
 import { memo } from "react";
 import { useNavigate } from "react-router-dom";
+import { AiModelSelector } from "./ai-model-selector";
 import HeaderActions from "./header-actions";
 import HeaderGroupInfo from "./header-group-info";
 import HeaderUserInfo from "./header-user-info";
@@ -18,6 +19,11 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
   const navigate = useNavigate();
   const { name, subheading, avatar, isOnline, isGroup } =
     useConversationDetails(conversation, currentUserId);
+
+  const isAi = Boolean(
+    conversation.isAiConversation ||
+      conversation.participants?.some((p) => p.isAI),
+  );
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm">
@@ -51,7 +57,10 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
         )}
       </div>
 
-      <HeaderActions />
+      <div className="flex shrink-0 items-center gap-2">
+        {isAi && <AiModelSelector />}
+        <HeaderActions isAiConversation={isAi} />
+      </div>
     </div>
   );
 };
