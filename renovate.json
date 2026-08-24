@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)"
+  ],
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "📋 Dependency Dashboard",
+  "prConcurrentLimit": 2,
+  "prHourlyLimit": 2,
+  "timezone": "Asia/Ho_Chi_Minh",
+  "schedule": ["before 6am on monday"],
+  "packageRules": [
+    {
+      "description": "Group all GitHub Actions updates into a single PR",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": false
+    },
+    {
+      "description": "Group all @types/* packages into a single PR",
+      "matchPackagePatterns": ["^@types/"],
+      "groupName": "TypeScript definitions (@types)",
+      "automerge": false
+    },
+    {
+      "description": "Group minor and patch updates for all npm packages into a single PR",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "Non-major npm dependencies",
+      "automerge": false
+    },
+    {
+      "description": "Require manual approval on Dependency Dashboard for Major version updates",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ]
+}
