@@ -55,6 +55,7 @@ export const getApiErrorMessage = (
     if (data?.message) {
       return data.message;
     }
+    return fallback;
   }
   if (error instanceof Error) {
     return error.message;
@@ -108,7 +109,7 @@ API.interceptors.response.use(
         toast.error(
           getApiErrorMessage(
             error,
-            "Login limit reached (maximum 5 attempts).",
+            "Too many requests. Please try again later!",
           ),
         );
         break;
