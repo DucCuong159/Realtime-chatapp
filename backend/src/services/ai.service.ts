@@ -51,6 +51,7 @@ let inFlightFetchPromise: Promise<{
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes normal cache TTL (drastically saves quota)
 const MIN_FORCE_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes cooldown between forced live probes
+const EMPTY_CACHE_TTL_MS = 10 * 1000; // 10s short TTL for empty probe results to allow fast retries
 const PROBE_CONCURRENCY_LIMIT = 4; // Max concurrent model quota check probes
 
 /**
@@ -320,11 +321,28 @@ export const getAvailableTextOutModelsService = async (
         return a.id.localeCompare(b.id);
       });
 
+      // Degraded batch (e.g. upstream timeouts): keep the last good result
+      // instead of caching an empty list for the full TTL.
+      if (supportedModels.length === 0 && modelsCache?.data.length) {
+        return {
+          models: modelsCache.data,
+          cachedAt: new Date(modelsCache.cachedAt).toISOString(),
+        };
+      }
+
       const completedAt = Date.now();
-      modelsCache = {
-        data: supportedModels,
-        cachedAt: completedAt,
-      };
+      if (supportedModels.length > 0) {
+        modelsCache = {
+          data: supportedModels,
+          cachedAt: completedAt,
+        };
+      } else {
+        // Fast retry for initial empty result (10s short TTL)
+        modelsCache = {
+          data: [],
+          cachedAt: completedAt - (CACHE_TTL_MS - EMPTY_CACHE_TTL_MS),
+        };
+      }
 
       return {
         models: supportedModels,
