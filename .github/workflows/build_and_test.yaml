@@ -43,7 +43,7 @@ jobs:
 
       # ─── BACKEND BUILD & TYPECHECK ─────────────────────────────────────────
       - name: Setup Backend Cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             backend/node_modules
@@ -61,7 +61,7 @@ jobs:
 
       # ─── FRONTEND BUILD, LINT & TYPECHECK ──────────────────────────────────
       - name: Setup Frontend Cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: |
             frontend/node_modules
