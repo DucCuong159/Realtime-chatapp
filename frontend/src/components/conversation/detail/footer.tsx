@@ -32,7 +32,7 @@ const ConversationFooter = ({
   onCancelReply,
 }: Props) => {
   const { sendMessage, isSendingMsg } = useConversation();
-  const { selectedModelId } = useAiModels();
+  const { getEffectiveModelId } = useAiModels();
 
   const [image, setImage] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
@@ -106,7 +106,7 @@ const ConversationFooter = ({
       content: messageContent,
       image: currentImage || undefined,
       replyTo: replyTo,
-      aiModelId: isAiConversation ? selectedModelId : undefined,
+      aiModelId: isAiConversation ? getEffectiveModelId() : undefined,
     };
     // Send payload in background (non-blocking)
     sendMessage(payload, isAiConversation);

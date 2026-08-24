@@ -16,6 +16,7 @@ interface AIModelsState {
   fetchAiModels: (forceRefresh?: boolean) => Promise<void>;
   setSelectedModelId: (modelId: string) => void;
   getSelectedModel: () => AIModelInfo | undefined;
+  getEffectiveModelId: () => string | undefined;
 }
 
 const getInitialSelectedModel = (): string => {
@@ -102,6 +103,18 @@ export const useAiModels = create<AIModelsState>()((set, get) => ({
 
   getSelectedModel: () => {
     const { models, selectedModelId } = get();
-    return models.find((m) => m.id === selectedModelId);
+    const current = models.find(
+      (m) => m.id === selectedModelId && m.isAvailable,
+    );
+    if (current) return current;
+    return models.find((m) => m.isAvailable);
+  },
+
+  getEffectiveModelId: () => {
+    const { models, selectedModelId } = get();
+    const available =
+      models.find((m) => m.id === selectedModelId && m.isAvailable) ||
+      models.find((m) => m.isAvailable);
+    return available?.id || selectedModelId || undefined;
   },
 }));

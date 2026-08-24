@@ -12,7 +12,14 @@ import {
 import ConversationModel from "../models/Conversation.js";
 import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
-import { NotFoundException } from "../utils/app-error.js";
+import {
+  AIModelInfo,
+  getAvailableTextOutModelsService,
+} from "./ai.service.js";
+import {
+  BadRequestException,
+  NotFoundException,
+} from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
 import { validateConversationParticipantsService } from "./conversation.service.js";
@@ -151,13 +158,37 @@ const getAIResponse = async (
   aiModelId?: string,
 ) => {
   let geminiAI: any = null;
-  const targetModelId = aiModelId?.trim() || "gemini-2.5-flash";
+  let targetModelId = "gemini-2.5-flash";
 
   try {
     geminiAI = await UserModel.findOne({ isAI: true });
     if (!geminiAI) {
       throw new NotFoundException("AI model not found");
     }
+
+    // Resolve model against discovered/available models (cached in memory)
+    const { models: availableModels } = await getAvailableTextOutModelsService();
+
+    let resolvedModel: AIModelInfo | undefined;
+    if (aiModelId?.trim()) {
+      resolvedModel = availableModels.find(
+        (m) => m.id === aiModelId.trim() && m.isAvailable,
+      );
+      if (!resolvedModel) {
+        throw new BadRequestException(
+          `AI model (${aiModelId.trim()}) is either unavailable or does not exist. Please select an available model from the toolbar.`,
+        );
+      }
+    } else {
+      resolvedModel = availableModels.find((m) => m.isAvailable);
+      if (!resolvedModel) {
+        throw new BadRequestException(
+          "No AI models are currently available. Please try again later.",
+        );
+      }
+    }
+
+    targetModelId = resolvedModel.id;
 
     const conversationHistory = await getConversationHistory(
       conversationId,
