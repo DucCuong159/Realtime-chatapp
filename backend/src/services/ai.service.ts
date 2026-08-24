@@ -28,6 +28,7 @@ interface RawGeminiModel {
 
 interface ListModelsApiResponse {
   models?: RawGeminiModel[];
+  nextPageToken?: string;
   error?: {
     code: number;
     message: string;
@@ -168,6 +169,51 @@ const checkModelQuota = async (
 };
 
 /**
+ * Fetch all raw models from Google Generative Language API, handling pagination via nextPageToken.
+ */
+const fetchAllRawModels = async (apiKey: string): Promise<RawGeminiModel[]> => {
+  const allRawModels: RawGeminiModel[] = [];
+  let pageToken: string | undefined = undefined;
+
+  do {
+    const listUrl = new URL(
+      "https://generativelanguage.googleapis.com/v1beta/models",
+    );
+    listUrl.searchParams.set("key", apiKey);
+    if (pageToken) {
+      listUrl.searchParams.set("pageToken", pageToken);
+    }
+
+    const listController = new AbortController();
+    const listTimeoutId = setTimeout(() => listController.abort(), 10000); // 10s deadline
+
+    let listData: ListModelsApiResponse;
+    try {
+      const listRes = await fetch(listUrl.toString(), {
+        signal: listController.signal,
+      });
+      listData = await listRes.json();
+    } finally {
+      clearTimeout(listTimeoutId);
+    }
+
+    if (listData.error) {
+      throw new InternalServerException(
+        `Google API Error [${listData.error.code}]: ${listData.error.message}`,
+      );
+    }
+
+    if (listData.models && listData.models.length > 0) {
+      allRawModels.push(...listData.models);
+    }
+
+    pageToken = listData.nextPageToken || undefined;
+  } while (pageToken);
+
+  return allRawModels;
+};
+
+/**
  * Fetch supported text-out models and their quota status.
  * Uses request coalescing and throttling to prevent quota exhaustion from concurrent/repeated requests.
  */
@@ -216,32 +262,15 @@ export const getAvailableTextOutModelsService = async (
   // 4. Launch new probe batch and share in-flight promise with concurrent requests
   inFlightFetchPromise = (async () => {
     try {
-      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-      const listController = new AbortController();
-      const listTimeoutId = setTimeout(() => listController.abort(), 10000); // 10s deadline
-
-      let listData: ListModelsApiResponse;
-      try {
-        const listRes = await fetch(listUrl, { signal: listController.signal });
-        listData = await listRes.json();
-      } finally {
-        clearTimeout(listTimeoutId);
-      }
-
-      if (listData.error) {
-        throw new InternalServerException(
-          `Google API Error [${listData.error.code}]: ${listData.error.message}`,
-        );
-      }
+      const allRawModels = await fetchAllRawModels(apiKey);
 
       // Filter text-out models supporting generateContent
-      const rawTextModels =
-        listData.models?.filter((m) => {
-          const modelId = m.name.replace(/^models\//, "");
-          const supportsGenerate =
-            m.supportedGenerationMethods?.includes("generateContent");
-          return Boolean(supportsGenerate && isTextOutModel(modelId));
-        }) || [];
+      const rawTextModels = allRawModels.filter((m) => {
+        const modelId = m.name.replace(/^models\//, "");
+        const supportsGenerate =
+          m.supportedGenerationMethods?.includes("generateContent");
+        return Boolean(supportsGenerate && isTextOutModel(modelId));
+      });
 
       // Check quota for all candidate models concurrently
       const checkedResults = await Promise.allSettled(
