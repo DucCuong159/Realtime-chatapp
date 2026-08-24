@@ -1,3 +1,4 @@
+import pLimit from "p-limit";
 import { Env } from "../config/env.config.js";
 import { HTTPSTATUS } from "../config/http.config.js";
 import { InternalServerException } from "../utils/app-error.js";
@@ -50,6 +51,7 @@ let inFlightFetchPromise: Promise<{
 
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes normal cache TTL (drastically saves quota)
 const MIN_FORCE_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes cooldown between forced live probes
+const PROBE_CONCURRENCY_LIMIT = 4; // Max concurrent model quota check probes
 
 /**
  * Filter only pure text/chat models.
@@ -272,17 +274,20 @@ export const getAvailableTextOutModelsService = async (
         return Boolean(supportsGenerate && isTextOutModel(modelId));
       });
 
-      // Check quota for all candidate models concurrently
+      // Check quota for all candidate models through p-limit worker pool
+      const limit = pLimit(PROBE_CONCURRENCY_LIMIT);
       const checkedResults = await Promise.allSettled(
-        rawTextModels.map(async (m) => {
-          const modelId = m.name.replace(/^models\//, "");
-          const quota = await checkModelQuota(modelId, apiKey);
-          return {
-            model: m,
-            modelId,
-            quota,
-          };
-        }),
+        rawTextModels.map((m) =>
+          limit(async () => {
+            const modelId = m.name.replace(/^models\//, "");
+            const quota = await checkModelQuota(modelId, apiKey);
+            return {
+              model: m,
+              modelId,
+              quota,
+            };
+          }),
+        ),
       );
 
       const supportedModels: AIModelInfo[] = [];
