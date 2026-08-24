@@ -42,7 +42,13 @@ interface ModelsCache {
 }
 
 let modelsCache: ModelsCache | null = null;
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes cache TTL
+let inFlightFetchPromise: Promise<{
+  models: AIModelInfo[];
+  cachedAt: string;
+}> | null = null;
+
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes normal cache TTL (drastically saves quota)
+const MIN_FORCE_REFRESH_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes cooldown between forced live probes
 
 /**
  * Filter only pure text/chat models.
@@ -163,6 +169,7 @@ const checkModelQuota = async (
 
 /**
  * Fetch supported text-out models and their quota status.
+ * Uses request coalescing and throttling to prevent quota exhaustion from concurrent/repeated requests.
  */
 export const getAvailableTextOutModelsService = async (
   forceRefresh: boolean = false,
@@ -175,6 +182,8 @@ export const getAvailableTextOutModelsService = async (
   }
 
   const now = Date.now();
+
+  // 1. Return fresh cached data if still within normal TTL (unless force-refreshed)
   if (
     !forceRefresh &&
     modelsCache &&
@@ -186,75 +195,103 @@ export const getAvailableTextOutModelsService = async (
     };
   }
 
-  const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
-  const listRes = await fetch(listUrl);
-  const listData: ListModelsApiResponse = await listRes.json();
-
-  if (listData.error) {
-    throw new InternalServerException(
-      `Google API Error [${listData.error.code}]: ${listData.error.message}`,
-    );
+  // 2. Throttling: If forceRefresh is requested, but cache was updated very recently (< 30s),
+  // reuse the cached result to prevent quota exhaustion from rapid clicks or loops.
+  if (
+    forceRefresh &&
+    modelsCache &&
+    now - modelsCache.cachedAt < MIN_FORCE_REFRESH_INTERVAL_MS
+  ) {
+    return {
+      models: modelsCache.data,
+      cachedAt: new Date(modelsCache.cachedAt).toISOString(),
+    };
   }
 
-  // Filter text-out models supporting generateContent
-  const rawTextModels =
-    listData.models?.filter((m) => {
-      const modelId = m.name.replace(/^models\//, "");
-      const supportsGenerate =
-        m.supportedGenerationMethods?.includes("generateContent");
-      return Boolean(supportsGenerate && isTextOutModel(modelId));
-    }) || [];
+  // 3. Request Coalescing: If another probe is already in flight, reuse its promise
+  if (inFlightFetchPromise) {
+    return inFlightFetchPromise;
+  }
 
-  // Check quota for all candidate models concurrently
-  const checkedResults = await Promise.allSettled(
-    rawTextModels.map(async (m) => {
-      const modelId = m.name.replace(/^models\//, "");
-      const quota = await checkModelQuota(modelId, apiKey);
-      return {
-        model: m,
-        modelId,
-        quota,
-      };
-    }),
-  );
+  // 4. Launch new probe batch and share in-flight promise with concurrent requests
+  inFlightFetchPromise = (async () => {
+    try {
+      const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
+      const listRes = await fetch(listUrl);
+      const listData: ListModelsApiResponse = await listRes.json();
 
-  const supportedModels: AIModelInfo[] = [];
-
-  for (const result of checkedResults) {
-    if (result.status === "fulfilled") {
-      const { model, modelId, quota } = result.value;
-      if (quota.isSupported) {
-        supportedModels.push({
-          id: modelId,
-          name: model.displayName || modelId,
-          description: model.description,
-          inputTokenLimit: model.inputTokenLimit,
-          outputTokenLimit: model.outputTokenLimit,
-          status: quota.status,
-          latencyMs: quota.latencyMs,
-          statusBadge: quota.statusBadge,
-          note: quota.note,
-          isAvailable: quota.isAvailable,
-        });
+      if (listData.error) {
+        throw new InternalServerException(
+          `Google API Error [${listData.error.code}]: ${listData.error.message}`,
+        );
       }
+
+      // Filter text-out models supporting generateContent
+      const rawTextModels =
+        listData.models?.filter((m) => {
+          const modelId = m.name.replace(/^models\//, "");
+          const supportsGenerate =
+            m.supportedGenerationMethods?.includes("generateContent");
+          return Boolean(supportsGenerate && isTextOutModel(modelId));
+        }) || [];
+
+      // Check quota for all candidate models concurrently
+      const checkedResults = await Promise.allSettled(
+        rawTextModels.map(async (m) => {
+          const modelId = m.name.replace(/^models\//, "");
+          const quota = await checkModelQuota(modelId, apiKey);
+          return {
+            model: m,
+            modelId,
+            quota,
+          };
+        }),
+      );
+
+      const supportedModels: AIModelInfo[] = [];
+
+      for (const result of checkedResults) {
+        if (result.status === "fulfilled") {
+          const { model, modelId, quota } = result.value;
+          if (quota.isSupported) {
+            supportedModels.push({
+              id: modelId,
+              name: model.displayName || modelId,
+              description: model.description,
+              inputTokenLimit: model.inputTokenLimit,
+              outputTokenLimit: model.outputTokenLimit,
+              status: quota.status,
+              latencyMs: quota.latencyMs,
+              statusBadge: quota.statusBadge,
+              note: quota.note,
+              isAvailable: quota.isAvailable,
+            });
+          }
+        }
+      }
+
+      // Sort: Ready models first (sorted by latency ascending), then busy, then quota exceeded
+      supportedModels.sort((a, b) => {
+        if (a.isAvailable && !b.isAvailable) return -1;
+        if (!a.isAvailable && b.isAvailable) return 1;
+        if (a.latencyMs && b.latencyMs) return a.latencyMs - b.latencyMs;
+        return a.id.localeCompare(b.id);
+      });
+
+      const completedAt = Date.now();
+      modelsCache = {
+        data: supportedModels,
+        cachedAt: completedAt,
+      };
+
+      return {
+        models: supportedModels,
+        cachedAt: new Date(completedAt).toISOString(),
+      };
+    } finally {
+      inFlightFetchPromise = null;
     }
-  }
+  })();
 
-  // Sort: Ready models first (sorted by latency ascending), then busy, then quota exceeded
-  supportedModels.sort((a, b) => {
-    if (a.isAvailable && !b.isAvailable) return -1;
-    if (!a.isAvailable && b.isAvailable) return 1;
-    if (a.latencyMs && b.latencyMs) return a.latencyMs - b.latencyMs;
-    return a.id.localeCompare(b.id);
-  });
-
-  modelsCache = {
-    data: supportedModels,
-    cachedAt: now,
-  };
-
-  return {
-    models: supportedModels,
-    cachedAt: new Date(now).toISOString(),
-  };
+  return inFlightFetchPromise;
 };
