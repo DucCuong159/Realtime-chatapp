@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { ModelMessage, streamText } from "ai";
 import cloudinary from "../config/cloudinary.config.js";
 import { Env } from "../config/env.config.js";
+import { HTTPSTATUS } from "../config/http.config.js";
 import {
   emitConversationAI,
   emitLastMessageToParticipants,
@@ -25,7 +26,7 @@ export const sendMessageService = async (
   body: sendMessageSchemaType,
   originatingSocketId?: string,
 ) => {
-  const { conversationId, content, image, replyTo } = body;
+  const { conversationId, content, image, replyTo, aiModelId } = body;
 
   const conversation = await validateConversationParticipantsService(
     conversationId,
@@ -96,14 +97,17 @@ export const sendMessageService = async (
   emitLastMessageToParticipants(participantIds, conversationId, newMessage);
 
   if (targetConversation.isAiConversation) {
-    queueAIResponse(conversationId, participantIds, newMessage).catch(
-      (error) => {
-        console.error(
-          `Failed to generate AI response for conversation ${conversationId}:`,
-          error,
-        );
-      },
-    );
+    queueAIResponse(
+      conversationId,
+      participantIds,
+      newMessage,
+      aiModelId,
+    ).catch((error) => {
+      console.error(
+        `Failed to generate AI response for conversation ${conversationId}:`,
+        error,
+      );
+    });
   }
 
   return {
@@ -118,13 +122,16 @@ const queueAIResponse = async (
   conversationId: string,
   participantIds: string[],
   triggerMessage: MessageDocument,
+  aiModelId?: string,
 ) => {
   const currentTask =
     aiConversationQueues.get(conversationId) || Promise.resolve();
 
   const nextTask = currentTask
     .catch(() => {})
-    .then(() => getAIResponse(conversationId, participantIds, triggerMessage));
+    .then(() =>
+      getAIResponse(conversationId, participantIds, triggerMessage, aiModelId),
+    );
 
   aiConversationQueues.set(conversationId, nextTask);
 
@@ -141,8 +148,11 @@ const getAIResponse = async (
   conversationId: string,
   participantIds: string[],
   triggerMessage: MessageDocument,
+  aiModelId?: string,
 ) => {
   let geminiAI: any = null;
+  const targetModelId = aiModelId?.trim() || "gemini-2.5-flash";
+
   try {
     geminiAI = await UserModel.findOne({ isAI: true });
     if (!geminiAI) {
@@ -188,7 +198,7 @@ const getAIResponse = async (
       .filter((msg) => msg.content.length > 0);
 
     const result = streamText({
-      model: google("gemini-3.6-flash"),
+      model: google(targetModelId),
       messages: formattedMessages,
       abortSignal: AbortSignal.timeout(60000),
       system: `
@@ -248,18 +258,31 @@ const getAIResponse = async (
 
     emitLastMessageToParticipants(participantIds, conversationId, aiMessage);
     return aiMessage;
-  } catch (error) {
+  } catch (error: any) {
     console.error(
-      `AI generation error for conversation ${conversationId}:`,
+      `AI generation error with model ${targetModelId} for conversation ${conversationId}:`,
       error,
     );
+
+    const errorMsg = (error?.message || "").toLowerCase();
+    const isQuotaExceeded =
+      error?.status === HTTPSTATUS.TOO_MANY_REQUESTS ||
+      error?.statusCode === HTTPSTATUS.TOO_MANY_REQUESTS ||
+      errorMsg.includes("quota") ||
+      errorMsg.includes("resource_exhausted") ||
+      errorMsg.includes("rate limit");
+
+    const errorMessage = isQuotaExceeded
+      ? `AI Model (${targetModelId}) has exceeded its rate limit quota (429). Please select another AI model from the toolbar.`
+      : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`;
+
     emitConversationAI({
       conversationId,
       chunk: null,
       sender: geminiAI || undefined,
       done: true,
       message: null,
-      error: "Failed to generate AI response. Please try again later.",
+      error: errorMessage,
     });
     throw error;
   }

@@ -37,6 +37,7 @@ export const sendMessageSchema = z
       .trim()
       .regex(objectIdRegex, "Invalid replyTo message ID")
       .optional(),
+    aiModelId: z.string().trim().optional(),
   })
   .refine((data) => data.content || data.image, {
     message: "Content or image is required",
