@@ -29,7 +29,18 @@ export const conversationIdSchema = z.object({
 });
 
 export const getConversationMessagesQuerySchema = z.object({
-  cursor: z.string().trim().optional(),
+  cursor: z
+    .string()
+    .trim()
+    .refine(
+      (val) =>
+        /^[0-9a-fA-F]{24}$/.test(val) || !Number.isNaN(Date.parse(val)),
+      {
+        message:
+          "Cursor must be a valid ISO datetime string or a 24-character hexadecimal ObjectId",
+      },
+    )
+    .optional(),
   limit: z.coerce.number().int().positive().max(100).default(30).optional(),
 });
 
