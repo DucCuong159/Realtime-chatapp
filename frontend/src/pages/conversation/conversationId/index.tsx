@@ -86,26 +86,26 @@ const SingleConversation = () => {
   }
 
   return (
-    <div className="relative flex h-screen flex-col">
+    <div className="relative flex h-screen flex-col overflow-hidden">
       <ConversationHeader
         conversation={conversation}
         currentUserId={currentUserId}
       />
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-        {isArrayEmpty(messages) ? (
+      {isArrayEmpty(messages) ? (
+        <div className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <EmptyState
             title="Start a conversation"
             description="No messages yet. Send the first message"
           />
-        ) : (
-          <ConversationBody
-            conversationId={conversationId}
-            messages={messages}
-            onReply={setReplyTo}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <ConversationBody
+          conversationId={conversationId}
+          messages={messages}
+          onReply={setReplyTo}
+        />
+      )}
 
       <ConversationFooter
         replyTo={replyTo}

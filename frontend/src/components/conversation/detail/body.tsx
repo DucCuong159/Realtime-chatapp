@@ -1,15 +1,24 @@
 import AvatarWithBadge from "@/components/avatar-with-badge";
 import Response from "@/components/ui/ai-response";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversation } from "@/hooks/use-conversation";
 import { useSocket } from "@/hooks/use-socket";
 import { cn, formatConversationTime } from "@/lib/utils";
 import type { AIStreamPayload, MessageType } from "@/types/conversation.type";
 import { RiCircleFill } from "@remixicon/react";
-import { Reply } from "lucide-react";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { ChevronDown, Reply } from "lucide-react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
+import { useShallow } from "zustand/react/shallow";
 
 interface ConversationBodyProps {
   conversationId: string;
@@ -206,14 +215,55 @@ const ConversationBody = ({
 }: ConversationBodyProps) => {
   const { user } = useAuth();
   const currentUserId = user?._id || null;
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { socket } = useSocket();
+
   const {
     addOrUpdateMessage,
     updateStreamingAIMessage,
     clearStreamingAIMessage,
-  } = useConversation();
+    fetchMoreMessages,
+    isFetchingMoreMessages,
+    hasMore,
+    isSendingMsg,
+  } = useConversation(
+    useShallow((state) => ({
+      addOrUpdateMessage: state.addOrUpdateMessage,
+      updateStreamingAIMessage: state.updateStreamingAIMessage,
+      clearStreamingAIMessage: state.clearStreamingAIMessage,
+      fetchMoreMessages: state.fetchMoreMessages,
+      isFetchingMoreMessages: state.isFetchingMoreMessages,
+      hasMore: Boolean(state.singleConversation?.pagination?.hasMore),
+      isSendingMsg: state.isSendingMsg,
+    })),
+  );
 
+  const previousScrollHeightRef = useRef<number | null>(null);
+  const previousScrollTopRef = useRef<number | null>(null);
+  const isPrependingRef = useRef<boolean>(false);
+  const isInitialLoadRef = useRef<boolean>(true);
+  const prevConversationIdRef = useRef<string>(conversationId);
+
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  // Reset initial load flag and scroll-to-bottom button when conversation switches
+  useEffect(() => {
+    if (prevConversationIdRef.current !== conversationId) {
+      isInitialLoadRef.current = true;
+      isPrependingRef.current = false;
+      previousScrollHeightRef.current = null;
+      previousScrollTopRef.current = null;
+      prevConversationIdRef.current = conversationId;
+      setShowScrollToBottom(false);
+    }
+  }, [conversationId]);
+
+  // Handle Socket AI streaming
   useEffect(() => {
     if (!socket) return;
 
@@ -253,10 +303,60 @@ const ConversationBody = ({
     clearStreamingAIMessage,
   ]);
 
-  useEffect(() => {
-    if (!messages.length) return;
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  // Scroll Position Restoration & Auto-Scroll
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (isInitialLoadRef.current && messages.length > 0) {
+      container.scrollTop = container.scrollHeight;
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    if (isPrependingRef.current) {
+      if (previousScrollHeightRef.current !== null) {
+        const newScrollHeight = container.scrollHeight;
+        const oldScrollHeight = previousScrollHeightRef.current;
+        const oldScrollTop = previousScrollTopRef.current ?? 0;
+        const heightDiff = newScrollHeight - oldScrollHeight;
+
+        container.scrollTop = heightDiff + oldScrollTop;
+      }
+      isPrependingRef.current = false;
+      previousScrollHeightRef.current = null;
+      previousScrollTopRef.current = null;
+    } else {
+      const isNearBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight <
+        150;
+      const lastMessage = messages[messages.length - 1];
+      const isLastFromCurrentUser = lastMessage?.sender?._id === currentUserId;
+
+      if (isNearBottom || isLastFromCurrentUser) {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  }, [messages, currentUserId]);
+
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Detect when user reaches near top
+    if (container.scrollTop <= 80 && hasMore && !isFetchingMoreMessages) {
+      previousScrollHeightRef.current = container.scrollHeight;
+      previousScrollTopRef.current = container.scrollTop;
+      isPrependingRef.current = true;
+
+      fetchMoreMessages(conversationId);
+    }
+
+    // Detect distance from bottom to show/hide scroll-to-bottom button
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    setShowScrollToBottom(distanceFromBottom > 200);
+  }, [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId]);
 
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -284,28 +384,69 @@ const ConversationBody = ({
     }
   }, []);
 
-  const isSendingMsg = useConversation((state) => state.isSendingMsg);
-
   return (
-    <div className="flex flex-1 flex-col justify-end gap-1 p-3 w-full">
-      {messages.map((message, index) => {
-        const isCurrentUser = message.sender?._id === currentUserId;
-        const isLastFromUser = index === messages.length - 1 && isCurrentUser;
+    <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overflow-x-hidden p-3 w-full bg-background flex flex-col justify-start"
+      >
+        {/* Beginning of conversation indicator */}
+        {!hasMore && messages.length > 0 && (
+          <div className="flex items-center justify-center py-4 select-none">
+            <div className="text-[11px] text-muted-foreground/70 flex items-center gap-2 font-medium">
+              <span className="h-px w-8 bg-border/60" />
+              <span>Beginning of conversation history</span>
+              <span className="h-px w-8 bg-border/60" />
+            </div>
+          </div>
+        )}
 
-        return (
-          <MessageItem
-            key={message._id}
-            message={message}
-            currentUserId={currentUserId}
-            isCurrentUser={isCurrentUser}
-            isLastFromUser={isLastFromUser}
-            isSendingMsg={isSendingMsg}
-            onReply={onReply}
-            onScrollToMessage={handleScrollToMessage}
-          />
-        );
-      })}
-      <div ref={bottomRef} />
+        {/* Top Loading Indicator */}
+        {isFetchingMoreMessages && (
+          <div className="flex items-center justify-center pb-3 select-none">
+            <Spinner className="size-6 text-primary!" />
+          </div>
+        )}
+
+        {/* Flexible spacer to push messages to bottom when few messages exist */}
+        <div className="flex-1 min-h-0" />
+
+        <div className="flex flex-col gap-1 w-full">
+          {messages.map((message, index) => {
+            const isCurrentUser = message.sender?._id === currentUserId;
+            const isLastFromUser =
+              index === messages.length - 1 && isCurrentUser;
+
+            return (
+              <MessageItem
+                key={message._id}
+                message={message}
+                currentUserId={currentUserId}
+                isCurrentUser={isCurrentUser}
+                isLastFromUser={isLastFromUser}
+                isSendingMsg={isSendingMsg}
+                onReply={onReply}
+                onScrollToMessage={handleScrollToMessage}
+              />
+            );
+          })}
+        </div>
+        <div ref={bottomRef} className="h-0 w-full shrink-0" />
+      </div>
+
+      {/* Floating Scroll-to-Bottom Button */}
+      {showScrollToBottom && (
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={scrollToBottom}
+          className="absolute bottom-4 right-5 z-20 size-9 rounded-full shadow-md border border-border/60 bg-background/90 hover:bg-background backdrop-blur-md transition-all hover:scale-105 active:scale-95 animate-in fade-in zoom-in-75 duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
+          aria-label="Scroll to bottom"
+        >
+          <ChevronDown className="size-5" />
+        </Button>
+      )}
     </div>
   );
 };
