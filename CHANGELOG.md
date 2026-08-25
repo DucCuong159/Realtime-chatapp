@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.1.0...realtime-chatapp-v1.2.0) (2026-08-25)
+
+
+### Features
+
+* add AI model selector with quota status and dynamic dispatch ([#49](https://github.com/DucCuong159/Realtime-chatapp/issues/49)) ([#50](https://github.com/DucCuong159/Realtime-chatapp/issues/50)) ([312b28d](https://github.com/DucCuong159/Realtime-chatapp/commit/312b28d9919e84bc4e6d48ab44dd14f111247ea1))
+* **agent:** add agentic skills framework and custom guidelines ([#78](https://github.com/DucCuong159/Realtime-chatapp/issues/78)) ([41b152e](https://github.com/DucCuong159/Realtime-chatapp/commit/41b152e629e3653cf5376c199e874b8dc92353f2))
+
+
+### Bug Fixes
+
+* display error toast notification for auth failures ([#25](https://github.com/DucCuong159/Realtime-chatapp/issues/25)) ([#52](https://github.com/DucCuong159/Realtime-chatapp/issues/52)) ([747817f](https://github.com/DucCuong159/Realtime-chatapp/commit/747817f65314ddf5b9854417e43368579f2066bd))
+* display error toast on failed auth and limit auth attempts ([#26](https://github.com/DucCuong159/Realtime-chatapp/issues/26)) ([#51](https://github.com/DucCuong159/Realtime-chatapp/issues/51)) ([2795ea2](https://github.com/DucCuong159/Realtime-chatapp/commit/2795ea2b0c74bb6d6bbbd21b8b9b95054c90d02c))
+
 ## [1.1.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.0.0...realtime-chatapp-v1.1.0) (2026-08-24)
 
 
