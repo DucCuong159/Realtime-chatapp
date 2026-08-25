@@ -181,13 +181,38 @@ export const validateConversationParticipantsService = async (
 export const getSingleConversationService = async (
   conversationId: string,
   userId: string,
+  cursor?: string,
+  limit: number = 30,
 ) => {
   const conversation = await validateConversationParticipantsService(
     conversationId,
     userId,
   );
 
-  const messages = await MessageModel.find({ conversationId })
+  const query: Record<string, any> = { conversationId };
+
+  if (cursor) {
+    let cursorDate: Date | null = null;
+    const parsedDate = new Date(cursor);
+    if (!Number.isNaN(parsedDate.getTime())) {
+      cursorDate = parsedDate;
+    } else if (/^[0-9a-fA-F]{24}$/.test(cursor)) {
+      const cursorMessage = await MessageModel.findById(cursor)
+        .select("createdAt")
+        .lean();
+      if (cursorMessage?.createdAt) {
+        cursorDate = new Date(cursorMessage.createdAt);
+      }
+    }
+
+    if (cursorDate) {
+      query.createdAt = { $lt: cursorDate };
+    }
+  }
+
+  const items = await MessageModel.find(query)
+    .sort({ createdAt: -1, _id: -1 })
+    .limit(limit + 1)
     .populate("sender", "name avatar isAI")
     .populate({
       path: "replyTo",
@@ -197,10 +222,22 @@ export const getSingleConversationService = async (
         select: "name avatar isAI",
       },
     })
-    .sort({ createdAt: -1, _id: -1 });
+    .lean();
+
+  const hasMore = items.length > limit;
+  const rawMessages = hasMore ? items.slice(0, limit) : items;
+  const oldestMessage = rawMessages[rawMessages.length - 1];
+  const nextCursor =
+    hasMore && oldestMessage?.createdAt
+      ? new Date(oldestMessage.createdAt).toISOString()
+      : null;
 
   return {
     conversation,
-    messages: messages.reverse(),
+    messages: [...rawMessages].reverse(),
+    pagination: {
+      hasMore,
+      nextCursor,
+    },
   };
 };

@@ -28,6 +28,15 @@ export const conversationIdSchema = z.object({
   conversationId: z.string().trim().min(1),
 });
 
+export const getConversationMessagesQuerySchema = z.object({
+  cursor: z.string().trim().optional(),
+  limit: z.coerce.number().int().positive().max(100).default(30).optional(),
+});
+
 export type CreateConversationSchemaType = z.infer<
   typeof createConversationSchema
+>;
+
+export type GetConversationMessagesQueryType = z.infer<
+  typeof getConversationMessagesQuerySchema
 >;

@@ -9,6 +9,7 @@ import {
 import {
   conversationIdSchema,
   createConversationSchema,
+  getConversationMessagesQuerySchema,
 } from "../validators/conversation.validator.js";
 
 export const createConversationController = asyncHandler(
@@ -42,15 +43,23 @@ export const getSingleConversationsController = asyncHandler(
     const userId = req.user?._id;
 
     const { conversationId } = conversationIdSchema.parse(req.params);
-
-    const { conversation, messages } = await getSingleConversationService(
-      conversationId,
-      userId,
+    const { cursor, limit } = getConversationMessagesQuerySchema.parse(
+      req.query,
     );
+
+    const { conversation, messages, pagination } =
+      await getSingleConversationService(
+        conversationId,
+        userId,
+        cursor,
+        limit,
+      );
+
     return res.status(HTTPSTATUS.SUCCESS).json({
       message: "User conversations retrieved successfully",
       conversation,
       messages,
+      pagination,
     });
   },
 );
