@@ -1,0 +1,3 @@
+# Autonomous Agent Directive
+- BẮT BUỘC: Đọc ngay file `.agent/rules.md` để lấy toàn bộ danh mục Skill, tiêu chuẩn code và checklist dự án.
+- Luôn tự động tra cứu các skills trong `.agent/skills/` theo hướng dẫn trong `.agent/rules.md` trước khi viết code.
