@@ -21,9 +21,11 @@
     },
     {
       "description": "Group all @types/* packages into a single PR",
-      "matchPackagePatterns": ["^@types/"],
       "groupName": "TypeScript definitions (@types)",
-      "automerge": false
+      "automerge": false,
+      "matchPackageNames": [
+        "/^@types//"
+      ]
     },
     {
       "description": "Group minor and patch updates for all npm packages into a single PR",
