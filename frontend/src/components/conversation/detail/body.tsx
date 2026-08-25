@@ -349,7 +349,13 @@ const ConversationBody = ({
       previousScrollTopRef.current = container.scrollTop;
       isPrependingRef.current = true;
 
-      fetchMoreMessages(conversationId);
+      void fetchMoreMessages(conversationId).then((success) => {
+        if (!success) {
+          isPrependingRef.current = false;
+          previousScrollHeightRef.current = null;
+          previousScrollTopRef.current = null;
+        }
+      });
     }
 
     // Detect distance from bottom to show/hide scroll-to-bottom button
