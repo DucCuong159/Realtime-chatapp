@@ -6,6 +6,7 @@ import type {
   CreateConversationType,
   CreateMessageType,
   MessageType,
+  PaginationType,
 } from "@/types/conversation.type";
 import { toast } from "sonner";
 import { create } from "zustand";
@@ -18,12 +19,14 @@ interface ConversationState {
   singleConversation: {
     conversation: ConversationType;
     messages: MessageType[];
+    pagination?: PaginationType;
   } | null;
 
   isConversationsLoading: boolean;
   isUsersLoading: boolean;
   isCreatingConversation: boolean;
   isSingleConversationLoading: boolean;
+  isFetchingMoreMessages: boolean;
   isSendingMsg: boolean;
 
   fetchAllUsers: () => Promise<void>;
@@ -32,6 +35,7 @@ interface ConversationState {
     payload: CreateConversationType,
   ) => Promise<ConversationType | null>;
   fetchSingleConversation: (conversationId: string) => Promise<void>;
+  fetchMoreMessages: (conversationId: string) => Promise<boolean>;
   sendMessage: (
     payload: CreateMessageType,
     isAIConversation?: boolean,
@@ -105,6 +109,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
   isUsersLoading: false,
   isCreatingConversation: false,
   isSingleConversationLoading: false,
+  isFetchingMoreMessages: false,
   isSendingMsg: false,
 
   fetchAllUsers: async () => {
@@ -165,6 +170,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
           singleConversation: {
             conversation: data.conversation,
             messages: data.messages,
+            pagination: data.pagination,
           },
         });
       }
@@ -176,6 +182,56 @@ export const useConversation = create<ConversationState>()((set, get) => ({
       if (activeFetchingConversationId === conversationId) {
         set({ isSingleConversationLoading: false });
       }
+    }
+  },
+
+  fetchMoreMessages: async (conversationId: string) => {
+    const state = get();
+    if (state.isFetchingMoreMessages) return false;
+
+    const single = state.singleConversation;
+    if (!single || single.conversation._id !== conversationId) return false;
+
+    const pagination = single.pagination;
+    if (!pagination?.hasMore || !pagination?.nextCursor) return false;
+
+    set({ isFetchingMoreMessages: true });
+    try {
+      const { data } = await API.get(`/conversation/${conversationId}`, {
+        params: {
+          cursor: pagination.nextCursor,
+          limit: 30,
+        },
+      });
+
+      const currentState = get();
+      if (
+        currentState.singleConversation &&
+        currentState.singleConversation.conversation._id === conversationId
+      ) {
+        const olderMessages: MessageType[] = data.messages || [];
+        const currentMessages = currentState.singleConversation.messages;
+
+        // Deduplicate messages by _id
+        const existingIds = new Set(currentMessages.map((m) => m._id));
+        const uniqueOlder = olderMessages.filter(
+          (m) => !existingIds.has(m._id),
+        );
+
+        set({
+          singleConversation: {
+            ...currentState.singleConversation,
+            messages: [...uniqueOlder, ...currentMessages],
+            pagination: data.pagination,
+          },
+        });
+        return uniqueOlder.length > 0;
+      }
+      return false;
+    } catch {
+      return false;
+    } finally {
+      set({ isFetchingMoreMessages: false });
     }
   },
 

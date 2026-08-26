@@ -1,5 +1,10 @@
 import type { UserType } from "./auth.type";
 
+export type PaginationType = {
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
 export type ConversationType = {
   _id: string;
   lastMessage?: MessageType | null;
