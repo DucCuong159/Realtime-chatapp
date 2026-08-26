@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.2.0...realtime-chatapp-v1.3.0) (2026-08-26)
+
+
+### Features
+
+* **conversation:** implement cursor-based pagination and infinite scroll ([#40](https://github.com/DucCuong159/Realtime-chatapp/issues/40)) ([#79](https://github.com/DucCuong159/Realtime-chatapp/issues/79)) ([a0d31d6](https://github.com/DucCuong159/Realtime-chatapp/commit/a0d31d69e95ffc961e4655fad250fea473290e50))
+* **script:** add message benchmark tool and update documentation ([#81](https://github.com/DucCuong159/Realtime-chatapp/issues/81)) ([d9140c6](https://github.com/DucCuong159/Realtime-chatapp/commit/d9140c68af8cf19b3328acc2a72225c5500cbe08))
+
 ## [1.2.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.1.0...realtime-chatapp-v1.2.0) (2026-08-25)
 
 
