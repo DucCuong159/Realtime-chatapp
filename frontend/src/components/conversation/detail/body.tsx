@@ -364,6 +364,13 @@ const ConversationBody = ({
     setShowScrollToBottom(distanceFromBottom > 200);
   }, [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId]);
 
+  // Re-check the top boundary after render so short histories can load older
+  // messages even when the container never emits a scroll event.
+  useEffect(() => {
+    if (messages.length === 0) return;
+    handleScroll();
+  }, [messages.length, handleScroll]);
+
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
