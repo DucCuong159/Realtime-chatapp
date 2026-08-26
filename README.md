@@ -2,7 +2,7 @@
 
 # 💬 Realtime Chat App
 
-**A production-ready, full-stack real-time messaging platform powered by React 19, Express 5, Socket.IO, and Google Gemini AI.**
+**A production-ready full-stack real-time messaging platform powered by React 19, Express 5, Socket.IO 4, and Google Gemini AI.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-008080?style=for-the-badge&logo=render&logoColor=white)](https://realtime-chatapp-vn.onrender.com/conversation)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -10,133 +10,78 @@
 [![Express 5](https://img.shields.io/badge/Express-5.x-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![Socket.IO](https://img.shields.io/badge/Socket.io-4.x-010101?style=for-the-badge&logo=socketdotio&logoColor=white)](https://socket.io/)
 [![Tailwind CSS v4](https://img.shields.io/badge/TailwindCSS-v4.x-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose%209-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongoosejs.com/)
+[![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-Google%20Gemini-black?style=for-the-badge&logo=vercel&logoColor=white)](https://sdk.vercel.ai/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge)](LICENSE)
 
-[🌐 **Explore Live Demo**](https://realtime-chatapp-vn.onrender.com/conversation) · [🐛 Report Bug](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 Request Feature](https://github.com/DucCuong159/Realtime-chatapp/issues)
+[🌐 **Live Demo**](https://realtime-chatapp-vn.onrender.com/conversation) · [📖 **Detailed Architecture & Flow Guide**](REALTIME_CHAT_FLOW.md) · [🐛 **Report Bug**](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 **Request Feature**](https://github.com/DucCuong159/Realtime-chatapp/issues)
 
 </div>
 
 ---
 
-## 📖 Table of Contents
-
-- [Overview](#-overview)
-- [Key Features](#-key-features)
-- [Architecture & Tech Stack](#-architecture--tech-stack)
-- [System Architecture](#-system-architecture)
-- [Project Structure](#-project-structure)
-- [Getting Started](#-getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Environment Configuration](#environment-configuration)
-  - [Local Installation](#local-installation)
-  - [Database Seeding](#database-seeding)
-- [Deployment Guide (Render)](#-deployment-guide-render)
-- [API Reference](#-api-reference)
-- [Socket Events](#-socket-events)
-- [Security & Performance](#-security--performance)
-- [License](#-license)
-
----
-
 ## 🌟 Overview
 
-**Realtime Chat App** is an end-to-end modern web application designed for seamless interpersonal communication and AI-assisted conversations. Inspired by modern messaging platforms like Messenger and Slack, it combines low-latency WebSocket communication with intelligent generative AI assistants, robust security, and an ultra-responsive interface.
+**Realtime Chat App** delivers low-latency interpersonal chat and AI assistant workflows. It combines a **Hybrid HTTP REST + WebSocket architecture**, **Dynamic Google Gemini AI model switching**, and **cursor-based pagination** with zero-drift scroll restoration.
+
+> 💡 *For in-depth sequence diagrams, algorithm breakdowns, and code walkthroughs, see [**REALTIME_CHAT_FLOW.md**](REALTIME_CHAT_FLOW.md).*
 
 ---
 
 ## ✨ Key Features
 
-### ⚡ Real-Time Messaging & Synchronization
-- **Instant Messaging**: Low-latency bidirectional communication powered by **Socket.IO**.
-- **Multi-Tab Synchronization**: Client socket tracking (`x-socket-id`) prevents duplicate notifications across multiple open tabs for the same user.
-- **Online Presence Tracking**: Real-time user presence (online/offline indicator badges) dynamically tracked and broadcasted upon connection state changes.
-- **Optimistic UI Updates**: Outgoing messages appear immediately with local temporary IDs and auto-reconcile with backend confirmations.
-
-### 🤖 Gemini AI Assistant Integration
-- **Streaming AI Responses**: Real-time token streaming with **Google Gemini (`gemini-2.5-flash`)** using the Vercel AI SDK.
-- **Rich Markdown Formatting**: Streamed AI responses render with Markdown headings, syntax-highlighted code blocks, tables, and lists via **Streamdown**.
-- **Sequential Conversation Queue**: Background message queuing ensures conversational coherence without race conditions during concurrent prompts.
-- **Seedable AI Companion**: CLI seed script to initialize dedicated AI assistant profiles in MongoDB.
-
-### 💬 Rich Conversation Experience
-- **Direct & Group Conversations**: 1-on-1 direct chats with deterministic deduplication keys and multi-member group chats.
-- **Message Replies & Context**: Quoting and replying to specific messages with quick navigation and highlight-scroll to referenced messages.
-- **Media Sharing**: Image uploading and rendering with automatic Cloudinary storage and optimization.
-- **Live Search & Filtering**: Instant search across users and conversation participants.
-
-### 🔐 Security & Identity
-- **JWT Authentication via HttpOnly Cookies**: Protection against XSS and token-theft attacks.
-- **Passport.js JWT Strategy**: Robust request authentication middleware.
-- **Password Hashing**: Bcrypt with salted rounds.
-- **Strict Rate Limiting**: Anti-brute-force protection on authentication and message routes.
-- **Security Headers**: Configured with **Helmet** and strict CORS policies.
-- **Input Validation**: Strict schema validation using **Zod** across frontend and backend boundaries.
-
-### 🎨 Modern UI / UX Design
-- **Tailwind CSS v4**: Utility-first styling with modern CSS variables.
-- **Light / Dark Mode**: Theme switching with persistent preferences.
-- **Accessible Components**: Powered by **Radix / Base UI** primitives with keyboard navigation and ARIA attributes.
-- **Responsive Layout**: Desktop aside navigation and mobile-first drawer views.
+- ⚡ **Hybrid Real-Time Pipeline**: HTTP POST for data validation & media uploads; Socket.IO for real-time room broadcasting.
+- 🔄 **Multi-Tab Sync & Echo Prevention**: Request header `x-socket-id` and `.except(socketId)` prevent duplicate messages on the sender's active tab while syncing all other tabs.
+- 🟢 **Accurate Online Presence**: Multi-tab tracking via `Map<userId, Set<socketId>>` — users only show offline when all sessions disconnect.
+- 🎯 **Optimistic UI & Auto-Rollback**: Instant UI feedback with local UUIDs, server ID reconciliation, and fail-safe sidebar rollback on error.
+- 🤖 **Gemini AI Streaming & Dynamic Selector**: Real-time token streaming, live quota latency check (`checkModelQuota`), auto-fallback on 429 quota limits, and markdown rendering with XSS hardening.
+- 📜 **Cursor-Based Pagination & Infinite Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) and `useLayoutEffect` Element-Anchor scroll restoration (Zero Viewport Drift).
+- 💬 **Rich Messaging**: 1-on-1 and group chats, message replies with context quotes, Cloudinary media sharing (up to 15MB), and user search.
+- 🔐 **Hardened Security**: Stateless JWT in `HttpOnly` `SameSite` cookies, Passport authentication, bcrypt hashing, rate limiting, and Zod validation.
 
 ---
 
-## 🛠 Architecture & Tech Stack
+## 🛠 Tech Stack
 
-| Layer | Technology | Description |
-| :--- | :--- | :--- |
-| **Frontend Framework** | **React 19**, **TypeScript** | High-performance SPA with modern React hooks & concurrent features |
-| **Build Tool** | **Vite 8** | Ultra-fast HMR and optimized production bundling |
-| **State Management** | **Zustand 5** | Lightweight, reactive client stores for Auth, Conversation, and Socket |
-| **Styling & Icons** | **TailwindCSS v4**, **Lucide**, **Remix Icons** | Modern design system with CSS custom properties |
-| **Markdown / AI Rendering** | **Streamdown**, **harden-react-markdown** | Secure, XSS-hardened real-time Markdown stream viewer |
-| **Backend Framework** | **Node.js 20+**, **Express 5** | Scalable asynchronous REST API & Static File Server |
-| **Realtime Engine** | **Socket.IO 4** | WebSocket server with room management and authentication middleware |
-| **AI SDK** | **Vercel AI SDK (`@ai-sdk/google`)** | Gemini model streaming API integration |
-| **Database & ODM** | **MongoDB**, **Mongoose 9** | NoSQL document database with indexing and schema validation |
-| **Cloud Storage** | **Cloudinary SDK** | Image transformation, upload, and CDN hosting |
-| **Authentication** | **Passport.js**, **JWT**, **Bcrypt** | Stateless token authentication via HttpOnly cookies |
-| **CI / CD** | **GitHub Actions**, **CodeRabbit** | Automated CI pipeline with AI code review integration |
-| **Cloud Hosting** | **Render.com** | Fullstack monorepo deployment on containerized cloud |
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Radix UI, Streamdown |
+| **Backend** | Node.js 20+, Express 5, Socket.IO 4, Mongoose 9 (MongoDB), Passport.js, Zod |
+| **AI & Media** | Vercel AI SDK (`@ai-sdk/google`), Google Gemini Models, Cloudinary SDK |
+| **Dev & Infra** | Render.com (Monorepo Web Service), GitHub Actions, CodeRabbit |
 
 ---
 
-## 🏗 System Architecture
+## 🏗 Architecture Overview
 
 ```mermaid
-flowchart TD
-    subgraph Client["Frontend (React 19 + Vite)"]
-        UI["User Interface (TailwindCSS v4 + Radix)"]
-        Zustand["Zustand Stores (Auth, Conversation, Socket)"]
-        Axios["Axios Client (HttpOnly Cookie Auth)"]
-        SocketClient["Socket.IO Client"]
+flowchart LR
+    subgraph Client["Frontend (React 19)"]
+        UI["UI / Zustand Stores"]
+        Axios["Axios (x-socket-id)"]
+        SocketC["Socket.IO Client"]
     end
 
     subgraph Server["Backend (Express 5 + Socket.IO)"]
-        AuthMid["Passport JWT Middleware"]
-        REST["REST API Controllers"]
-        SocketServer["Socket.IO Server (Rooms & Events)"]
-        AIService["AI Service (Vercel AI SDK)"]
+        Auth["Passport JWT / io.use"]
+        REST["REST Controllers"]
+        SocketS["Socket Gateway"]
+        AISvc["AI Stream Service"]
     end
 
-    subgraph External["External Services & DB"]
-        MongoDB[("MongoDB Database")]
-        Gemini["Google Gemini AI API"]
-        Cloudinary["Cloudinary CDN Storage"]
+    subgraph Infra["External Services & DB"]
+        DB[("MongoDB")]
+        Gemini["Gemini AI API"]
+        Cloud["Cloudinary CDN"]
     end
 
-    UI --> Zustand
-    Zustand --> Axios
-    Zustand --> SocketClient
-
-    Axios -->|"HTTP (REST)"| REST
-    SocketClient <-->|"WebSockets (Bidirectional)"| SocketServer
-
-    REST --> AuthMid
-    AuthMid --> MongoDB
-    REST --> MongoDB
-    REST --> Cloudinary
-    AIService --> Gemini
-    AIService -->|"Stream Chunks"| SocketServer
+    UI --> Axios & SocketC
+    Axios -->|"HTTP POST / GET"| REST
+    SocketC <-->|"WebSocket"| SocketS
+    REST --> Auth --> DB & Cloud
+    REST -->|"Trigger AI"| AISvc
+    AISvc --> Gemini
+    AISvc -->|"Stream Chunks"| SocketS
 ```
 
 ---
@@ -145,41 +90,26 @@ flowchart TD
 
 ```text
 realtime-chatapp/
-├── backend/                  # Express 5 Backend API & Socket Server
+├── backend/                       # Express 5 & Socket.IO Gateway
 │   ├── src/
-│   │   ├── config/           # Environment variables, DB, Cloudinary & Passport config
-│   │   ├── controllers/      # Route request handlers (auth, user, conversation)
-│   │   ├── lib/              # Socket.IO initialization & event emitters
-│   │   ├── middleware/       # JWT auth, error handlers, rate limiters
-│   │   ├── models/           # Mongoose schemas (User, Conversation, Message)
-│   │   ├── routes/           # Express REST route definitions
-│   │   ├── script/           # Seed scripts (Gemini AI profile seeder)
-│   │   ├── services/         # Business logic (Message, AI streaming, Auth)
-│   │   ├── utils/            # JWT, Cookie, and helper utilities
-│   │   └── index.ts          # Server entry point & static SPA serving
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── frontend/                 # React 19 SPA (Vite + TailwindCSS v4)
+│   │   ├── config/                # DB, Cloudinary, Passport, Env configs
+│   │   ├── controllers/           # ai, auth, conversation, message, user controllers
+│   │   ├── lib/socket.ts          # Socket Gateway, auth handshake, room emitters
+│   │   ├── models/                # Conversation, Message, User Mongoose schemas
+│   │   ├── routes/                # ai, auth, conversation, user routes
+│   │   ├── script/                # seedGeminiAI.ts, listGeminiModels.ts, spamMessages.ts
+│   │   ├── services/              # AI queue, auth, conversation keyset queries, messages
+│   │   ├── utils/ & validators/   # Zod schemas, JWT cookies, media utils
+│   │   └── index.ts               # Server entry point & static SPA server
+├── frontend/                      # React 19 SPA (Vite + Tailwind CSS v4)
 │   ├── src/
-│   │   ├── assets/           # Static icons and branding logos
-│   │   ├── components/       # Reusable UI components & layouts
-│   │   │   ├── auth/         # Login & Register forms
-│   │   │   ├── conversation/ # Header, Message List, Footer, ReplyBar, Popovers
-│   │   │   └── ui/           # Buttons, Inputs, Avatars, Modals, Markdown Response
-│   │   ├── hooks/            # Zustand stores (useAuth, useConversation, useSocket)
-│   │   ├── lib/              # Axios client instance, date formatting & utils
-│   │   ├── pages/            # Application routes (Chat, Auth, 404)
-│   │   ├── routes/           # React Router route definitions & protected route guards
-│   │   ├── types/            # TypeScript data contracts & payload models
-│   │   ├── App.tsx           # Root component with Theme & Toast providers
-│   │   └── main.tsx          # React application entry point
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-│
-├── .github/                  # GitHub Actions CI workflows & issue templates
-├── .coderabbit.yaml          # CodeRabbit AI code review configuration
+│   │   ├── components/            # UI primitives, conversation detail, AI model selector
+│   │   ├── hooks/                 # Zustand stores (useAuth, useConversation, useSocket, useAiModels)
+│   │   ├── lib/                   # Axios client with x-socket-id interceptor
+│   │   ├── pages/                 # Auth & Conversation views
+│   │   ├── types/                 # TypeScript data contracts
+│   │   └── App.tsx & main.tsx     # App root & entry point
+├── REALTIME_CHAT_FLOW.md          # Complete deep-dive architecture flow
 └── README.md
 ```
 
@@ -187,162 +117,98 @@ realtime-chatapp/
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### 1. Prerequisites
+- **Node.js**: `v20.x` or newer & **Yarn**: `v1.22.x`
+- **MongoDB**: Local or Atlas connection URI
+- **Cloudinary** & **Google Gemini AI** API keys
 
-- **Node.js**: `v20.x` or `v22.x` / `v24.x`
-- **Yarn**: `v1.22.x`
-- **MongoDB**: Local MongoDB instance or [MongoDB Atlas URI](https://www.mongodb.com/atlas)
-- **Cloudinary Account**: Cloud name, API Key, and Secret from [Cloudinary Console](https://cloudinary.com)
-- **Google Gemini API Key**: API key from [Google AI Studio](https://aistudio.google.com/)
+### 2. Environment Variables
 
----
-
-### Environment Configuration
-
-#### 1. Backend Environment (`backend/.env`)
-
-Create a `.env` file in the `backend/` directory:
-
+**Backend (`backend/.env`):**
 ```env
-# Application
-NODE_ENV=development
 PORT=8080
+NODE_ENV=development
 FRONTEND_ORIGIN=http://localhost:5173
-
-# Database
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/realtime-chat?retryWrites=true&w=majority
-
-# JWT Authentication
-JWT_SECRET=your_super_secret_jwt_key_at_least_32_characters_long
+MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/chat?retryWrites=true&w=majority
+JWT_SECRET=your_super_secret_jwt_key_min_32_chars
 JWT_EXPIRES_IN=7d
-
-# Cloudinary (Media Uploads)
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-
-# Google Gemini AI
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 GOOGLE_GENERATIVE_AI_API_KEY=your_gemini_api_key
 ```
 
-#### 2. Frontend Environment (`frontend/.env`)
-
-Create a `.env` file in the `frontend/` directory (optional in development, defaults to `http://localhost:8080`):
-
+**Frontend (`frontend/.env`):**
 ```env
 VITE_API_URL=http://localhost:8080
 ```
 
----
+### 3. Installation & Run
 
-### Local Installation
+```bash
+# Clone repository
+git clone https://github.com/DucCuong159/Realtime-chatapp.git
+cd Realtime-chatapp
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/DucCuong159/Realtime-chatapp.git
-   cd Realtime-chatapp
-   ```
+# Install dependencies
+yarn --cwd frontend install
+yarn --cwd backend install
 
-2. **Install dependencies:**
-   ```bash
-   # Install frontend dependencies
-   yarn --cwd frontend install
+# Seed Gemini AI user companion
+yarn --cwd backend seed:ai
 
-   # Install backend dependencies
-   yarn --cwd backend install
-   ```
-
-3. **Seed the Gemini AI Model:**
-   ```bash
-   yarn --cwd backend run seed:ai
-   ```
-
-4. **Start local development servers:**
-   ```bash
-   # In terminal 1: Start Backend (Port 8080)
-   yarn --cwd backend dev
-
-   # In terminal 2: Start Frontend (Port 5173)
-   yarn --cwd frontend dev
-   ```
-
-5. Open your browser and navigate to `http://localhost:5173`.
+# Start development servers
+yarn --cwd backend dev    # Terminal 1: Port 8080
+yarn --cwd frontend dev   # Terminal 2: Port 5173
+```
 
 ---
 
-## 🌐 Deployment Guide (Render)
+## 📡 API & Socket.IO Reference
 
-This repository is optimized for zero-configuration monorepo deployment on **[Render.com](https://render.com/)** as a single Web Service:
+### REST Endpoints
 
-1. Connect your GitHub repository to Render and create a **Web Service**.
-2. Configure the following settings:
+| Group | Method | Endpoint | Description | Auth |
+| :--- | :---: | :--- | :--- | :---: |
+| **Auth** | `POST` | `/api/auth/register` | Register user (5 req/hr limit) | No |
+| | `POST` | `/api/auth/login` | Login & set HttpOnly cookie (5 req/15m limit) | No |
+| | `POST` | `/api/auth/logout` | Clear auth session cookie | Yes |
+| | `GET` | `/api/auth/status` | Verify JWT and return profile | Yes |
+| **User** | `GET` | `/api/user/all` | Get registered users list | Yes |
+| **Chat** | `GET` | `/api/conversation/all` | Fetch user conversations with last message | Yes |
+| | `POST` | `/api/conversation/create` | Create 1-on-1 or group conversation | Yes |
+| | `GET` | `/api/conversation/:id` | Get messages with cursor pagination (`?cursor=&limit=30`) | Yes |
+| | `POST` | `/api/conversation/message/send` | Send message / prompt AI (`x-socket-id` header) | Yes |
+| **AI** | `GET` | `/api/ai/models` | Get active Gemini models & quota latency (`?refresh=true`) | Yes |
 
-| Setting | Value |
-| :--- | :--- |
-| **Runtime** | `Node` |
-| **Root Directory** | *(Leave blank)* |
-| **Build Command** | `yarn --cwd frontend install --production=false && yarn --cwd frontend build && rm -rf frontend/node_modules && yarn --cwd backend install --production=false && yarn --cwd backend build` |
-| **Start Command** | `yarn --cwd backend start` |
-| **Plan** | `Free` (or higher) |
+### Socket.IO Events
 
-3. Under **Environment Variables**, add all keys from `backend/.env` (set `NODE_ENV=production`).
-4. Click **Deploy Web Service**. Render will automatically build the React Vite bundle, compile TypeScript, and serve the application!
-
----
-
-## 📡 API Reference
-
-### Authentication (`/api/auth`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :---: |
-| `POST` | `/api/auth/register` | Register a new user account | No |
-| `POST` | `/api/auth/login` | Log in and receive HttpOnly session cookie | No |
-| `POST` | `/api/auth/logout` | Invalidate session and clear auth cookie | Yes |
-| `GET` | `/api/auth/status` | Verify current session and retrieve profile | Yes |
-
-### Users (`/api/user`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/user/all` | Get list of available users for direct chats | Yes |
-
-### Conversations & Messages (`/api/conversation`)
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :---: |
-| `GET` | `/api/conversation/all` | List all user conversations with last message | Yes |
-| `POST` | `/api/conversation/create` | Create direct (1-on-1) or group conversation | Yes |
-| `GET` | `/api/conversation/:id` | Fetch conversation details and message history | Yes |
-| `POST` | `/api/conversation/message/send` | Send text / image / reply message | Yes |
-
----
-
-## 🔌 Socket Events
-
-| Event Name | Direction | Payload | Purpose |
+| Event Name | Direction | Payload | Description |
 | :--- | :---: | :--- | :--- |
-| `user:online` | Server ➔ Client | `{ userId: string }` | Broadcast user presence online |
-| `user:offline` | Server ➔ Client | `{ userId: string }` | Broadcast user presence offline |
-| `conversation:message` | Server ➔ Client | `MessageType` | Broadcast new message to conversation room |
-| `conversation:lastMessage`| Server ➔ Client | `{ conversationId, lastMessage }` | Update conversation list preview |
-| `conversation:ai` | Server ➔ Client | `{ conversationId, chunk, done, message, error }` | Real-time AI response streaming |
+| `online:users` | Server ➔ All | `string[]` | Broadcast online user IDs |
+| `conversation:join` | Client ➔ Server | `conversationId, callback` | Join room `conversation:<id>` |
+| `conversation:leave`| Client ➔ Server | `conversationId` | Leave room `conversation:<id>` |
+| `message:new` | Server ➔ Room | `MessageType` | New message in room (excludes sender tab) |
+| `conversation:updated` | Server ➔ User | `{ conversationId, lastMessage }` | Update sidebar preview and bump rank |
+| `conversation:new` | Server ➔ User | `ConversationType` | Notify user of new conversation |
+| `conversation:ai` | Server ➔ Room | `{ chunk, done, message, error }` | Stream AI tokens and completion |
 
 ---
 
-## 🛡 Security & Performance Highlights
+## 🌐 Deployment (Render)
 
-- 🔒 **HttpOnly & Secure Cookies**: Protects access tokens from JavaScript execution contexts.
-- 🛡 **Helmet Protection**: Adds secure HTTP response headers (`Content-Security-Policy`, `X-Content-Type-Options`).
-- 🚦 **Rate Limiting**: Throttles brute-force attempts on sensitive endpoints.
-- 📦 **Optimized Asset Chunking**: Split CSS and dynamic chunks for lightning-fast First Contentful Paint (FCP).
-- 🧹 **Zero-Leak Memory Management**: Automatic cleanup of socket listeners and timeout subscriptions on component unmount.
+Optimized for monorepo single-service deployment on **Render.com**:
+- **Build Command**: `yarn --cwd frontend install --production=false && yarn --cwd frontend build && rm -rf frontend/node_modules && yarn --cwd backend install --production=false && yarn --cwd backend build`
+- **Start Command**: `yarn --cwd backend start`
+- **Environment Variables**: Add all keys from `backend/.env` with `NODE_ENV=production`.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [ISC License](LICENSE).
-
----
+Licensed under the [ISC License](LICENSE).
 
 <div align="center">
   <sub>Developed with ❤️ by <a href="https://github.com/DucCuong159">DucCuong159</a></sub>
 </div>
+
