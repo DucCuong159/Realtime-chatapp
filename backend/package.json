@@ -10,7 +10,8 @@
     "dev": "tsx watch ./src/index.ts",
     "test": "node --import tsx --test",
     "seed:ai": "tsx ./src/script/seedGeminiAI.ts",
-    "list:models": "tsx ./src/script/listGeminiModels.ts"
+    "list:models": "tsx ./src/script/listGeminiModels.ts",
+    "spam:messages": "tsx ./src/script/spamMessages.ts"
   },
   "keywords": [],
   "author": "",
