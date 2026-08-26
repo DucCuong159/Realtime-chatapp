@@ -245,6 +245,7 @@ const ConversationBody = ({
   } | null>(null);
   const isPrependingRef = useRef<boolean>(false);
   const isInitialLoadRef = useRef<boolean>(true);
+  const canAutoFetchMoreMessagesRef = useRef<boolean>(true);
   const prevConversationIdRef = useRef<string>(conversationId);
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -259,6 +260,7 @@ const ConversationBody = ({
       isInitialLoadRef.current = true;
       isPrependingRef.current = false;
       prependAnchorRef.current = null;
+      canAutoFetchMoreMessagesRef.current = true;
       prevConversationIdRef.current = conversationId;
       setShowScrollToBottom(false);
     }
@@ -346,12 +348,21 @@ const ConversationBody = ({
     }
   }, [messages, currentUserId, isFetchingMoreMessages]);
 
-  const handleScroll = useCallback(() => {
+  const handleScroll = useCallback((isUserInitiated: boolean) => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    if (isUserInitiated) {
+      canAutoFetchMoreMessagesRef.current = true;
+    }
+
     // Detect when user reaches near top
-    if (container.scrollTop <= 80 && hasMore && !isFetchingMoreMessages) {
+    if (
+      container.scrollTop <= 80 &&
+      hasMore &&
+      !isFetchingMoreMessages &&
+      (isUserInitiated || canAutoFetchMoreMessagesRef.current)
+    ) {
       const containerTop = container.getBoundingClientRect().top;
       const firstVisibleMessage = Array.from(
         container.querySelectorAll<HTMLElement>("[id^='message-']"),
@@ -370,6 +381,7 @@ const ConversationBody = ({
         if (!success) {
           isPrependingRef.current = false;
           prependAnchorRef.current = null;
+          canAutoFetchMoreMessagesRef.current = false;
         }
       });
     }
@@ -380,11 +392,15 @@ const ConversationBody = ({
     setShowScrollToBottom(distanceFromBottom > 200);
   }, [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId]);
 
+  const handleUserScroll = useCallback(() => {
+    handleScroll(true);
+  }, [handleScroll]);
+
   // Re-check the top boundary after render so short histories can load older
   // messages even when the container never emits a scroll event.
   useEffect(() => {
     if (messages.length === 0) return;
-    handleScroll();
+    handleScroll(false);
   }, [messages.length, handleScroll]);
 
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -417,7 +433,7 @@ const ConversationBody = ({
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
+        onScroll={handleUserScroll}
         className="flex-1 overflow-y-auto overflow-x-hidden p-3 w-full bg-background flex flex-col justify-start"
       >
         {/* Beginning of conversation indicator */}
