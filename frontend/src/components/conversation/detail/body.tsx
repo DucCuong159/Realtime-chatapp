@@ -315,6 +315,10 @@ const ConversationBody = ({
     }
 
     if (isPrependingRef.current) {
+      // Keep the measurements until the prepend request has finished. Socket
+      // updates can render while the older-message request is still pending.
+      if (isFetchingMoreMessages) return;
+
       if (previousScrollHeightRef.current !== null) {
         const newScrollHeight = container.scrollHeight;
         const oldScrollHeight = previousScrollHeightRef.current;
@@ -337,7 +341,7 @@ const ConversationBody = ({
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }
     }
-  }, [messages, currentUserId]);
+  }, [messages, currentUserId, isFetchingMoreMessages]);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
