@@ -239,8 +239,10 @@ const ConversationBody = ({
     })),
   );
 
-  const previousScrollHeightRef = useRef<number | null>(null);
-  const previousScrollTopRef = useRef<number | null>(null);
+  const prependAnchorRef = useRef<{
+    messageId: string;
+    viewportOffset: number;
+  } | null>(null);
   const isPrependingRef = useRef<boolean>(false);
   const isInitialLoadRef = useRef<boolean>(true);
   const prevConversationIdRef = useRef<string>(conversationId);
@@ -256,8 +258,7 @@ const ConversationBody = ({
     if (prevConversationIdRef.current !== conversationId) {
       isInitialLoadRef.current = true;
       isPrependingRef.current = false;
-      previousScrollHeightRef.current = null;
-      previousScrollTopRef.current = null;
+      prependAnchorRef.current = null;
       prevConversationIdRef.current = conversationId;
       setShowScrollToBottom(false);
     }
@@ -315,21 +316,23 @@ const ConversationBody = ({
     }
 
     if (isPrependingRef.current) {
-      // Keep the measurements until the prepend request has finished. Socket
-      // updates can render while the older-message request is still pending.
-      if (isFetchingMoreMessages) return;
+      const anchor = prependAnchorRef.current;
+      if (anchor) {
+        const anchorElement = document.getElementById(anchor.messageId);
+        if (anchorElement && container.contains(anchorElement)) {
+          const containerTop = container.getBoundingClientRect().top;
+          const currentOffset =
+            anchorElement.getBoundingClientRect().top - containerTop;
 
-      if (previousScrollHeightRef.current !== null) {
-        const newScrollHeight = container.scrollHeight;
-        const oldScrollHeight = previousScrollHeightRef.current;
-        const oldScrollTop = previousScrollTopRef.current ?? 0;
-        const heightDiff = newScrollHeight - oldScrollHeight;
-
-        container.scrollTop = heightDiff + oldScrollTop;
+          container.scrollTop += currentOffset - anchor.viewportOffset;
+        }
       }
-      isPrependingRef.current = false;
-      previousScrollHeightRef.current = null;
-      previousScrollTopRef.current = null;
+
+      if (!isFetchingMoreMessages) {
+        isPrependingRef.current = false;
+        prependAnchorRef.current = null;
+      }
+      return;
     } else {
       const isNearBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight <
@@ -349,15 +352,24 @@ const ConversationBody = ({
 
     // Detect when user reaches near top
     if (container.scrollTop <= 80 && hasMore && !isFetchingMoreMessages) {
-      previousScrollHeightRef.current = container.scrollHeight;
-      previousScrollTopRef.current = container.scrollTop;
+      const containerTop = container.getBoundingClientRect().top;
+      const firstVisibleMessage = Array.from(
+        container.querySelectorAll<HTMLElement>("[id^='message-']"),
+      ).find((message) => message.getBoundingClientRect().bottom > containerTop);
+
+      prependAnchorRef.current = firstVisibleMessage
+        ? {
+            messageId: firstVisibleMessage.id,
+            viewportOffset:
+              firstVisibleMessage.getBoundingClientRect().top - containerTop,
+          }
+        : null;
       isPrependingRef.current = true;
 
       void fetchMoreMessages(conversationId).then((success) => {
         if (!success) {
           isPrependingRef.current = false;
-          previousScrollHeightRef.current = null;
-          previousScrollTopRef.current = null;
+          prependAnchorRef.current = null;
         }
       });
     }
