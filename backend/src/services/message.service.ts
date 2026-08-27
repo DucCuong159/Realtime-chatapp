@@ -58,6 +58,7 @@ export const sendMessageService = async (
     sender: userId,
     content,
     image: imageUrl,
+    contentType: imageUrl ? "image" : "text",
     replyTo,
   });
 
