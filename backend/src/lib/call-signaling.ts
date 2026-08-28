@@ -117,6 +117,29 @@ const isUserInActiveCall = (targetUserId: string): boolean => {
   return false;
 };
 
+const validateCallConversation = async (
+  conversationId: string | undefined,
+  callerId: string,
+  calleeId: string,
+): Promise<string | undefined> => {
+  if (!conversationId) return undefined;
+
+  try {
+    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(conversationId);
+    if (!isValidObjectId) return undefined;
+
+    const conversation = await ConversationModel.findOne({
+      _id: conversationId,
+      participants: { $all: [callerId, calleeId] },
+    }).select("_id");
+
+    return conversation ? conversation._id.toString() : undefined;
+  } catch (error) {
+    console.error("Error validating call conversation participants:", error);
+    return undefined;
+  }
+};
+
 const rejectInitiationEarly = async (
   io: SocketServer,
   socket: AuthenticatedSocket,
@@ -235,6 +258,21 @@ export const registerCallSignaling = (
         _id: currentUserId,
       };
 
+      // 0. Security: Validate conversation membership if conversationId is provided
+      let verifiedConversationId: string | undefined;
+      if (conversationId) {
+        verifiedConversationId = await validateCallConversation(
+          conversationId,
+          currentUserId,
+          targetCalleeId,
+        );
+
+        if (!verifiedConversationId) {
+          socket.emit("call:rejected", { callId, reason: "failed" });
+          return;
+        }
+      }
+
       // 1. Check if callee is online
       const isCalleeOnline =
         onlineUsers.has(targetCalleeId) &&
@@ -248,7 +286,7 @@ export const registerCallSignaling = (
           currentUserId,
           targetCalleeId,
           "offline",
-          conversationId,
+          verifiedConversationId,
         );
         return;
       }
@@ -262,7 +300,7 @@ export const registerCallSignaling = (
           currentUserId,
           targetCalleeId,
           "busy",
-          conversationId,
+          verifiedConversationId,
         );
         return;
       }
@@ -270,7 +308,7 @@ export const registerCallSignaling = (
       activeCallBySocket.set(socket.id, { callId, peerId: targetCalleeId });
       activeCalls.set(callId, {
         callId,
-        conversationId,
+        conversationId: verifiedConversationId,
         callerId: currentUserId,
         calleeId: targetCalleeId,
         callerSocketId: socket.id,
@@ -280,7 +318,7 @@ export const registerCallSignaling = (
       // Forward to callee personal room (rings all callee's tabs)
       io.to(`user:${targetCalleeId}`).emit("call:incoming", {
         callId,
-        conversationId,
+        conversationId: verifiedConversationId,
         caller: verifiedCaller,
       });
     },
