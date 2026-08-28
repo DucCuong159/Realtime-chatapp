@@ -32,6 +32,15 @@ const ConversationListItem = ({
     }
     if (lastMessage.image) return "📷 Photo";
 
+    if (lastMessage.contentType === "call") {
+      const isMissed =
+        lastMessage.callInfo?.status === "missed" ||
+        lastMessage.callInfo?.status === "declined" ||
+        lastMessage.callInfo?.status === "busy" ||
+        !lastMessage.callInfo?.duration;
+      return isMissed ? "📞 Missed audio call" : "📞 Audio call";
+    }
+
     if (isGroup && lastMessage.sender) {
       return `${
         lastMessage.sender._id === currentUserId

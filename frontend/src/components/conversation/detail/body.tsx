@@ -19,6 +19,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
+import CallMessageItem from "./call-message-item";
 
 interface ConversationBodyProps {
   conversationId: string;
@@ -57,6 +58,30 @@ const MessageItem = memo(
     const isImageOnly = Boolean(
       message.image && !message.content && !message.replyTo,
     );
+
+    const isCallMessage = message.contentType === "call";
+
+    if (isCallMessage) {
+      return (
+        <div className="flex flex-col w-full px-2 py-1">
+          <div
+            className={cn(
+              "flex items-center gap-1.5 w-full",
+              isCurrentUser ? "justify-end" : "justify-start",
+            )}
+          >
+            {!isCurrentUser && (
+              <AvatarWithBadge
+                name={message.sender?.name || "User"}
+                src={message.sender?.avatar || ""}
+                size="size-7"
+              />
+            )}
+            <CallMessageItem message={message} currentUserId={currentUserId} />
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="flex flex-col w-full transition-colors duration-500 rounded-2xl">
@@ -348,49 +373,54 @@ const ConversationBody = ({
     }
   }, [messages, currentUserId, isFetchingMoreMessages]);
 
-  const handleScroll = useCallback((isUserInitiated: boolean) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const handleScroll = useCallback(
+    (isUserInitiated: boolean) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
 
-    if (isUserInitiated) {
-      canAutoFetchMoreMessagesRef.current = true;
-    }
+      if (isUserInitiated) {
+        canAutoFetchMoreMessagesRef.current = true;
+      }
 
-    // Detect when user reaches near top
-    if (
-      container.scrollTop <= 80 &&
-      hasMore &&
-      !isFetchingMoreMessages &&
-      (isUserInitiated || canAutoFetchMoreMessagesRef.current)
-    ) {
-      const containerTop = container.getBoundingClientRect().top;
-      const firstVisibleMessage = Array.from(
-        container.querySelectorAll<HTMLElement>("[id^='message-']"),
-      ).find((message) => message.getBoundingClientRect().bottom > containerTop);
+      // Detect when user reaches near top
+      if (
+        container.scrollTop <= 80 &&
+        hasMore &&
+        !isFetchingMoreMessages &&
+        (isUserInitiated || canAutoFetchMoreMessagesRef.current)
+      ) {
+        const containerTop = container.getBoundingClientRect().top;
+        const firstVisibleMessage = Array.from(
+          container.querySelectorAll<HTMLElement>("[id^='message-']"),
+        ).find(
+          (message) => message.getBoundingClientRect().bottom > containerTop,
+        );
 
-      prependAnchorRef.current = firstVisibleMessage
-        ? {
-            messageId: firstVisibleMessage.id,
-            viewportOffset:
-              firstVisibleMessage.getBoundingClientRect().top - containerTop,
+        prependAnchorRef.current = firstVisibleMessage
+          ? {
+              messageId: firstVisibleMessage.id,
+              viewportOffset:
+                firstVisibleMessage.getBoundingClientRect().top - containerTop,
+            }
+          : null;
+        isPrependingRef.current = true;
+
+        void fetchMoreMessages(conversationId).then((success) => {
+          if (!success) {
+            isPrependingRef.current = false;
+            prependAnchorRef.current = null;
+            canAutoFetchMoreMessagesRef.current = false;
           }
-        : null;
-      isPrependingRef.current = true;
+        });
+      }
 
-      void fetchMoreMessages(conversationId).then((success) => {
-        if (!success) {
-          isPrependingRef.current = false;
-          prependAnchorRef.current = null;
-          canAutoFetchMoreMessagesRef.current = false;
-        }
-      });
-    }
-
-    // Detect distance from bottom to show/hide scroll-to-bottom button
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    setShowScrollToBottom(distanceFromBottom > 200);
-  }, [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId]);
+      // Detect distance from bottom to show/hide scroll-to-bottom button
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShowScrollToBottom(distanceFromBottom > 200);
+    },
+    [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId],
+  );
 
   const handleUserScroll = useCallback(() => {
     handleScroll(true);
