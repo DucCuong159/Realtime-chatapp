@@ -43,52 +43,48 @@ interface HeaderGroupInfoProps {
   isOnline: boolean;
 }
 
-export const HeaderGroupInfo = memo(
-  ({
-    participants,
-    name,
-    subheading,
-    avatar,
-    isOnline,
-  }: HeaderGroupInfoProps) => {
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          openOnHover
-          className="cursor-pointer rounded-lg text-left outline-none transition-opacity hover:opacity-90"
-          aria-label={name ? `Members of ${name}` : "Member list"}
-        >
-          <HeaderUserInfo
-            name={name}
-            subheading={subheading}
-            avatar={avatar}
-            isGroup={true}
-            isOnline={isOnline}
-          />
-        </DropdownMenuTrigger>
+const HeaderGroupInfo = ({
+  participants,
+  name,
+  subheading,
+  avatar,
+  isOnline,
+}: HeaderGroupInfoProps) => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        openOnHover
+        className="cursor-pointer rounded-lg text-left outline-none transition-opacity hover:opacity-90"
+        aria-label={name ? `Members of ${name}` : "Member list"}
+      >
+        <HeaderUserInfo
+          name={name}
+          subheading={subheading}
+          avatar={avatar}
+          isGroup={true}
+          isOnline={isOnline}
+        />
+      </DropdownMenuTrigger>
 
-        <DropdownMenuContent
-          className="w-56 rounded-xl p-1.5"
-          side="bottom"
-          align="start"
-          sideOffset={8}
-        >
-          <DropdownMenuGroup>
-            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-              Members ({participants.length})
-            </DropdownMenuLabel>
-            <div className="max-h-60 space-y-0.5 overflow-y-auto">
-              {participants.map((member) => (
-                <MemberDropdownItem key={member._id} member={member} />
-              ))}
-            </div>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  },
-);
+      <DropdownMenuContent
+        className="w-56 rounded-xl p-1.5"
+        side="bottom"
+        align="start"
+        sideOffset={8}
+      >
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+            Members ({participants.length})
+          </DropdownMenuLabel>
+          <div className="max-h-60 space-y-0.5 overflow-y-auto">
+            {participants.map((member) => (
+              <MemberDropdownItem key={member._id} member={member} />
+            ))}
+          </div>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
 
-HeaderGroupInfo.displayName = "HeaderGroupInfo";
-
-export default HeaderGroupInfo;
+export default memo(HeaderGroupInfo);
