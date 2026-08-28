@@ -126,18 +126,30 @@ const validateCallConversation = async (
   callerId: string,
   calleeId: string,
 ): Promise<string | undefined> => {
-  if (!conversationId) return undefined;
-
   try {
-    const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(conversationId);
-    if (!isValidObjectId) return undefined;
+    if (conversationId) {
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(conversationId);
+      if (!isValidObjectId) return undefined;
 
-    const conversation = await ConversationModel.findOne({
-      _id: conversationId,
-      participants: { $all: [callerId, calleeId] },
+      const conversation = await ConversationModel.findOne({
+        _id: conversationId,
+        participants: { $all: [callerId, calleeId] },
+      }).select("_id");
+
+      return conversation ? conversation._id.toString() : undefined;
+    }
+
+    // Lookup existing 1-1 direct conversation if conversationId is omitted
+    const directKey =
+      callerId < calleeId
+        ? `${callerId}_${calleeId}`
+        : `${calleeId}_${callerId}`;
+
+    const directConversation = await ConversationModel.findOne({
+      directKey,
     }).select("_id");
 
-    return conversation ? conversation._id.toString() : undefined;
+    return directConversation ? directConversation._id.toString() : undefined;
   } catch (error) {
     console.error("Error validating call conversation participants:", error);
     return undefined;
@@ -271,7 +283,7 @@ export const registerCallSignaling = (
         return;
       }
 
-      // 1. Security: Validate conversation membership if conversationId is provided
+      // 1. Security: Validate conversation membership if provided, or resolve direct 1-1 conversation
       let verifiedConversationId: string | undefined;
       if (conversationId) {
         verifiedConversationId = await validateCallConversation(
@@ -284,6 +296,12 @@ export const registerCallSignaling = (
           socket.emit("call:rejected", { callId, reason: "failed" });
           return;
         }
+      } else {
+        verifiedConversationId = await validateCallConversation(
+          undefined,
+          currentUserId,
+          targetCalleeId,
+        );
       }
 
       // 2. Check if caller already has an active call
