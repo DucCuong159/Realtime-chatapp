@@ -48,9 +48,13 @@ export const saveAndEmitCallMessage = async (
           ? "declined"
           : "missed";
 
-    const contentText = isCompleted
-      ? `Audio call\n${formatDuration(duration)}`
-      : "Missed audio call";
+const contentText = isCompleted
+        ? `Audio call\n${formatDuration(duration)}`
+        : callStatus === "busy"
+          ? "Busy audio call"
+          : callStatus === "declined"
+            ? "Declined audio call"
+            : "Missed audio call";
 
     const newMessage = await MessageModel.create({
       conversationId: callRecord.conversationId,
@@ -175,33 +179,34 @@ export const registerCallSignaling = (
 ) => {
   const currentUserId = String(userId).trim();
 
-  // Helper to determine destination socket ID for peer-to-peer routing
-  const getPeerDestination = (
-    callRecord: ActiveCallRecord | undefined,
-    targetUserId: string,
-  ): string => {
-    if (!callRecord) return `user:${targetUserId}`;
-    if (socket.id === callRecord.callerSocketId && callRecord.calleeSocketId) {
-      return callRecord.calleeSocketId;
+  // Helper to determine destination socket ID or user room for verified peer
+  const getPeerDestinationFromRecord = (
+    callRecord: ActiveCallRecord,
+  ): string | null => {
+    if (currentUserId === callRecord.callerId) {
+      return callRecord.calleeSocketId || `user:${callRecord.calleeId}`;
     }
-    if (socket.id === callRecord.calleeSocketId && callRecord.callerSocketId) {
-      return callRecord.callerSocketId;
+    if (currentUserId === callRecord.calleeId) {
+      return callRecord.callerSocketId || `user:${callRecord.callerId}`;
     }
-    return `user:${targetUserId}`;
+    return null;
   };
 
   // Reusable handler to terminate call session and notify peer
   const handleTermination = async (
-    data: { callId?: string; targetUserId?: string; reason?: string },
+    data: { callId?: string; reason?: string },
     defaultReason: string,
     outgoingEvent: "call:rejected" | "call:ended",
   ) => {
-    const { callId, targetUserId, reason = defaultReason } = data;
-    if (!targetUserId || !callId) return;
+    const { callId, reason = defaultReason } = data;
+    if (!callId) return;
 
-    const targetId = String(targetUserId).trim();
     const callRecord = activeCalls.get(callId);
-    const destination = getPeerDestination(callRecord, targetId);
+    if (!callRecord) return;
+
+    // Enforce call membership: currentUserId must be caller or callee
+    const destination = getPeerDestinationFromRecord(callRecord);
+    if (!destination) return;
 
     await terminateCallSession(
       io,
@@ -218,7 +223,6 @@ export const registerCallSignaling = (
     eventName: "webrtc:offer" | "webrtc:answer" | "webrtc:ice-candidate",
     data: {
       callId?: string;
-      targetUserId?: string;
       sdp?: { type: string; sdp?: string };
       candidate?: {
         candidate: string;
@@ -227,12 +231,15 @@ export const registerCallSignaling = (
       };
     },
   ) => {
-    const { callId, targetUserId, ...payload } = data;
-    if (!targetUserId || !callId) return;
+    const { callId, ...payload } = data;
+    if (!callId) return;
 
-    const targetId = String(targetUserId).trim();
     const callRecord = activeCalls.get(callId);
-    const destination = getPeerDestination(callRecord, targetId);
+    if (!callRecord) return;
+
+    // Enforce call membership: currentUserId must be caller or callee
+    const destination = getPeerDestinationFromRecord(callRecord);
+    if (!destination) return;
 
     io.to(destination).emit(eventName, {
       callId,
@@ -258,7 +265,13 @@ export const registerCallSignaling = (
         _id: currentUserId,
       };
 
-      // 0. Security: Validate conversation membership if conversationId is provided
+      // 0. Prevent duplicate call ID overwrite
+      if (activeCalls.has(callId)) {
+        socket.emit("call:rejected", { callId, reason: "failed" });
+        return;
+      }
+
+      // 1. Security: Validate conversation membership if conversationId is provided
       let verifiedConversationId: string | undefined;
       if (conversationId) {
         verifiedConversationId = await validateCallConversation(
@@ -273,7 +286,21 @@ export const registerCallSignaling = (
         }
       }
 
-      // 1. Check if callee is online
+      // 2. Check if caller already has an active call
+      if (isUserInActiveCall(currentUserId)) {
+        await rejectInitiationEarly(
+          io,
+          socket,
+          callId,
+          currentUserId,
+          targetCalleeId,
+          "busy",
+          verifiedConversationId,
+        );
+        return;
+      }
+
+      // 3. Check if callee is online
       const isCalleeOnline =
         onlineUsers.has(targetCalleeId) &&
         (onlineUsers.get(targetCalleeId)?.size ?? 0) > 0;
@@ -291,7 +318,7 @@ export const registerCallSignaling = (
         return;
       }
 
-      // 2. Server-side Busy Check: Check if callee is already engaged in another call
+      // 4. Server-side Busy Check: Check if callee is already engaged in another call
       if (isUserInActiveCall(targetCalleeId)) {
         await rejectInitiationEarly(
           io,
@@ -324,21 +351,27 @@ export const registerCallSignaling = (
     },
   );
 
-  socket.on("call:accept", (data: { callId: string; callerId: string }) => {
-    const { callId, callerId } = data;
-    if (!callerId || !callId) return;
+  socket.on("call:accept", (data: { callId: string }) => {
+    const { callId } = data;
+    if (!callId) return;
 
-    const targetCallerId = String(callerId).trim();
-    activeCallBySocket.set(socket.id, { callId, peerId: targetCallerId });
     const callRecord = activeCalls.get(callId);
-    if (callRecord) {
-      callRecord.status = "connected";
-      callRecord.startTime = Date.now();
-      callRecord.calleeSocketId = socket.id;
+    // Validate record exists, currentUserId is authentic callee, and status is calling
+    if (
+      !callRecord ||
+      currentUserId !== callRecord.calleeId ||
+      callRecord.status !== "calling"
+    ) {
+      return;
     }
 
+    activeCallBySocket.set(socket.id, { callId, peerId: callRecord.callerId });
+    callRecord.status = "connected";
+    callRecord.startTime = Date.now();
+    callRecord.calleeSocketId = socket.id;
+
     // 1. Notify caller that call was accepted (route directly to caller's socket if available)
-    const callerTarget = callRecord?.callerSocketId || `user:${targetCallerId}`;
+    const callerTarget = callRecord.callerSocketId || `user:${callRecord.callerId}`;
     io.to(callerTarget).emit("call:accepted", {
       callId,
       calleeId: currentUserId,
@@ -353,27 +386,20 @@ export const registerCallSignaling = (
 
   socket.on(
     "call:reject",
-    (data: {
-      callId: string;
-      targetUserId: string;
-      reason?: "rejected" | "busy" | "timeout";
-    }) => handleTermination(data, "rejected", "call:rejected"),
+    (data: { callId: string; reason?: "rejected" | "busy" | "timeout" }) =>
+      handleTermination(data, "rejected", "call:rejected"),
   );
 
   socket.on(
     "call:end",
-    (data: {
-      callId: string;
-      targetUserId: string;
-      reason?: "ended" | "missed" | "failed";
-    }) => handleTermination(data, "ended", "call:ended"),
+    (data: { callId: string; reason?: "ended" | "missed" | "failed" }) =>
+      handleTermination(data, "ended", "call:ended"),
   );
 
   socket.on(
     "webrtc:offer",
     (data: {
       callId: string;
-      targetUserId: string;
       sdp: { type: "offer" | "answer" | "pranswer" | "rollback"; sdp?: string };
     }) => relaySignal("webrtc:offer", data),
   );
@@ -382,7 +408,6 @@ export const registerCallSignaling = (
     "webrtc:answer",
     (data: {
       callId: string;
-      targetUserId: string;
       sdp: { type: "offer" | "answer" | "pranswer" | "rollback"; sdp?: string };
     }) => relaySignal("webrtc:answer", data),
   );
@@ -391,7 +416,6 @@ export const registerCallSignaling = (
     "webrtc:ice-candidate",
     (data: {
       callId: string;
-      targetUserId: string;
       candidate: {
         candidate: string;
         sdpMid?: string | null;

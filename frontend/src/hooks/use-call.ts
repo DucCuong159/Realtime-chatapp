@@ -233,7 +233,6 @@ export const useCall = create<CallState>((set, get) => ({
       (candidate) => {
         socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
           callId: session.callId,
-          targetUserId: session.remoteUser._id,
           candidate,
         });
       },
@@ -252,7 +251,6 @@ export const useCall = create<CallState>((set, get) => ({
     // Notify caller that call was accepted
     socket.emit(CALL_SOCKET_EVENTS.ACCEPT, {
       callId: session.callId,
-      callerId: session.remoteUser._id,
     });
   },
 
@@ -276,7 +274,6 @@ export const useCall = create<CallState>((set, get) => ({
         (candidate) => {
           socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
             callId: session.callId,
-            targetUserId: session.remoteUser._id,
             candidate,
           });
         },
@@ -296,7 +293,6 @@ export const useCall = create<CallState>((set, get) => ({
       const offer = await webrtcManager.createOffer();
       socket.emit(CALL_SOCKET_EVENTS.WEBRTC_OFFER, {
         callId: session.callId,
-        targetUserId: session.remoteUser._id,
         sdp: offer,
       });
     } catch (error) {
@@ -318,7 +314,6 @@ export const useCall = create<CallState>((set, get) => ({
       const answer = await webrtcManager.handleOffer(payload.sdp);
       socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ANSWER, {
         callId: session.callId,
-        targetUserId: session.remoteUser._id,
         sdp: answer,
       });
     } catch (error) {
@@ -382,7 +377,6 @@ export const useCall = create<CallState>((set, get) => ({
     if (session && socket) {
       socket.emit(CALL_SOCKET_EVENTS.REJECT, {
         callId: session.callId,
-        targetUserId: session.remoteUser._id,
         reason,
       });
     }
@@ -402,7 +396,6 @@ export const useCall = create<CallState>((set, get) => ({
     if (session && socket) {
       socket.emit(CALL_SOCKET_EVENTS.END, {
         callId: session.callId,
-        targetUserId: session.remoteUser._id,
         reason,
       });
     }

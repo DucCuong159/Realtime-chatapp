@@ -65,21 +65,18 @@ export interface CallEndedPayload {
 
 export interface WebRTCOfferPayload {
   callId: string;
-  targetUserId?: string;
   senderId?: string;
   sdp: RTCSessionDescriptionInit;
 }
 
 export interface WebRTCAnswerPayload {
   callId: string;
-  targetUserId?: string;
   senderId?: string;
   sdp: RTCSessionDescriptionInit;
 }
 
 export interface WebRTCIceCandidatePayload {
   callId: string;
-  targetUserId?: string;
   senderId?: string;
   candidate: RTCIceCandidateInit;
 }
