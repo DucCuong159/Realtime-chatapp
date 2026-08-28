@@ -125,14 +125,23 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
 
     set({ status: "CONNECTING" });
 
-    // Initialize peer connection on Callee side
-    await setupPeerConnection(
-      session.callId,
-      socket,
-      () => get().handleWebRTCConnected(),
-      () => get().endCall("failed"),
-      () => get().status,
-    );
+    try {
+      // Initialize peer connection on Callee side
+      await setupPeerConnection(
+        session.callId,
+        socket,
+        () => get().handleWebRTCConnected(),
+        () => get().endCall("failed"),
+        () => get().status,
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Failed to establish the call connection";
+      toast.error(message);
+      get().endCall("failed");
+    }
 
     // Notify caller that call was accepted
     socket.emit(CALL_SOCKET_EVENTS.ACCEPT, {

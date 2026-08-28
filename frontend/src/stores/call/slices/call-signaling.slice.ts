@@ -75,11 +75,14 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
       return;
     }
 
+    const { socket } = useSocket.getState();
+    if (!socket || !socket.connected) {
+      get().endCall("failed");
+      return;
+    }
+
     clearTimers();
     soundEffects.stopAll();
-
-    const { socket } = useSocket.getState();
-    if (!socket) return;
 
     set({ status: "CONNECTING" });
 
