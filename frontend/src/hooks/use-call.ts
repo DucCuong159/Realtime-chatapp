@@ -139,6 +139,11 @@ export const useCall = create<CallState>((set, get) => ({
 
     // Acquire microphone in background without blocking UI
     webrtcManager.getLocalAudioStream().catch((err: unknown) => {
+      const currentStatus = get().status;
+      // If the call was already ended, rejected, or reset, ignore cancellation
+      if (currentStatus === "IDLE" || currentStatus === "ENDED") {
+        return;
+      }
       const message =
         err instanceof Error
           ? err.message

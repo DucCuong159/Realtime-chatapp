@@ -6,6 +6,8 @@ class WebRTCManager {
   private remoteStream: MediaStream | null = null;
   private remoteAudioElement: HTMLAudioElement | null = null;
   private queuedIceCandidates: RTCIceCandidateInit[] = [];
+  private isCleanedUp = false;
+  private pendingMediaPromise: Promise<MediaStream> | null = null;
 
   constructor() {
     // Lazily create audio element for remote stream output
@@ -16,28 +18,49 @@ class WebRTCManager {
   }
 
   /**
-   * Acquire local audio stream from user microphone
+   * Acquire local audio stream from user microphone.
+   * If cleanup() is invoked before this promise resolves, newly acquired tracks
+   * are immediately stopped to avoid keeping the hardware microphone active.
    */
   async getLocalAudioStream(): Promise<MediaStream> {
     if (this.localStream) {
       return this.localStream;
     }
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-      this.localStream = stream;
-      return stream;
-    } catch (error) {
-      console.error("Failed to acquire user microphone:", error);
-      throw error;
+    if (this.pendingMediaPromise) {
+      return this.pendingMediaPromise;
     }
+
+    this.isCleanedUp = false;
+
+    this.pendingMediaPromise = (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+          video: false,
+        });
+
+        // If cleanup() was called while getUserMedia was pending, immediately stop all tracks!
+        if (this.isCleanedUp) {
+          stream.getTracks().forEach((track) => track.stop());
+          throw new Error("Call ended before microphone access was granted");
+        }
+
+        this.localStream = stream;
+        return stream;
+      } catch (error) {
+        console.error("Failed to acquire user microphone:", error);
+        throw error;
+      } finally {
+        this.pendingMediaPromise = null;
+      }
+    })();
+
+    return this.pendingMediaPromise;
   }
 
   /**
@@ -210,9 +233,11 @@ class WebRTCManager {
   }
 
   /**
-   * Full cleanup: stops all media tracks, closes PC, resets audio element
+   * Full cleanup: stops all media tracks, closes PC, resets audio element,
+   * and cancels any pending microphone acquisition.
    */
   cleanup(): void {
+    this.isCleanedUp = true;
     this.cleanupPeerConnection();
 
     if (this.localStream) {
