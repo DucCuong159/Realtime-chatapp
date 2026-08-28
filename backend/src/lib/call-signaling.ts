@@ -17,6 +17,8 @@ export interface ActiveCallRecord {
   conversationId?: string;
   callerId: string;
   calleeId: string;
+  callerSocketId?: string;
+  calleeSocketId?: string;
   startTime?: number;
   status: "calling" | "connected" | "ended";
 }
@@ -101,6 +103,46 @@ export const terminateCallSession = async (
   }
 };
 
+const isUserInActiveCall = (targetUserId: string): boolean => {
+  for (const call of activeCalls.values()) {
+    const isParticipant =
+      call.callerId === targetUserId || call.calleeId === targetUserId;
+    const isActiveStatus =
+      call.status === "calling" || call.status === "connected";
+
+    if (isParticipant && isActiveStatus) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const rejectInitiationEarly = async (
+  io: SocketServer,
+  socket: AuthenticatedSocket,
+  callId: string,
+  callerId: string,
+  calleeId: string,
+  reason: "offline" | "busy",
+  conversationId?: string,
+) => {
+  socket.emit("call:rejected", { callId, reason });
+  if (conversationId) {
+    await saveAndEmitCallMessage(
+      io,
+      {
+        callId,
+        conversationId,
+        callerId,
+        calleeId,
+        callerSocketId: socket.id,
+        status: "calling",
+      },
+      reason,
+    );
+  }
+};
+
 export const registerCallSignaling = (
   io: SocketServer,
   socket: AuthenticatedSocket,
@@ -109,6 +151,21 @@ export const registerCallSignaling = (
   activeCallBySocket: Map<string, ActiveCallInfo>,
 ) => {
   const currentUserId = String(userId).trim();
+
+  // Helper to determine destination socket ID for peer-to-peer routing
+  const getPeerDestination = (
+    callRecord: ActiveCallRecord | undefined,
+    targetUserId: string,
+  ): string => {
+    if (!callRecord) return `user:${targetUserId}`;
+    if (socket.id === callRecord.callerSocketId && callRecord.calleeSocketId) {
+      return callRecord.calleeSocketId;
+    }
+    if (socket.id === callRecord.calleeSocketId && callRecord.callerSocketId) {
+      return callRecord.callerSocketId;
+    }
+    return `user:${targetUserId}`;
+  };
 
   // Reusable handler to terminate call session and notify peer
   const handleTermination = async (
@@ -120,6 +177,9 @@ export const registerCallSignaling = (
     if (!targetUserId || !callId) return;
 
     const targetId = String(targetUserId).trim();
+    const callRecord = activeCalls.get(callId);
+    const destination = getPeerDestination(callRecord, targetId);
+
     await terminateCallSession(
       io,
       activeCallBySocket,
@@ -127,10 +187,10 @@ export const registerCallSignaling = (
       callId,
       reason,
     );
-    io.to(`user:${targetId}`).emit(outgoingEvent, { callId, reason });
+    io.to(destination).emit(outgoingEvent, { callId, reason });
   };
 
-  // Reusable handler to relay WebRTC media signals (offer / answer / ice-candidate)
+  // Reusable handler to relay WebRTC media signals strictly to the active peer socket
   const relaySignal = (
     eventName: "webrtc:offer" | "webrtc:answer" | "webrtc:ice-candidate",
     data: {
@@ -148,7 +208,10 @@ export const registerCallSignaling = (
     if (!targetUserId || !callId) return;
 
     const targetId = String(targetUserId).trim();
-    io.to(`user:${targetId}`).emit(eventName, {
+    const callRecord = activeCalls.get(callId);
+    const destination = getPeerDestination(callRecord, targetId);
+
+    io.to(destination).emit(eventName, {
       callId,
       senderId: currentUserId,
       ...payload,
@@ -167,28 +230,40 @@ export const registerCallSignaling = (
       if (!calleeId || !callId) return;
 
       const targetCalleeId = String(calleeId).trim();
-      const verifiedCaller = { ...caller, _id: currentUserId };
+      const verifiedCaller = {
+        ...caller,
+        _id: currentUserId,
+      };
 
-      // Check if callee is online
+      // 1. Check if callee is online
       const isCalleeOnline =
         onlineUsers.has(targetCalleeId) &&
         (onlineUsers.get(targetCalleeId)?.size ?? 0) > 0;
 
       if (!isCalleeOnline) {
-        socket.emit("call:rejected", { callId, reason: "offline" });
-        if (conversationId) {
-          await saveAndEmitCallMessage(
-            io,
-            {
-              callId,
-              conversationId,
-              callerId: currentUserId,
-              calleeId: targetCalleeId,
-              status: "calling",
-            },
-            "offline",
-          );
-        }
+        await rejectInitiationEarly(
+          io,
+          socket,
+          callId,
+          currentUserId,
+          targetCalleeId,
+          "offline",
+          conversationId,
+        );
+        return;
+      }
+
+      // 2. Server-side Busy Check: Check if callee is already engaged in another call
+      if (isUserInActiveCall(targetCalleeId)) {
+        await rejectInitiationEarly(
+          io,
+          socket,
+          callId,
+          currentUserId,
+          targetCalleeId,
+          "busy",
+          conversationId,
+        );
         return;
       }
 
@@ -198,10 +273,11 @@ export const registerCallSignaling = (
         conversationId,
         callerId: currentUserId,
         calleeId: targetCalleeId,
+        callerSocketId: socket.id,
         status: "calling",
       });
 
-      // Forward to callee personal room
+      // Forward to callee personal room (rings all callee's tabs)
       io.to(`user:${targetCalleeId}`).emit("call:incoming", {
         callId,
         conversationId,
@@ -220,12 +296,20 @@ export const registerCallSignaling = (
     if (callRecord) {
       callRecord.status = "connected";
       callRecord.startTime = Date.now();
+      callRecord.calleeSocketId = socket.id;
     }
 
-    // Notify caller that call was accepted
-    io.to(`user:${targetCallerId}`).emit("call:accepted", {
+    // 1. Notify caller that call was accepted (route directly to caller's socket if available)
+    const callerTarget = callRecord?.callerSocketId || `user:${targetCallerId}`;
+    io.to(callerTarget).emit("call:accepted", {
       callId,
       calleeId: currentUserId,
+    });
+
+    // 2. Clear other ringing tabs of this callee so they stop ringing
+    io.to(`user:${currentUserId}`).except(socket.id).emit("call:ended", {
+      callId,
+      reason: "answered_elsewhere",
     });
   });
 

@@ -306,8 +306,10 @@ export const useCall = create<CallState>((set, get) => ({
   },
 
   handleWebRTCOffer: async (payload: WebRTCOfferPayload) => {
-    const { session } = get();
+    const { session, status } = get();
     if (!session || session.callId !== payload.callId) return;
+    // Guard: Only process offer on the tab that actually accepted or is connecting the call
+    if (status !== "CONNECTING" && status !== "CONNECTED") return;
 
     const { socket } = useSocket.getState();
     if (!socket) return;
@@ -451,6 +453,15 @@ export const useCall = create<CallState>((set, get) => ({
     if (!session || session.callId !== payload.callId) return;
 
     clearTimers();
+
+    // If answered on another tab of the same user, silently stop ringing and reset
+    if (payload.reason === "answered_elsewhere") {
+      soundEffects.stopAll();
+      webrtcManager.cleanup();
+      get().resetCallState();
+      return;
+    }
+
     soundEffects.playCallEndTone();
     webrtcManager.cleanup();
 

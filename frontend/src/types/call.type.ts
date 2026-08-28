@@ -14,7 +14,8 @@ export type CallEndReason =
   | "timeout"
   | "failed"
   | "offline"
-  | "peer_disconnected";
+  | "peer_disconnected"
+  | "answered_elsewhere";
 
 export interface CallUser {
   _id: string;
