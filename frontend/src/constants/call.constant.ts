@@ -19,10 +19,34 @@ export const CALL_TIMINGS = {
   RESET_STATE_DELAY_MS: 1_600,
 } as const;
 
+const turnUrls =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_TURN_URL
+    ? import.meta.env.VITE_TURN_URL.split(",").map((u: string) => u.trim())
+    : [];
+const turnUsername =
+  typeof import.meta !== "undefined"
+    ? import.meta.env?.VITE_TURN_USERNAME
+    : undefined;
+const turnCredential =
+  typeof import.meta !== "undefined"
+    ? import.meta.env?.VITE_TURN_CREDENTIAL
+    : undefined;
+
+const iceServers: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: "stun:stun1.l.google.com:19302" },
+  { urls: "stun:stun2.l.google.com:19302" },
+];
+
+if (turnUrls.length > 0 && turnUsername && turnCredential) {
+  iceServers.push({
+    urls: turnUrls,
+    username: turnUsername,
+    credential: turnCredential,
+  });
+}
+
 export const DEFAULT_ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-  ],
+  iceServers,
+  iceCandidatePoolSize: 10,
 };

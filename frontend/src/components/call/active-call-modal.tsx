@@ -4,7 +4,7 @@ import { useCall } from "@/hooks/use-call";
 import { formatCallTimer } from "@/lib/utils";
 import type { CallEndReason, CallStatus, CallUser } from "@/types/call.type";
 import { Mic, MicOff, Minimize2, PhoneOff } from "lucide-react";
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 
 interface AvatarProps {
   remoteUser: CallUser;
@@ -12,7 +12,9 @@ interface AvatarProps {
 }
 
 const ActiveCallAvatar = ({ remoteUser, status }: AvatarProps) => {
-  const initials = remoteUser.name ? remoteUser.name.slice(0, 2).toUpperCase() : "U";
+  const initials = remoteUser.name
+    ? remoteUser.name.slice(0, 2).toUpperCase()
+    : "U";
 
   return (
     <div className="relative my-6 flex items-center justify-center">
@@ -150,6 +152,9 @@ const ActiveCallModal = () => {
   const toggleMute = useCall((s) => s.toggleMute);
   const toggleMinimize = useCall((s) => s.toggleMinimize);
 
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previousActiveElementRef = useRef<HTMLElement | null>(null);
+
   const isVisible =
     (status === "CALLING" ||
       status === "CONNECTING" ||
@@ -157,12 +162,36 @@ const ActiveCallModal = () => {
       status === "ENDED") &&
     !isMinimized;
 
+  useEffect(() => {
+    if (isVisible) {
+      previousActiveElementRef.current =
+        document.activeElement as HTMLElement | null;
+      modalRef.current?.focus();
+    } else if (previousActiveElementRef.current) {
+      previousActiveElementRef.current.focus?.();
+    }
+  }, [isVisible]);
+
   if (!isVisible || !session) return null;
 
   const { remoteUser } = session;
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") {
+      toggleMinimize();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="active-call-title"
+      ref={modalRef}
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150 outline-none"
+    >
       <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-card/95 backdrop-blur-md p-8 shadow-2xl flex flex-col items-center text-center">
         {/* Top bar controls */}
         <div className="absolute top-4 right-4">
@@ -181,7 +210,10 @@ const ActiveCallModal = () => {
         <ActiveCallAvatar remoteUser={remoteUser} status={status} />
 
         {/* User info */}
-        <h3 className="text-2xl font-bold text-foreground tracking-tight">
+        <h3
+          id="active-call-title"
+          className="text-2xl font-bold text-foreground tracking-tight"
+        >
           {remoteUser.name}
         </h3>
 

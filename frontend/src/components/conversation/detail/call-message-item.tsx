@@ -12,13 +12,22 @@ interface CallMessageItemProps {
 
 const CallMessageItem = ({ message, currentUserId }: CallMessageItemProps) => {
   const isCurrentUser = message.sender?._id === currentUserId;
+  const isCompleted = message.callInfo?.status === "completed";
   const isMissed =
-    message.callInfo?.status === "missed" ||
-    message.callInfo?.status === "declined" ||
-    message.callInfo?.status === "busy" ||
-    !message.callInfo?.duration;
+    !isCompleted &&
+    (message.callInfo?.status === "missed" ||
+      message.callInfo?.status === "declined" ||
+      message.callInfo?.status === "busy" ||
+      !message.callInfo?.duration);
 
-  const title = isMissed ? "Missed audio call" : "Audio call";
+  const callStatus = message.callInfo?.status;
+  const title = isMissed
+    ? callStatus === "declined"
+      ? "Declined audio call"
+      : callStatus === "busy"
+        ? "Busy audio call"
+        : "Missed audio call"
+    : "Audio call";
   const subtitle = isMissed
     ? formatConversationTime(message.createdAt)
     : formatDuration(message.callInfo?.duration);

@@ -28,6 +28,7 @@ class WebRTCManager {
     }
 
     if (this.pendingMediaPromise) {
+      this.isCleanedUp = false;
       return this.pendingMediaPromise;
     }
 

@@ -46,7 +46,10 @@ const CallMessageRow = ({
   currentUserId: string | null;
   isCurrentUser: boolean;
 }) => (
-  <div className="flex flex-col w-full px-2 py-1">
+  <div
+    id={`message-${message._id}`}
+    className="flex flex-col w-full px-2 py-1"
+  >
     <div
       className={cn(
         "flex items-center gap-1.5 w-full",

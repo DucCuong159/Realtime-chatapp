@@ -28,7 +28,10 @@ interface CallState {
   endReason: CallEndReason | null;
 
   // Actions
-  initiateCall: (remoteUser: CallUser, conversationId?: string) => Promise<void>;
+  initiateCall: (
+    remoteUser: CallUser,
+    conversationId?: string,
+  ) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: (reason?: CallEndReason) => void;
   endCall: (reason?: CallEndReason) => void;
@@ -43,13 +46,16 @@ interface CallState {
   handleCallEnded: (payload: CallEndedPayload) => void;
   handleWebRTCOffer: (payload: WebRTCOfferPayload) => Promise<void>;
   handleWebRTCAnswer: (payload: WebRTCAnswerPayload) => Promise<void>;
-  handleWebRTCIceCandidate: (payload: WebRTCIceCandidatePayload) => Promise<void>;
+  handleWebRTCIceCandidate: (
+    payload: WebRTCIceCandidatePayload,
+  ) => Promise<void>;
   handleWebRTCConnected: () => void;
 }
 
 let callTimer: number | null = null;
 let timeoutTimer: number | null = null;
 let endedResetTimer: number | null = null;
+let disconnectRecoveryTimer: number | null = null;
 
 const clearTimers = () => {
   if (callTimer !== null) {
@@ -64,8 +70,11 @@ const clearTimers = () => {
     clearTimeout(endedResetTimer);
     endedResetTimer = null;
   }
+  if (disconnectRecoveryTimer !== null) {
+    clearTimeout(disconnectRecoveryTimer);
+    disconnectRecoveryTimer = null;
+  }
 };
-
 
 export const useCall = create<CallState>((set, get) => ({
   status: "IDLE",
@@ -208,11 +217,15 @@ export const useCall = create<CallState>((set, get) => ({
     const { session, status } = get();
     if (status !== "RINGING" || !session) return;
 
+    const { socket } = useSocket.getState();
+    if (!socket || !socket.connected) {
+      toast.error("Network connection not available");
+      get().rejectCall("failed");
+      return;
+    }
+
     clearTimers();
     soundEffects.stopAll();
-
-    const { socket } = useSocket.getState();
-    if (!socket) return;
 
     try {
       await webrtcManager.getLocalAudioStream();
@@ -238,12 +251,29 @@ export const useCall = create<CallState>((set, get) => ({
       },
       (connectionState) => {
         if (connectionState === "connected") {
+          if (disconnectRecoveryTimer) {
+            clearTimeout(disconnectRecoveryTimer);
+            disconnectRecoveryTimer = null;
+          }
           get().handleWebRTCConnected();
-        } else if (
-          connectionState === "failed" ||
-          connectionState === "disconnected"
-        ) {
+        } else if (connectionState === "failed") {
+          if (disconnectRecoveryTimer) {
+            clearTimeout(disconnectRecoveryTimer);
+            disconnectRecoveryTimer = null;
+          }
           get().endCall("failed");
+        } else if (connectionState === "disconnected") {
+          // Transient disconnection: start a 5s grace period before failing
+          if (!disconnectRecoveryTimer) {
+            disconnectRecoveryTimer = window.setTimeout(() => {
+              if (
+                get().status === "CONNECTED" ||
+                get().status === "CONNECTING"
+              ) {
+                get().endCall("failed");
+              }
+            }, 5000);
+          }
         }
       },
     );
@@ -279,12 +309,29 @@ export const useCall = create<CallState>((set, get) => ({
         },
         (connectionState) => {
           if (connectionState === "connected") {
+            if (disconnectRecoveryTimer) {
+              clearTimeout(disconnectRecoveryTimer);
+              disconnectRecoveryTimer = null;
+            }
             get().handleWebRTCConnected();
-          } else if (
-            connectionState === "failed" ||
-            connectionState === "disconnected"
-          ) {
+          } else if (connectionState === "failed") {
+            if (disconnectRecoveryTimer) {
+              clearTimeout(disconnectRecoveryTimer);
+              disconnectRecoveryTimer = null;
+            }
             get().endCall("failed");
+          } else if (connectionState === "disconnected") {
+            // Transient disconnection: start a 5s grace period before failing
+            if (!disconnectRecoveryTimer) {
+              disconnectRecoveryTimer = window.setTimeout(() => {
+                if (
+                  get().status === "CONNECTED" ||
+                  get().status === "CONNECTING"
+                ) {
+                  get().endCall("failed");
+                }
+              }, 5000);
+            }
           }
         },
       );

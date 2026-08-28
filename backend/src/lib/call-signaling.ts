@@ -2,6 +2,7 @@ import { Server as SocketServer, type Socket } from "socket.io";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
 import { formatDuration } from "../utils/date-time.js";
+import { capitalize } from "../utils/string.js";
 
 export interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -20,9 +21,11 @@ export interface ActiveCallRecord {
   callerSocketId?: string;
   calleeSocketId?: string;
   startTime?: number;
+  createdAt: number;
   status: "calling" | "connected" | "ended";
 }
 
+const CALL_RING_TIMEOUT_MS = 40_000;
 const activeCalls = new Map<string, ActiveCallRecord>();
 
 export const saveAndEmitCallMessage = async (
@@ -48,13 +51,9 @@ export const saveAndEmitCallMessage = async (
           ? "declined"
           : "missed";
 
-const contentText = isCompleted
-        ? `Audio call\n${formatDuration(duration)}`
-        : callStatus === "busy"
-          ? "Busy audio call"
-          : callStatus === "declined"
-            ? "Declined audio call"
-            : "Missed audio call";
+    const contentText = isCompleted
+      ? `Audio call\n${formatDuration(duration)}`
+      : `${capitalize(callStatus)} audio call`;
 
     const newMessage = await MessageModel.create({
       conversationId: callRecord.conversationId,
@@ -108,7 +107,17 @@ export const terminateCallSession = async (
 };
 
 const isUserInActiveCall = (targetUserId: string): boolean => {
-  for (const call of activeCalls.values()) {
+  const now = Date.now();
+  for (const [callId, call] of activeCalls.entries()) {
+    // Expire stale calling entries that remain in calling status beyond the ring timeout
+    if (
+      call.status === "calling" &&
+      now - call.createdAt > CALL_RING_TIMEOUT_MS
+    ) {
+      activeCalls.delete(callId);
+      continue;
+    }
+
     const isParticipant =
       call.callerId === targetUserId || call.calleeId === targetUserId;
     const isActiveStatus =
@@ -175,6 +184,7 @@ const rejectInitiationEarly = async (
         callerId,
         calleeId,
         callerSocketId: socket.id,
+        createdAt: Date.now(),
         status: "calling",
       },
       reason,
@@ -357,6 +367,7 @@ export const registerCallSignaling = (
         callerId: currentUserId,
         calleeId: targetCalleeId,
         callerSocketId: socket.id,
+        createdAt: Date.now(),
         status: "calling",
       });
 
