@@ -76,6 +76,51 @@ const clearTimers = () => {
   }
 };
 
+const setupPeerConnection = async (
+  callId: string,
+  socket: NonNullable<ReturnType<typeof useSocket.getState>["socket"]>,
+  onConnected: () => void,
+  onFailed: () => void,
+  getStatus: () => CallStatus,
+) => {
+  return webrtcManager.initializePeerConnection(
+    (candidate) => {
+      socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
+        callId,
+        candidate,
+      });
+    },
+    (connectionState) => {
+      if (connectionState === "connected") {
+        if (disconnectRecoveryTimer) {
+          clearTimeout(disconnectRecoveryTimer);
+          disconnectRecoveryTimer = null;
+        }
+        onConnected();
+      } else if (connectionState === "failed") {
+        if (disconnectRecoveryTimer) {
+          clearTimeout(disconnectRecoveryTimer);
+          disconnectRecoveryTimer = null;
+        }
+        onFailed();
+      } else if (connectionState === "disconnected") {
+        // Transient disconnection: start a 5s grace period before failing
+        if (!disconnectRecoveryTimer) {
+          disconnectRecoveryTimer = window.setTimeout(() => {
+            const currentStatus = getStatus();
+            if (
+              currentStatus === "CONNECTED" ||
+              currentStatus === "CONNECTING"
+            ) {
+              onFailed();
+            }
+          }, 5000);
+        }
+      }
+    },
+  );
+};
+
 export const useCall = create<CallState>((set, get) => ({
   status: "IDLE",
   session: null,
@@ -242,40 +287,12 @@ export const useCall = create<CallState>((set, get) => ({
     set({ status: "CONNECTING" });
 
     // Initialize peer connection on Callee side
-    await webrtcManager.initializePeerConnection(
-      (candidate) => {
-        socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
-          callId: session.callId,
-          candidate,
-        });
-      },
-      (connectionState) => {
-        if (connectionState === "connected") {
-          if (disconnectRecoveryTimer) {
-            clearTimeout(disconnectRecoveryTimer);
-            disconnectRecoveryTimer = null;
-          }
-          get().handleWebRTCConnected();
-        } else if (connectionState === "failed") {
-          if (disconnectRecoveryTimer) {
-            clearTimeout(disconnectRecoveryTimer);
-            disconnectRecoveryTimer = null;
-          }
-          get().endCall("failed");
-        } else if (connectionState === "disconnected") {
-          // Transient disconnection: start a 5s grace period before failing
-          if (!disconnectRecoveryTimer) {
-            disconnectRecoveryTimer = window.setTimeout(() => {
-              if (
-                get().status === "CONNECTED" ||
-                get().status === "CONNECTING"
-              ) {
-                get().endCall("failed");
-              }
-            }, 5000);
-          }
-        }
-      },
+    await setupPeerConnection(
+      session.callId,
+      socket,
+      () => get().handleWebRTCConnected(),
+      () => get().endCall("failed"),
+      () => get().status,
     );
 
     // Notify caller that call was accepted
@@ -300,40 +317,12 @@ export const useCall = create<CallState>((set, get) => ({
 
     try {
       // Initialize peer connection on Caller side
-      await webrtcManager.initializePeerConnection(
-        (candidate) => {
-          socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
-            callId: session.callId,
-            candidate,
-          });
-        },
-        (connectionState) => {
-          if (connectionState === "connected") {
-            if (disconnectRecoveryTimer) {
-              clearTimeout(disconnectRecoveryTimer);
-              disconnectRecoveryTimer = null;
-            }
-            get().handleWebRTCConnected();
-          } else if (connectionState === "failed") {
-            if (disconnectRecoveryTimer) {
-              clearTimeout(disconnectRecoveryTimer);
-              disconnectRecoveryTimer = null;
-            }
-            get().endCall("failed");
-          } else if (connectionState === "disconnected") {
-            // Transient disconnection: start a 5s grace period before failing
-            if (!disconnectRecoveryTimer) {
-              disconnectRecoveryTimer = window.setTimeout(() => {
-                if (
-                  get().status === "CONNECTED" ||
-                  get().status === "CONNECTING"
-                ) {
-                  get().endCall("failed");
-                }
-              }, 5000);
-            }
-          }
-        },
+      await setupPeerConnection(
+        session.callId,
+        socket,
+        () => get().handleWebRTCConnected(),
+        () => get().endCall("failed"),
+        () => get().status,
       );
 
       // Create Offer and emit to callee
