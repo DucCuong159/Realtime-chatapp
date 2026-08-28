@@ -37,6 +37,7 @@
 - 🤖 **Gemini AI Streaming & Dynamic Selector**: Real-time token streaming, live quota latency check (`checkModelQuota`), auto-fallback on 429 quota limits, and markdown rendering with XSS hardening.
 - 📜 **Cursor-Based Pagination & Infinite Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) and `useLayoutEffect` Element-Anchor scroll restoration (Zero Viewport Drift).
 - 💬 **Rich Messaging**: 1-on-1 and group chats, message replies with context quotes, Cloudinary media sharing (up to 15MB), and user search.
+- 📞 **Real-Time WebRTC Voice Calling**: Peer-to-peer ultra-low latency voice calls with pure Web Audio API sound synthesis, optimistic instant dial tone (<10ms), isolated duration tickers, STUN ICE race-condition handling, floating minimized pill widget, and automatic chat history call logging.
 - 🔐 **Hardened Security**: Stateless JWT in `HttpOnly` `SameSite` cookies, Passport authentication, bcrypt hashing, rate limiting, and Zod validation.
 
 ---
@@ -192,6 +193,14 @@ yarn --cwd frontend dev   # Terminal 2: Port 5173
 | `conversation:updated` | Server ➔ User | `{ conversationId, lastMessage }` | Update sidebar preview and bump rank |
 | `conversation:new` | Server ➔ User | `ConversationType` | Notify user of new conversation |
 | `conversation:ai` | Server ➔ Room | `{ chunk, done, message, error }` | Stream AI tokens and completion |
+| `call:initiate` | Caller ➔ Server | `{ callId, calleeId, conversationId, caller }` | Request starting a 1-on-1 audio call |
+| `call:incoming` | Server ➔ Callee | `{ callId, conversationId, caller }` | Trigger incoming call ring & modal |
+| `call:accept` | Callee ➔ Server | `{ callId, callerId }` | Callee accepts call, start timer |
+| `call:accepted` | Server ➔ Caller | `{ callId, calleeId }` | Notify caller to initiate SDP Offer |
+| `call:reject` / `call:rejected` | Bidirectional | `{ callId, targetUserId, reason }` | Decline/busy/timeout call & log to DB |
+| `call:end` / `call:ended` | Bidirectional | `{ callId, targetUserId, reason }` | End active call, teardown & log to DB |
+| `webrtc:offer` / `answer` | Client ➔ Client | `{ callId, targetUserId, sdp }` | Exchange SDP session descriptions |
+| `webrtc:ice-candidate` | Client ➔ Client | `{ callId, targetUserId, candidate }` | Exchange P2P network candidates |
 
 ---
 

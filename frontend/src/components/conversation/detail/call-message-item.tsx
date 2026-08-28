@@ -1,33 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { useCall } from "@/hooks/use-call";
-import { formatConversationTime } from "@/lib/utils";
+import { formatConversationTime, formatDuration } from "@/lib/utils";
 import type { MessageType } from "@/types/conversation.type";
 import { Phone, PhoneMissed } from "lucide-react";
 import { memo } from "react";
-
-const formatDuration = (duration = 0): string => {
-  if (duration <= 0) return "0s";
-
-  const hours = Math.floor(duration / 3600);
-  const minutes = Math.floor((duration % 3600) / 60);
-  const seconds = duration % 60;
-
-  if (hours > 0) {
-    if (minutes > 0 && seconds > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    }
-    if (minutes > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return seconds > 0 ? `${hours}h ${seconds}s` : `${hours}h`;
-  }
-
-  if (minutes > 0) {
-    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-  }
-
-  return `${seconds}s`;
-};
 
 interface CallMessageItemProps {
   message: MessageType;

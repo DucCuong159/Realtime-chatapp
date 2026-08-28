@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { formatCallDuration, useCall } from "@/hooks/use-call";
+import { useCall } from "@/hooks/use-call";
+import { formatCallTimer } from "@/lib/utils";
 import type { CallEndReason, CallStatus, CallUser } from "@/types/call.type";
 import { Mic, MicOff, Minimize2, PhoneOff } from "lucide-react";
 import { memo } from "react";
@@ -105,7 +106,7 @@ const CallStatusDisplay = ({
       case "CONNECTING":
         return "Connecting...";
       case "CONNECTED":
-        return formatCallDuration(duration);
+        return formatCallTimer(duration);
       case "ENDED":
         if (endReason === "busy") return "User is busy";
         if (endReason === "rejected") return "Call declined";

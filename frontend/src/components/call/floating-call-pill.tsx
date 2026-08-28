@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { formatCallDuration, useCall } from "@/hooks/use-call";
+import { useCall } from "@/hooks/use-call";
+import { formatCallTimer } from "@/lib/utils";
 import type { CallStatus } from "@/types/call.type";
 import { Maximize2, Mic, MicOff, PhoneOff } from "lucide-react";
 import { memo } from "react";
@@ -11,7 +12,7 @@ const FloatingCallTimer = ({ status }: { status: CallStatus }) => {
   const getPillStatusText = (): string => {
     switch (status) {
       case "CONNECTED":
-        return formatCallDuration(duration);
+        return formatCallTimer(duration);
       case "CALLING":
         return "Calling...";
       case "ENDED":

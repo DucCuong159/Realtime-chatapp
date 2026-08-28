@@ -1,6 +1,7 @@
 import { Server as SocketServer, type Socket } from "socket.io";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
+import { formatDuration } from "../utils/date-time.js";
 
 export interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -21,30 +22,6 @@ export interface ActiveCallRecord {
 }
 
 const activeCalls = new Map<string, ActiveCallRecord>();
-
-const formatCallDurationText = (duration: number): string => {
-  if (duration <= 0) return "0s";
-
-  const hours = Math.floor(duration / 3600);
-  const minutes = Math.floor((duration % 3600) / 60);
-  const seconds = duration % 60;
-
-  if (hours > 0) {
-    if (minutes > 0 && seconds > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    }
-    if (minutes > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return seconds > 0 ? `${hours}h ${seconds}s` : `${hours}h`;
-  }
-
-  if (minutes > 0) {
-    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-  }
-
-  return `${seconds}s`;
-};
 
 export const saveAndEmitCallMessage = async (
   io: SocketServer | null,
@@ -69,9 +46,8 @@ export const saveAndEmitCallMessage = async (
           ? "declined"
           : "missed";
 
-    const durationText = isCompleted ? formatCallDurationText(duration) : "";
     const contentText = isCompleted
-      ? `Audio call\n${durationText}`
+      ? `Audio call\n${formatDuration(duration)}`
       : "Missed audio call";
 
     const newMessage = await MessageModel.create({
@@ -134,6 +110,51 @@ export const registerCallSignaling = (
 ) => {
   const currentUserId = String(userId).trim();
 
+  // Reusable handler to terminate call session and notify peer
+  const handleTermination = async (
+    data: { callId?: string; targetUserId?: string; reason?: string },
+    defaultReason: string,
+    outgoingEvent: "call:rejected" | "call:ended",
+  ) => {
+    const { callId, targetUserId, reason = defaultReason } = data;
+    if (!targetUserId || !callId) return;
+
+    const targetId = String(targetUserId).trim();
+    await terminateCallSession(
+      io,
+      activeCallBySocket,
+      socket.id,
+      callId,
+      reason,
+    );
+    io.to(`user:${targetId}`).emit(outgoingEvent, { callId, reason });
+  };
+
+  // Reusable handler to relay WebRTC media signals (offer / answer / ice-candidate)
+  const relaySignal = (
+    eventName: "webrtc:offer" | "webrtc:answer" | "webrtc:ice-candidate",
+    data: {
+      callId?: string;
+      targetUserId?: string;
+      sdp?: { type: string; sdp?: string };
+      candidate?: {
+        candidate: string;
+        sdpMid?: string | null;
+        sdpMLineIndex?: number | null;
+      };
+    },
+  ) => {
+    const { callId, targetUserId, ...payload } = data;
+    if (!targetUserId || !callId) return;
+
+    const targetId = String(targetUserId).trim();
+    io.to(`user:${targetId}`).emit(eventName, {
+      callId,
+      senderId: currentUserId,
+      ...payload,
+    });
+  };
+
   socket.on(
     "call:initiate",
     async (data: {
@@ -146,12 +167,7 @@ export const registerCallSignaling = (
       if (!calleeId || !callId) return;
 
       const targetCalleeId = String(calleeId).trim();
-
-      // Security: enforce authenticated user as caller
-      const verifiedCaller = {
-        ...caller,
-        _id: currentUserId,
-      };
+      const verifiedCaller = { ...caller, _id: currentUserId };
 
       // Check if callee is online
       const isCalleeOnline =
@@ -159,14 +175,7 @@ export const registerCallSignaling = (
         (onlineUsers.get(targetCalleeId)?.size ?? 0) > 0;
 
       if (!isCalleeOnline) {
-        console.log(
-          `[Call Signaling] Callee ${targetCalleeId} is offline. Online users:`,
-          Array.from(onlineUsers.keys()),
-        );
-        socket.emit("call:rejected", {
-          callId,
-          reason: "offline",
-        });
+        socket.emit("call:rejected", { callId, reason: "offline" });
         if (conversationId) {
           await saveAndEmitCallMessage(
             io,
@@ -182,10 +191,6 @@ export const registerCallSignaling = (
         }
         return;
       }
-
-      console.log(
-        `[Call Signaling] Forwarding call:incoming to user:${targetCalleeId} from caller ${currentUserId}`,
-      );
 
       activeCallBySocket.set(socket.id, { callId, peerId: targetCalleeId });
       activeCalls.set(callId, {
@@ -226,54 +231,20 @@ export const registerCallSignaling = (
 
   socket.on(
     "call:reject",
-    async (data: {
+    (data: {
       callId: string;
       targetUserId: string;
       reason?: "rejected" | "busy" | "timeout";
-    }) => {
-      const { callId, targetUserId, reason = "rejected" } = data;
-      if (!targetUserId || !callId) return;
-
-      const targetId = String(targetUserId).trim();
-      await terminateCallSession(
-        io,
-        activeCallBySocket,
-        socket.id,
-        callId,
-        reason,
-      );
-
-      io.to(`user:${targetId}`).emit("call:rejected", {
-        callId,
-        reason,
-      });
-    },
+    }) => handleTermination(data, "rejected", "call:rejected"),
   );
 
   socket.on(
     "call:end",
-    async (data: {
+    (data: {
       callId: string;
       targetUserId: string;
       reason?: "ended" | "missed" | "failed";
-    }) => {
-      const { callId, targetUserId, reason = "ended" } = data;
-      if (!targetUserId || !callId) return;
-
-      const targetId = String(targetUserId).trim();
-      await terminateCallSession(
-        io,
-        activeCallBySocket,
-        socket.id,
-        callId,
-        reason,
-      );
-
-      io.to(`user:${targetId}`).emit("call:ended", {
-        callId,
-        reason,
-      });
-    },
+    }) => handleTermination(data, "ended", "call:ended"),
   );
 
   socket.on(
@@ -282,17 +253,7 @@ export const registerCallSignaling = (
       callId: string;
       targetUserId: string;
       sdp: { type: "offer" | "answer" | "pranswer" | "rollback"; sdp?: string };
-    }) => {
-      const { callId, targetUserId, sdp } = data;
-      if (!targetUserId || !callId || !sdp) return;
-
-      const targetId = String(targetUserId).trim();
-      io.to(`user:${targetId}`).emit("webrtc:offer", {
-        callId,
-        senderId: currentUserId,
-        sdp,
-      });
-    },
+    }) => relaySignal("webrtc:offer", data),
   );
 
   socket.on(
@@ -301,17 +262,7 @@ export const registerCallSignaling = (
       callId: string;
       targetUserId: string;
       sdp: { type: "offer" | "answer" | "pranswer" | "rollback"; sdp?: string };
-    }) => {
-      const { callId, targetUserId, sdp } = data;
-      if (!targetUserId || !callId || !sdp) return;
-
-      const targetId = String(targetUserId).trim();
-      io.to(`user:${targetId}`).emit("webrtc:answer", {
-        callId,
-        senderId: currentUserId,
-        sdp,
-      });
-    },
+    }) => relaySignal("webrtc:answer", data),
   );
 
   socket.on(
@@ -319,17 +270,11 @@ export const registerCallSignaling = (
     (data: {
       callId: string;
       targetUserId: string;
-      candidate: { candidate: string; sdpMid?: string | null; sdpMLineIndex?: number | null };
-    }) => {
-      const { callId, targetUserId, candidate } = data;
-      if (!targetUserId || !callId || !candidate) return;
-
-      const targetId = String(targetUserId).trim();
-      io.to(`user:${targetId}`).emit("webrtc:ice-candidate", {
-        callId,
-        senderId: currentUserId,
-        candidate,
-      });
-    },
+      candidate: {
+        candidate: string;
+        sdpMid?: string | null;
+        sdpMLineIndex?: number | null;
+      };
+    }) => relaySignal("webrtc:ice-candidate", data),
   );
 };

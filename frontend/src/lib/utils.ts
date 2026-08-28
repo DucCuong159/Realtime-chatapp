@@ -25,3 +25,29 @@ export const formatConversationTime = (date?: string | Date | null) => {
 export const isArrayEmpty = (arr?: unknown[] | null): boolean => {
   return !Array.isArray(arr) || arr.length === 0;
 };
+
+export const formatDuration = (seconds = 0): string => {
+  if (seconds <= 0) return "0s";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+  return parts.join(" ");
+};
+
+export const formatCallTimer = (seconds = 0): string => {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+  }
+  return `${pad(mins)}:${pad(secs)}`;
+};
+
+
+
