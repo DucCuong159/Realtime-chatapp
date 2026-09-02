@@ -39,7 +39,6 @@ export interface CallInitiatePayload {
   callId: string;
   calleeId: string;
   conversationId?: string;
-  caller: CallUser;
 }
 
 export interface CallIncomingPayload {

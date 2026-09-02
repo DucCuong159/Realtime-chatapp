@@ -3,6 +3,7 @@ export const CALL_SOCKET_EVENTS = {
   INCOMING: "call:incoming",
   ACCEPT: "call:accept",
   ACCEPTED: "call:accepted",
+  CONNECTED: "call:connected",
   REJECT: "call:reject",
   REJECTED: "call:rejected",
   END: "call:end",

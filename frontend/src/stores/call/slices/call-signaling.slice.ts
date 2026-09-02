@@ -155,6 +155,13 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     clearTimers();
     soundEffects.stopAll();
 
+    const { socket } = useSocket.getState();
+    if (session && socket && socket.connected) {
+      socket.emit(CALL_SOCKET_EVENTS.CONNECTED, {
+        callId: session.callId,
+      });
+    }
+
     set({
       status: "CONNECTED",
       session: session ? { ...session, startTime: Date.now() } : null,

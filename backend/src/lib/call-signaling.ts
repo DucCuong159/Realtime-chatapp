@@ -1,6 +1,7 @@
 import { Server as SocketServer, type Socket } from "socket.io";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel from "../models/Message.js";
+import UserModel from "../models/User.js";
 import { formatDuration } from "../utils/date-time.js";
 import { capitalize } from "../utils/string.js";
 
@@ -22,7 +23,7 @@ export interface ActiveCallRecord {
   calleeSocketId?: string;
   startTime?: number;
   createdAt: number;
-  status: "calling" | "connected" | "ended";
+  status: "calling" | "connecting" | "connected" | "ended";
 }
 
 const CALL_RING_TIMEOUT_MS = 40_000;
@@ -37,7 +38,9 @@ export const saveAndEmitCallMessage = async (
 
   try {
     const isCompleted =
-      callRecord.status === "connected" && Boolean(callRecord.startTime);
+      callRecord.status === "connected" &&
+      Boolean(callRecord.startTime) &&
+      endReason !== "failed";
     const duration =
       isCompleted && callRecord.startTime
         ? Math.max(1, Math.round((Date.now() - callRecord.startTime) / 1000))
@@ -121,7 +124,9 @@ const isUserInActiveCall = (targetUserId: string): boolean => {
     const isParticipant =
       call.callerId === targetUserId || call.calleeId === targetUserId;
     const isActiveStatus =
-      call.status === "calling" || call.status === "connected";
+      call.status === "calling" ||
+      call.status === "connecting" ||
+      call.status === "connected";
 
     if (isParticipant && isActiveStatus) {
       return true;
@@ -143,7 +148,7 @@ const validateCallConversation = async (
       const conversation = await ConversationModel.findOne({
         _id: conversationId,
         isGroup: false,
-        participants: { $all: [callerId, calleeId] },
+        participants: { $size: 2, $all: [callerId, calleeId] },
       }).select("_id");
 
       return conversation ? conversation._id.toString() : undefined;
@@ -158,6 +163,7 @@ const validateCallConversation = async (
     const directConversation = await ConversationModel.findOne({
       directKey,
       isGroup: false,
+      participants: { $size: 2, $all: [callerId, calleeId] },
     }).select("_id");
 
     return directConversation ? directConversation._id.toString() : undefined;
@@ -278,22 +284,34 @@ export const registerCallSignaling = (
       callId: string;
       calleeId: string;
       conversationId?: string;
-      caller: { _id: string; name: string; avatar?: string | null };
     }) => {
-      const { callId, calleeId, conversationId, caller } = data;
+      const { callId, calleeId, conversationId } = data;
       if (!calleeId || !callId) return;
 
       const targetCalleeId = String(calleeId).trim();
-      const verifiedCaller = {
-        ...caller,
-        _id: currentUserId,
-      };
+      if (targetCalleeId === currentUserId) return;
 
       // 0. Prevent duplicate call ID overwrite
       if (activeCalls.has(callId)) {
         socket.emit("call:rejected", { callId, reason: "failed" });
         return;
       }
+
+      // Security: Fetch authentic caller profile server-side to prevent identity spoofing
+      const callerUser = await UserModel.findById(currentUserId)
+        .select("name avatar")
+        .lean();
+
+      if (!callerUser) {
+        socket.emit("call:rejected", { callId, reason: "failed" });
+        return;
+      }
+
+      const verifiedCaller = {
+        _id: currentUserId,
+        name: callerUser.name,
+        avatar: callerUser.avatar ?? null,
+      };
 
       // 1. Security: Validate conversation membership if provided, or resolve direct 1-1 conversation
       let verifiedConversationId: string | undefined;
@@ -397,12 +415,12 @@ export const registerCallSignaling = (
     }
 
     activeCallBySocket.set(socket.id, { callId, peerId: callRecord.callerId });
-    callRecord.status = "connected";
-    callRecord.startTime = Date.now();
+    callRecord.status = "connecting";
     callRecord.calleeSocketId = socket.id;
 
     // 1. Notify caller that call was accepted (route directly to caller's socket if available)
-    const callerTarget = callRecord.callerSocketId || `user:${callRecord.callerId}`;
+    const callerTarget =
+      callRecord.callerSocketId || `user:${callRecord.callerId}`;
     io.to(callerTarget).emit("call:accepted", {
       callId,
       calleeId: currentUserId,
@@ -413,6 +431,25 @@ export const registerCallSignaling = (
       callId,
       reason: "answered_elsewhere",
     });
+  });
+
+  socket.on("call:connected", (data: { callId: string }) => {
+    const { callId } = data;
+    if (!callId) return;
+
+    const callRecord = activeCalls.get(callId);
+    if (!callRecord) return;
+
+    const isParticipant =
+      currentUserId === callRecord.callerId ||
+      currentUserId === callRecord.calleeId;
+    if (!isParticipant) return;
+
+    // Transition from connecting to connected and start duration accounting
+    if (callRecord.status === "connecting") {
+      callRecord.status = "connected";
+      callRecord.startTime = Date.now();
+    }
   });
 
   socket.on(

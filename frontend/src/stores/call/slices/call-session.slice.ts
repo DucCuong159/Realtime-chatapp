@@ -65,11 +65,6 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
       callId,
       calleeId: remoteUser._id,
       conversationId,
-      caller: {
-        _id: currentUser._id,
-        name: currentUser.name,
-        avatar: currentUser.avatar,
-      },
     });
 
     // Acquire microphone in background without blocking UI
