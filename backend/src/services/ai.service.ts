@@ -55,18 +55,37 @@ const EMPTY_CACHE_TTL_MS = 10 * 1000; // 10s short TTL for empty probe results t
 const PROBE_CONCURRENCY_LIMIT = 4; // Max concurrent model quota check probes
 
 /**
- * Filter only pure text/chat models.
- * Exclude multi-modal generation (Image, TTS, Music) and specialized preview agents (Robotics, Computer Use, Deep Research).
+ * Filter only pure text/chat conversational models supporting multi-turn chat.
+ * Exclude multi-modal generation (Image, TTS, Music, Video), audio/transcription only,
+ * embeddings, AQA, realtime/live WebSocket models, and specialized preview agents.
  */
 const isTextOutModel = (modelId: string): boolean => {
   const id = modelId.toLowerCase();
 
-  // 1. Multi-modal generative models (Image, TTS, Music)
+  // 1. Multi-modal generative models (Image, TTS, Music, Video)
   const isImageOrMedia =
-    id.includes("image") || id.includes("banana") || id.includes("lyria");
+    id.includes("image") ||
+    id.includes("banana") ||
+    id.includes("lyria") ||
+    id.includes("veo");
   const isTTS = id.includes("tts");
 
-  // 2. Agents & Specialized previews (Robotics, Computer use, Deep research, Antigravity)
+  // 2. Audio/Speech-only and Transcription models (single-turn audio only, multiturn not supported)
+  const isTranscribeOrAudio =
+    id.includes("transcribe") ||
+    id.includes("audio-") ||
+    id.endsWith("-audio") ||
+    id.includes("speech");
+
+  // 3. Embeddings & AQA models
+  const isEmbeddingOrAQA =
+    id.includes("embedding") || id.includes("aqa");
+
+  // 4. Realtime / Live bidirectional WebSocket-only models
+  const isRealtimeOnly =
+    id.includes("realtime") || id.includes("-live");
+
+  // 5. Agents & Specialized previews (Robotics, Computer use, Deep research, Antigravity, Custom tools)
   const isAgentOrSpecialized =
     id.includes("robotics") ||
     id.includes("antigravity") ||
@@ -74,7 +93,14 @@ const isTextOutModel = (modelId: string): boolean => {
     id.includes("computer-use") ||
     id.includes("customtools");
 
-  if (isImageOrMedia || isTTS || isAgentOrSpecialized) {
+  if (
+    isImageOrMedia ||
+    isTTS ||
+    isTranscribeOrAudio ||
+    isEmbeddingOrAQA ||
+    isRealtimeOnly ||
+    isAgentOrSpecialized
+  ) {
     return false;
   }
 
@@ -93,6 +119,7 @@ interface QuotaCheckResult {
 
 /**
  * Ping test to check if the model has available quota and evaluate its latency.
+ * Probes with a multi-turn conversation to ensure the model supports multi-turn chat.
  */
 const checkModelQuota = async (
   modelId: string,
@@ -108,7 +135,13 @@ const checkModelQuota = async (
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: "ping" }] }] }),
+      body: JSON.stringify({
+        contents: [
+          { role: "user", parts: [{ text: "hi" }] },
+          { role: "model", parts: [{ text: "hello" }] },
+          { role: "user", parts: [{ text: "ping" }] },
+        ],
+      }),
       signal: controller.signal,
     });
 
