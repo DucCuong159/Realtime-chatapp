@@ -108,7 +108,7 @@ frontend/src/
 yarn run verify    # = type-check → lint → test:fast
 
 # Các lệnh con:
-yarn run type-check      # tsc --noEmit
+yarn run type-check      # tsc -b (project build mode traversing tsconfig references)
 yarn run lint            # eslint . --cache --max-warnings=0
 yarn run test:fast       # vitest run --changed
 yarn run test:coverage   # vitest run --coverage

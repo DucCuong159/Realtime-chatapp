@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc -b",
     "lint": "eslint . --cache --max-warnings=0",
     "test:fast": "vitest run --changed",
     "test:coverage": "vitest run --coverage",

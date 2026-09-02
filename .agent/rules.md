@@ -111,7 +111,7 @@ Mỗi khi nhận một yêu cầu từ người dùng, hãy tuân thủ 4 bướ
 
 Trước khi kết thúc bất kỳ tác vụ nào, tự động xác nhận các mục sau:
 
-- [ ] **Type-check**: Mã nguồn biên dịch sạch sẽ, không có lỗi (`tsc --noEmit`).
+- [ ] **Type-check**: Mã nguồn biên dịch sạch sẽ, không có lỗi (`tsc -b`).
 - [ ] **Clean Code**: Không còn `console.log` debug, biến rác, imports thừa hoặc code chết.
 - [ ] **Testing**: Đã bổ sung / cập nhật test case (Unit/Integration) và pass toàn bộ.
 - [ ] **Memory & Cleanup**: Đã dọn dẹp đầy đủ event listeners, timers, subscriptions.
