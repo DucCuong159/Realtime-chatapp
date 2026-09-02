@@ -14,7 +14,7 @@
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-Google%20Gemini-black?style=for-the-badge&logo=vercel&logoColor=white)](https://sdk.vercel.ai/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg?style=for-the-badge)](LICENSE)
 
-[🌐 **Live Demo**](https://realtime-chatapp-vn.onrender.com/conversation) · [📖 **Detailed Architecture & Flow Guide**](REALTIME_CHAT_FLOW.md) · [🐛 **Report Bug**](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 **Request Feature**](https://github.com/DucCuong159/Realtime-chatapp/issues)
+[🌐 **Live Demo**](https://realtime-chatapp-vn.onrender.com/conversation) · [🐛 **Report Bug**](https://github.com/DucCuong159/Realtime-chatapp/issues) · [💡 **Request Feature**](https://github.com/DucCuong159/Realtime-chatapp/issues)
 
 </div>
 
@@ -23,8 +23,6 @@
 ## 🌟 Overview
 
 **Realtime Chat App** delivers low-latency interpersonal chat and AI assistant workflows. It combines a **Hybrid HTTP REST + WebSocket architecture**, **Dynamic Google Gemini AI model switching**, and **cursor-based pagination** with zero-drift scroll restoration.
-
-> 💡 *For in-depth sequence diagrams, algorithm breakdowns, and code walkthroughs, see [**REALTIME_CHAT_FLOW.md**](REALTIME_CHAT_FLOW.md).*
 
 ---
 
@@ -110,7 +108,6 @@ realtime-chatapp/
 │   │   ├── pages/                 # Auth & Conversation views
 │   │   ├── types/                 # TypeScript data contracts
 │   │   └── App.tsx & main.tsx     # App root & entry point
-├── REALTIME_CHAT_FLOW.md          # Complete deep-dive architecture flow
 └── README.md
 ```
 
