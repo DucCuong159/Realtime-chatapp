@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.3.0...realtime-chatapp-v1.4.0) (2026-09-02)
+
+
+### Features
+
+* **call:** integrate real-time 1-on-1 webrtc voice call feature ([#32](https://github.com/DucCuong159/Realtime-chatapp/issues/32)) ([#82](https://github.com/DucCuong159/Realtime-chatapp/issues/82)) ([49d79bb](https://github.com/DucCuong159/Realtime-chatapp/commit/49d79bb02e87ee7e64c2c0afb9a7fc19d5b7c9a2))
+
+
+### Bug Fixes
+
+* **ai:** filter out non-conversational models and probe with multi-turn payload ([#85](https://github.com/DucCuong159/Realtime-chatapp/issues/85)) ([e813dee](https://github.com/DucCuong159/Realtime-chatapp/commit/e813dee6fa719240ff72d5a3d6a1966375e36212))
+
 ## [1.3.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.2.0...realtime-chatapp-v1.3.0) (2026-08-26)
 
 
