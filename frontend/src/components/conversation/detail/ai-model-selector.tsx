@@ -33,7 +33,7 @@ const formatTokenNum = (tokens?: number) => {
   return `${tokens}`;
 };
 
-export const AiModelSelector = memo(() => {
+const AiModelSelector = () => {
   const {
     models,
     selectedModelId,
@@ -276,6 +276,6 @@ export const AiModelSelector = memo(() => {
       </PopoverContent>
     </Popover>
   );
-});
+};
 
-AiModelSelector.displayName = "AiModelSelector";
+export default memo(AiModelSelector);

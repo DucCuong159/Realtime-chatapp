@@ -19,6 +19,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
+import CallMessageItem from "./call-message-item";
 
 interface ConversationBodyProps {
   conversationId: string;
@@ -36,6 +37,187 @@ interface MessageItemProps {
   onScrollToMessage: (targetId: string) => void;
 }
 
+const CallMessageRow = ({
+  message,
+  currentUserId,
+  isCurrentUser,
+}: {
+  message: MessageType;
+  currentUserId: string | null;
+  isCurrentUser: boolean;
+}) => (
+  <div
+    id={`message-${message._id}`}
+    className="flex flex-col w-full px-2 py-1"
+  >
+    <div
+      className={cn(
+        "flex items-center gap-1.5 w-full",
+        isCurrentUser ? "justify-end" : "justify-start",
+      )}
+    >
+      {!isCurrentUser && (
+        <AvatarWithBadge
+          name={message.sender?.name || "User"}
+          src={message.sender?.avatar || ""}
+          size="size-7"
+        />
+      )}
+      <CallMessageItem message={message} currentUserId={currentUserId} />
+    </div>
+  </div>
+);
+
+const MessageReplyPreview = ({
+  replyTo,
+  isCurrentUser,
+  currentUserId,
+  onScrollToMessage,
+}: {
+  replyTo: NonNullable<MessageType["replyTo"]>;
+  isCurrentUser: boolean;
+  currentUserId: string | null;
+  onScrollToMessage: (targetId: string) => void;
+}) => {
+  const replySenderName =
+    replyTo.sender?._id === currentUserId
+      ? "You"
+      : replyTo.sender?.name || "User";
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (replyTo._id) {
+          onScrollToMessage(replyTo._id);
+        }
+      }}
+      className={cn(
+        "mb-0.5 rounded border-l-2 p-1.5 text-xs text-left overflow-hidden min-w-0 cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all select-none",
+        isCurrentUser
+          ? "border-white/60 bg-white/10 text-white"
+          : "border-[#3d61ff] bg-[#3d61ff]/5 text-foreground",
+      )}
+    >
+      <span className="block font-medium text-[11px] opacity-90 truncate">
+        {replySenderName}
+      </span>
+      <span className="block font-normal opacity-80 truncate">
+        {replyTo.image ? "📷 Photo" : replyTo.content}
+      </span>
+    </button>
+  );
+};
+
+const MessageAttachment = ({
+  image,
+  isImageOnly,
+  isCurrentUser,
+}: {
+  image: string;
+  isImageOnly: boolean;
+  isCurrentUser: boolean;
+}) => {
+  const imageClassName = isImageOnly
+    ? cn(
+        "rounded-2xl max-w-sm w-auto",
+        isCurrentUser ? "rounded-br-xs" : "rounded-bl-xs",
+      )
+    : "rounded-xl w-full";
+
+  return (
+    <img
+      src={image}
+      alt="Attachment"
+      className={cn("max-h-80 object-cover", imageClassName)}
+    />
+  );
+};
+
+const MessageContent = ({
+  content,
+  isAI,
+  isStreaming,
+}: {
+  content?: string | null;
+  isAI?: boolean;
+  isStreaming?: boolean;
+}) => (
+  <>
+    {content &&
+      (isAI ? (
+        <Response>{content}</Response>
+      ) : (
+        <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+      ))}
+
+    {isStreaming && (
+      <div className="flex items-center gap-2">
+        <RiCircleFill
+          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+          style={{ animationDelay: "0s" }}
+        />
+        <RiCircleFill
+          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+          style={{ animationDelay: "0.2s" }}
+        />
+        <RiCircleFill
+          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
+          style={{ animationDelay: "0.4s" }}
+        />
+      </div>
+    )}
+  </>
+);
+
+const MessageActions = ({
+  formattedTime,
+  onReply,
+  disabled,
+  side,
+}: {
+  formattedTime: string;
+  onReply: () => void;
+  disabled: boolean;
+  side: "left" | "right";
+}) => {
+  const replyButton = (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      onClick={onReply}
+      disabled={disabled}
+      className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
+      aria-label="Reply"
+    >
+      <Reply className={cn("size-3.5", side === "right" && "scale-x-[-1]")} />
+    </Button>
+  );
+
+  const timeLabel = (
+    <span className="text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none self-center shrink-0">
+      {formattedTime}
+    </span>
+  );
+
+  if (side === "right") {
+    return (
+      <>
+        {timeLabel}
+        {replyButton}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {replyButton}
+      {timeLabel}
+    </>
+  );
+};
+
 const MessageItem = memo(
   ({
     message,
@@ -46,17 +228,29 @@ const MessageItem = memo(
     onReply,
     onScrollToMessage,
   }: MessageItemProps) => {
-    const isSending = message.status === "sending...";
+    if (message.contentType === "call") {
+      return (
+        <CallMessageRow
+          message={message}
+          currentUserId={currentUserId}
+          isCurrentUser={isCurrentUser}
+        />
+      );
+    }
+
     const formattedTime = formatConversationTime(message.createdAt);
-
-    const replySenderName =
-      message.replyTo?.sender?._id === currentUserId
-        ? "You"
-        : message.replyTo?.sender?.name || "User";
-
     const isImageOnly = Boolean(
       message.image && !message.content && !message.replyTo,
     );
+
+    const bubbleClassName = isImageOnly
+      ? "bg-transparent p-0 shadow-none"
+      : cn(
+          "gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-xs",
+          isCurrentUser
+            ? "rounded-br-xs bg-[#3d61ff] text-white"
+            : "rounded-bl-xs bg-muted text-foreground",
+        );
 
     return (
       <div className="flex flex-col w-full transition-colors duration-500 rounded-2xl">
@@ -66,7 +260,6 @@ const MessageItem = memo(
             isCurrentUser ? "justify-end" : "justify-start",
           )}
         >
-          {/* Receiver Avatar */}
           {!isCurrentUser && (
             <AvatarWithBadge
               name={message.sender?.name || "User"}
@@ -76,128 +269,59 @@ const MessageItem = memo(
           )}
 
           {isCurrentUser && (
-            <>
-              <span className="text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none self-center shrink-0">
-                {formattedTime}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => onReply(message)}
-                disabled={isSendingMsg}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
-                aria-label="Reply"
-              >
-                <Reply className="size-3.5 scale-x-[-1]" />
-              </Button>
-            </>
+            <MessageActions
+              formattedTime={formattedTime}
+              onReply={() => onReply(message)}
+              disabled={isSendingMsg}
+              side="right"
+            />
           )}
 
           <div
             id={`message-${message._id}`}
             className={cn(
               "relative flex max-w-[80%] flex-col text-sm wrap-break-word wrap-anywhere",
-              isImageOnly
-                ? "bg-transparent p-0 shadow-none"
-                : cn(
-                    "gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-xs",
-                    isCurrentUser
-                      ? "rounded-br-xs bg-[#3d61ff] text-white"
-                      : "rounded-bl-xs bg-muted text-foreground",
-                  ),
+              bubbleClassName,
             )}
           >
             {message.replyTo && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (message.replyTo?._id) {
-                    onScrollToMessage(message.replyTo._id);
-                  }
-                }}
-                className={cn(
-                  "mb-0.5 rounded border-l-2 p-1.5 text-xs text-left overflow-hidden min-w-0 cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all select-none",
-                  isCurrentUser
-                    ? "border-white/60 bg-white/10 text-white"
-                    : "border-[#3d61ff] bg-[#3d61ff]/5 text-foreground",
-                )}
-              >
-                <span className="block font-medium text-[11px] opacity-90 truncate">
-                  {replySenderName}
-                </span>
-                <span className="block font-normal opacity-80 truncate">
-                  {message.replyTo.image ? "📷 Photo" : message.replyTo.content}
-                </span>
-              </button>
-            )}
-
-            {message.image && (
-              <img
-                src={message.image}
-                alt="Attachment"
-                className={cn(
-                  "max-h-80 object-cover",
-                  isImageOnly
-                    ? cn(
-                        "rounded-2xl max-w-sm w-auto",
-                        isCurrentUser ? "rounded-br-xs" : "rounded-bl-xs",
-                      )
-                    : "rounded-xl w-full",
-                )}
+              <MessageReplyPreview
+                replyTo={message.replyTo}
+                isCurrentUser={isCurrentUser}
+                currentUserId={currentUserId}
+                onScrollToMessage={onScrollToMessage}
               />
             )}
 
-            {message.content &&
-              (message.sender?.isAI ? (
-                <Response>{message.content}</Response>
-              ) : (
-                <p className="whitespace-pre-wrap leading-relaxed">
-                  {message.content}
-                </p>
-              ))}
-
-            {message.streaming && (
-              <div className="flex items-center gap-2">
-                <RiCircleFill
-                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-                  style={{ animationDelay: "0s" }}
-                />
-                <RiCircleFill
-                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <RiCircleFill
-                  className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-                  style={{ animationDelay: "0.4s" }}
-                />
-              </div>
+            {message.image && (
+              <MessageAttachment
+                image={message.image}
+                isImageOnly={isImageOnly}
+                isCurrentUser={isCurrentUser}
+              />
             )}
+
+            <MessageContent
+              content={message.content}
+              isAI={message.sender?.isAI}
+              isStreaming={message.streaming}
+            />
           </div>
 
           {!isCurrentUser && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => onReply(message)}
-                disabled={isSendingMsg}
-                className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
-                aria-label="Reply"
-              >
-                <Reply className="size-3.5" />
-              </Button>
-              <span className="text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none self-center shrink-0">
-                {formattedTime}
-              </span>
-            </>
+            <MessageActions
+              formattedTime={formattedTime}
+              onReply={() => onReply(message)}
+              disabled={isSendingMsg}
+              side="left"
+            />
           )}
         </div>
 
         {isCurrentUser && isLastFromUser && (
           <div className="flex justify-end pr-2 pt-0.5 select-none">
             <span className="text-[11px] text-muted-foreground">
-              {isSending ? "Sending..." : "Sent"}
+              {message.status === "sending..." ? "Sending..." : "Sent"}
             </span>
           </div>
         )}
@@ -348,49 +472,54 @@ const ConversationBody = ({
     }
   }, [messages, currentUserId, isFetchingMoreMessages]);
 
-  const handleScroll = useCallback((isUserInitiated: boolean) => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  const handleScroll = useCallback(
+    (isUserInitiated: boolean) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
 
-    if (isUserInitiated) {
-      canAutoFetchMoreMessagesRef.current = true;
-    }
+      if (isUserInitiated) {
+        canAutoFetchMoreMessagesRef.current = true;
+      }
 
-    // Detect when user reaches near top
-    if (
-      container.scrollTop <= 80 &&
-      hasMore &&
-      !isFetchingMoreMessages &&
-      (isUserInitiated || canAutoFetchMoreMessagesRef.current)
-    ) {
-      const containerTop = container.getBoundingClientRect().top;
-      const firstVisibleMessage = Array.from(
-        container.querySelectorAll<HTMLElement>("[id^='message-']"),
-      ).find((message) => message.getBoundingClientRect().bottom > containerTop);
+      // Detect when user reaches near top
+      if (
+        container.scrollTop <= 80 &&
+        hasMore &&
+        !isFetchingMoreMessages &&
+        (isUserInitiated || canAutoFetchMoreMessagesRef.current)
+      ) {
+        const containerTop = container.getBoundingClientRect().top;
+        const firstVisibleMessage = Array.from(
+          container.querySelectorAll<HTMLElement>("[id^='message-']"),
+        ).find(
+          (message) => message.getBoundingClientRect().bottom > containerTop,
+        );
 
-      prependAnchorRef.current = firstVisibleMessage
-        ? {
-            messageId: firstVisibleMessage.id,
-            viewportOffset:
-              firstVisibleMessage.getBoundingClientRect().top - containerTop,
+        prependAnchorRef.current = firstVisibleMessage
+          ? {
+              messageId: firstVisibleMessage.id,
+              viewportOffset:
+                firstVisibleMessage.getBoundingClientRect().top - containerTop,
+            }
+          : null;
+        isPrependingRef.current = true;
+
+        void fetchMoreMessages(conversationId).then((success) => {
+          if (!success) {
+            isPrependingRef.current = false;
+            prependAnchorRef.current = null;
+            canAutoFetchMoreMessagesRef.current = false;
           }
-        : null;
-      isPrependingRef.current = true;
+        });
+      }
 
-      void fetchMoreMessages(conversationId).then((success) => {
-        if (!success) {
-          isPrependingRef.current = false;
-          prependAnchorRef.current = null;
-          canAutoFetchMoreMessagesRef.current = false;
-        }
-      });
-    }
-
-    // Detect distance from bottom to show/hide scroll-to-bottom button
-    const distanceFromBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    setShowScrollToBottom(distanceFromBottom > 200);
-  }, [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId]);
+      // Detect distance from bottom to show/hide scroll-to-bottom button
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShowScrollToBottom(distanceFromBottom > 200);
+    },
+    [hasMore, isFetchingMoreMessages, fetchMoreMessages, conversationId],
+  );
 
   const handleUserScroll = useCallback(() => {
     handleScroll(true);

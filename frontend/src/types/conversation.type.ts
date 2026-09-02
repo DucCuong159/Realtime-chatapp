@@ -17,10 +17,18 @@ export type ConversationType = {
   updatedAt: string;
 };
 
+export type CallInfoType = {
+  callType: "audio" | "video";
+  status: "completed" | "missed" | "declined" | "busy";
+  duration?: number;
+};
+
 export type MessageType = {
   _id: string;
   content: string | null;
   image: string | null;
+  contentType?: "text" | "image" | "video" | "call";
+  callInfo?: CallInfoType;
   sender: UserType | null;
   replyTo: MessageType | null;
   conversationId: string;

@@ -4,7 +4,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "../ui/input-group";
-import { NewConversationPopover } from "./new-conversation-popover";
+import NewConversationPopover from "./new-conversation-popover";
 
 const ConversationListHeader = ({
   onSearch,

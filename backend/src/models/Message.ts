@@ -5,6 +5,12 @@ export interface IReaction {
   emoji?: string;
 }
 
+export interface ICallInfo {
+  callType: "audio" | "video";
+  status: "completed" | "missed" | "declined" | "busy";
+  duration?: number;
+}
+
 export interface MessageDocument extends Document {
   conversationId: Types.ObjectId;
   sender: Types.ObjectId;
@@ -12,7 +18,8 @@ export interface MessageDocument extends Document {
   replyTo?: Types.ObjectId | null;
   content?: string;
   image?: string;
-  contentType?: "text" | "image" | "video";
+  contentType?: "text" | "image" | "video" | "call";
+  callInfo?: ICallInfo;
   reactions?: IReaction[];
   messageStatus: string;
 
@@ -43,7 +50,22 @@ const messageSchema = new Schema<MessageDocument>(
     },
     content: { type: String },
     image: { type: String },
-    contentType: { type: String, enum: ["text", "image", "video"] },
+    contentType: {
+      type: String,
+      enum: ["text", "image", "video", "call"],
+      default: "text",
+    },
+    callInfo: {
+      type: {
+        callType: { type: String, enum: ["audio", "video"] },
+        status: {
+          type: String,
+          enum: ["completed", "missed", "declined", "busy"],
+        },
+        duration: { type: Number, default: 0 },
+      },
+      default: undefined,
+    },
     reactions: [
       {
         user: {

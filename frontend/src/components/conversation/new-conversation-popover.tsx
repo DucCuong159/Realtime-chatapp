@@ -14,7 +14,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Spinner } from "../ui/spinner";
 
-export const NewConversationPopover = memo(() => {
+const NewConversationPopover = () => {
   const navigate = useNavigate();
   const {
     fetchAllUsers,
@@ -194,8 +194,7 @@ export const NewConversationPopover = memo(() => {
       </PopoverContent>
     </Popover>
   );
-});
-NewConversationPopover.displayName = "NewConversationPopover";
+};
 
 const UserAvatar = memo(({ user }: { user: UserType }) => (
   <>
@@ -279,3 +278,5 @@ const GroupUserItem = memo(
 );
 
 GroupUserItem.displayName = "GroupUserItem";
+
+export default memo(NewConversationPopover);

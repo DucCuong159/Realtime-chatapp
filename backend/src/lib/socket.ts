@@ -6,6 +6,11 @@ import { Env } from "../config/env.config.js";
 import type { ConversationDocument } from "../models/Conversation.js";
 import type { MessageDocument } from "../models/Message.js";
 import { validateConversationParticipantsService } from "../services/conversation.service.js";
+import {
+  type ActiveCallInfo,
+  registerCallSignaling,
+  terminateCallSession,
+} from "./call-signaling.js";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -15,6 +20,9 @@ let io: SocketServer | null = null;
 
 // Each userId maps to a Set of socketIds (supports multi-tab)
 const onlineUsers = new Map<string, Set<string>>();
+
+// Track active call sessions per socket for sudden disconnect handling
+const activeCallBySocket = new Map<string, ActiveCallInfo>();
 
 export const initializeSocket = (httpServer: HTTPServer) => {
   io = new SocketServer(httpServer, {
@@ -97,7 +105,28 @@ export const initializeSocket = (httpServer: HTTPServer) => {
       }
     });
 
-    socket.on("disconnect", () => {
+    // ================= WebRTC Voice Call Signaling =================
+    if (io) {
+      registerCallSignaling(io, socket, userId, onlineUsers, activeCallBySocket);
+    }
+
+    socket.on("disconnect", async () => {
+      // Handle call cleanup on sudden disconnect
+      const activeCall = activeCallBySocket.get(newSocketId);
+      if (activeCall) {
+        await terminateCallSession(
+          io,
+          activeCallBySocket,
+          newSocketId,
+          activeCall.callId,
+          "peer_disconnected",
+        );
+        io?.to(`user:${activeCall.peerId}`).emit("call:ended", {
+          callId: activeCall.callId,
+          reason: "peer_disconnected",
+        });
+      }
+
       const userSockets = onlineUsers.get(userId);
       if (userSockets) {
         userSockets.delete(newSocketId);
