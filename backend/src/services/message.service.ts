@@ -315,10 +315,16 @@ const handleAIError = (
     errorMsg.includes("resource_exhausted") ||
     errorMsg.includes("rate limit");
 
+  const isMultiturnUnsupported =
+    errorMsg.includes("multiturn chat is not enabled") ||
+    errorMsg.includes("multiturn");
+
   const errorMessage = targetModelId
     ? isQuotaExceeded
       ? `AI Model (${targetModelId}) has exceeded its rate limit quota (429). Please select another AI model from the toolbar.`
-      : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`
+      : isMultiturnUnsupported
+        ? `AI Model (${targetModelId}) does not support multi-turn chat conversations. Please select another conversational model (e.g. Gemini 2.0 Flash / 1.5 Flash) from the toolbar.`
+        : `Failed to generate response from AI model (${targetModelId}). Please try again or switch to another model.`
     : error?.message ||
       "Failed to resolve an available AI model. Please try again or select another model from the toolbar.";
 
