@@ -46,9 +46,9 @@
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Radix UI, Streamdown |
-| **Backend** | Node.js 20+, Express 5, Socket.IO 4, Mongoose 9 (MongoDB), Passport.js, Zod |
-| **AI & Media** | Vercel AI SDK (`@ai-sdk/google`), Google Gemini Models, Cloudinary SDK |
+| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Base UI, Streamdown |
+| **Backend** | Node.js 20+, Express 5, Socket.IO 4, Mongoose 9 (MongoDB), Passport.js, Zod 4 |
+| **AI & Media** | Vercel AI SDK (`ai` v7, `@ai-sdk/google` v4), Google Gemini Models, Cloudinary SDK |
 | **Dev & Infra** | Render.com (Monorepo Web Service), GitHub Actions, CodeRabbit |
 
 ---
