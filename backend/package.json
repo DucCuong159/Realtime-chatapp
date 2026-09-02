@@ -18,8 +18,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@ai-sdk/google": "4.0.51",
-    "ai": "7.0.79",
+    "@ai-sdk/google": "4.0.62",
+    "ai": "7.0.90",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.10.0",
     "cookie": "^2.0.1",
