@@ -94,9 +94,17 @@ frontend/src/
 - KHÔNG ghép chuỗi vào query — luôn dùng Mongoose query builder.
 - Rate limiting đã cấu hình via `express-rate-limit`.
 
-## 4. Package Manager
+## 4. Package Manager & Setup
 
 - **Toàn dự án (Root, Frontend, Backend)**: Thống nhất 100% sử dụng **Yarn 1 (classic)** với `yarn.lock`.
+- **Onboarding / Setup**: Khi clone dự án mới, bắt buộc chạy `yarn install` ở root để cài đặt tooling và kích hoạt Husky git hooks:
+  ```bash
+  yarn install              # Cài tooling root & kích hoạt Husky hooks
+  yarn --cwd frontend install
+  yarn --cwd backend install
+  # hoặc dùng lệnh tổng hợp:
+  yarn install:all
+  ```
 - Root quản lý Git tooling (Husky, lint-staged, commitlint).
 - Frontend & Backend quản lý dependencies ứng dụng riêng biệt.
 - **KHÔNG** sử dụng `npm` hoặc tạo file `package-lock.json`.

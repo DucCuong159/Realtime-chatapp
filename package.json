@@ -4,7 +4,8 @@
   "description": "Realtime chat application - monorepo root",
   "type": "module",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "install:all": "yarn install && yarn --cwd frontend install && yarn --cwd backend install"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",

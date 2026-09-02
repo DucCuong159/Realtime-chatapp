@@ -152,6 +152,7 @@ git clone https://github.com/DucCuong159/Realtime-chatapp.git
 cd Realtime-chatapp
 
 # Install dependencies
+yarn install              # Root: activates Husky git hooks & commitlint
 yarn --cwd frontend install
 yarn --cwd backend install
 
