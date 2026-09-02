@@ -142,6 +142,7 @@ const validateCallConversation = async (
 
       const conversation = await ConversationModel.findOne({
         _id: conversationId,
+        isGroup: false,
         participants: { $all: [callerId, calleeId] },
       }).select("_id");
 
@@ -156,6 +157,7 @@ const validateCallConversation = async (
 
     const directConversation = await ConversationModel.findOne({
       directKey,
+      isGroup: false,
     }).select("_id");
 
     return directConversation ? directConversation._id.toString() : undefined;

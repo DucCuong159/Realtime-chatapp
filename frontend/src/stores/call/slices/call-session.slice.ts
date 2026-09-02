@@ -134,6 +134,11 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
         () => get().endCall("failed"),
         () => get().status,
       );
+
+      // Notify caller that call was accepted
+      socket.emit(CALL_SOCKET_EVENTS.ACCEPT, {
+        callId: session.callId,
+      });
     } catch (err) {
       const message =
         err instanceof Error
@@ -142,11 +147,6 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
       toast.error(message);
       get().endCall("failed");
     }
-
-    // Notify caller that call was accepted
-    socket.emit(CALL_SOCKET_EVENTS.ACCEPT, {
-      callId: session.callId,
-    });
   },
 
   rejectCall: (reason: CallEndReason = "rejected") => {
