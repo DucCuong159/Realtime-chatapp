@@ -1,4 +1,5 @@
 import { useConversationDetails } from "@/hooks/use-conversation-details";
+import { formatLastMessageText } from "@/lib/call-message.utils";
 import { cn, formatConversationTime } from "@/lib/utils";
 import type { ConversationType } from "@/types/conversation.type";
 import { useLocation } from "react-router-dom";
@@ -9,6 +10,7 @@ interface PropsType {
   currentUserId: string | null;
   onClick?: () => void;
 }
+
 const ConversationListItem = ({
   conversation,
   currentUserId,
@@ -22,35 +24,7 @@ const ConversationListItem = ({
     currentUserId,
   );
 
-  const getLastMessageText = () => {
-    if (!lastMessage) {
-      return isGroup
-        ? conversation.createdBy === currentUserId
-          ? "Group created"
-          : "You were added"
-        : "Send a message";
-    }
-    if (lastMessage.image) return "📷 Photo";
-
-    if (lastMessage.contentType === "call") {
-      const isMissed =
-        lastMessage.callInfo?.status === "missed" ||
-        lastMessage.callInfo?.status === "declined" ||
-        lastMessage.callInfo?.status === "busy" ||
-        !lastMessage.callInfo?.duration;
-      return isMissed ? "📞 Missed audio call" : "📞 Audio call";
-    }
-
-    if (isGroup && lastMessage.sender) {
-      return `${
-        lastMessage.sender._id === currentUserId
-          ? "You"
-          : lastMessage.sender.name
-      }: ${lastMessage.content}`;
-    }
-
-    return lastMessage.content;
-  };
+  const previewText = formatLastMessageText(conversation, currentUserId, isGroup);
 
   return (
     <button
@@ -77,7 +51,7 @@ const ConversationListItem = ({
           </span>
         </div>
         <p className="text-xs truncate text-muted-foreground -mt-px">
-          {getLastMessageText()}
+          {previewText}
         </p>
       </div>
     </button>

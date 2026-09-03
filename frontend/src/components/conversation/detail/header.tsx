@@ -16,11 +16,83 @@ interface Props {
   currentUserId: string | null;
 }
 
-const ConversationHeader = ({ conversation, currentUserId }: Props) => {
-  const navigate = useNavigate();
+const useConversationCalls = (
+  conversationId: string,
+  participant: ConversationType["participants"][number] | null | undefined,
+  isDisabled: boolean,
+) => {
+  const startCall = useCallback(
+    (callType: "audio" | "video") => {
+      if (isDisabled || !participant) return;
+      useCall.getState().initiateCall(
+        {
+          _id: participant._id,
+          name: participant.name,
+          avatar: participant.avatar,
+        },
+        conversationId,
+        callType,
+      );
+    },
+    [conversationId, participant, isDisabled],
+  );
+
+  return {
+    handleAudioCall: useCallback(() => startCall("audio"), [startCall]),
+    handleVideoCall: useCallback(() => startCall("video"), [startCall]),
+  };
+};
+
+interface InfoProps {
+  conversation: ConversationType;
+  currentUserId: string | null;
+  onBack: () => void;
+}
+
+const HeaderInfoSection = ({
+  conversation,
+  currentUserId,
+  onBack,
+}: InfoProps) => {
   const { name, subheading, avatar, isOnline, isGroup } =
     useConversationDetails(conversation, currentUserId);
 
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="shrink-0 md:hidden"
+        onClick={onBack}
+        aria-label="Back to conversation list"
+      >
+        <ArrowLeft className="size-5 text-muted-foreground" />
+      </Button>
+
+      {isGroup ? (
+        <HeaderGroupInfo
+          participants={conversation.participants}
+          name={name}
+          subheading={subheading}
+          avatar={avatar}
+          isOnline={isOnline}
+        />
+      ) : (
+        <HeaderUserInfo
+          name={name}
+          subheading={subheading}
+          avatar={avatar}
+          isGroup={isGroup}
+          isOnline={isOnline}
+        />
+      )}
+    </div>
+  );
+};
+
+const ConversationHeader = ({ conversation, currentUserId }: Props) => {
+  const navigate = useNavigate();
+  const isGroup = conversation.isGroup;
   const isAi = Boolean(
     conversation.isAiConversation ||
     conversation.participants?.some((p) => p.isAI),
@@ -30,49 +102,19 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
     ? conversation.participants?.find((p) => p._id !== currentUserId)
     : null;
 
-  const handleAudioCall = useCallback(() => {
-    if (isAi || isGroup || !otherParticipant) return;
-    useCall.getState().initiateCall(
-      {
-        _id: otherParticipant._id,
-        name: otherParticipant.name,
-        avatar: otherParticipant.avatar,
-      },
-      conversation._id,
-    );
-  }, [isAi, isGroup, otherParticipant, conversation._id]);
+  const { handleAudioCall, handleVideoCall } = useConversationCalls(
+    conversation._id,
+    otherParticipant,
+    isAi || isGroup,
+  );
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm">
-      <div className="flex min-w-0 items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 md:hidden"
-          onClick={() => navigate(PROTECTED_ROUTES.CONVERSATION)}
-          aria-label="Back to conversation list"
-        >
-          <ArrowLeft className="size-5 text-muted-foreground" />
-        </Button>
-
-        {isGroup ? (
-          <HeaderGroupInfo
-            participants={conversation.participants}
-            name={name}
-            subheading={subheading}
-            avatar={avatar}
-            isOnline={isOnline}
-          />
-        ) : (
-          <HeaderUserInfo
-            name={name}
-            subheading={subheading}
-            avatar={avatar}
-            isGroup={isGroup}
-            isOnline={isOnline}
-          />
-        )}
-      </div>
+      <HeaderInfoSection
+        conversation={conversation}
+        currentUserId={currentUserId}
+        onBack={() => navigate(PROTECTED_ROUTES.CONVERSATION)}
+      />
 
       <div className="flex shrink-0 items-center gap-2">
         {isAi && <AiModelSelector />}
@@ -80,6 +122,7 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
           isAiConversation={isAi}
           isGroup={isGroup}
           onAudioCall={handleAudioCall}
+          onVideoCall={handleVideoCall}
         />
       </div>
     </div>

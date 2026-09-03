@@ -1,7 +1,7 @@
 import { CALL_SOCKET_EVENTS } from "@/constants/call.constant";
 import type { useSocket } from "@/hooks/use-socket";
 import { webrtcManager } from "@/lib/webrtc";
-import type { CallStatus } from "@/types/call.type";
+import type { CallStatus, CallType } from "@/types/call.type";
 import {
   getDisconnectRecoveryTimer,
   setDisconnectRecoveryTimer,
@@ -9,12 +9,14 @@ import {
 
 export const setupPeerConnection = async (
   callId: string,
+  callType: CallType,
   socket: NonNullable<ReturnType<typeof useSocket.getState>["socket"]>,
   onConnected: () => void,
   onFailed: () => void,
   getStatus: () => CallStatus,
 ) => {
   return webrtcManager.initializePeerConnection(
+    callType,
     (candidate) => {
       socket.emit(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, {
         callId,
@@ -39,7 +41,7 @@ export const setupPeerConnection = async (
       } else if (connectionState === "disconnected") {
         // Transient disconnection: start a 5s grace period before failing
         if (!activeRecoveryTimer) {
-          const timer = window.setTimeout(() => {
+          const timer = setTimeout(() => {
             const currentStatus = getStatus();
             if (
               currentStatus === "CONNECTED" ||
