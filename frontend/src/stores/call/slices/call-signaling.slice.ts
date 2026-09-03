@@ -22,6 +22,18 @@ import {
 import { setupPeerConnection } from "../helpers/peer-connection";
 import type { CallSignalingSlice, CallSlice } from "../types";
 
+const notifyCallRejectReason = (name: string, reason: string) => {
+  const reasonMessages: Record<string, string> = {
+    busy: `${name} is currently busy`,
+    rejected: `${name} declined the call`,
+    offline: `${name} is offline`,
+    timeout: "Call timed out",
+  };
+  if (reasonMessages[reason]) {
+    toast.info(reasonMessages[reason]);
+  }
+};
+
 export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
   set,
   get,
@@ -39,14 +51,16 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     }
 
     clearTimers();
-
     const newSession: CallSession = {
       callId: payload.callId,
       conversationId: payload.conversationId,
+      callType: payload.callType || "audio",
       remoteUser: payload.caller,
       isCaller: false,
       duration: 0,
       isMuted: false,
+      isVideoOff: false,
+      isRemoteVideoOff: false,
       status: "RINGING",
     };
 
@@ -54,14 +68,17 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
       status: "RINGING",
       session: newSession,
       isMuted: false,
+      isVideoOff: false,
+      isRemoteVideoOff: false,
       isMinimized: false,
       endReason: null,
+      localStream: null,
+      remoteStream: null,
     });
 
     soundEffects.playIncomingRing();
 
-    // Timeout for incoming call
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (get().status === "RINGING") {
         get().rejectCall("timeout");
       }
@@ -74,30 +91,30 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     if (status !== "CALLING" || !session || session.callId !== payload.callId) {
       return;
     }
-
     const { socket } = useSocket.getState();
-    if (!socket || !socket.connected) {
+    if (!socket?.connected) {
       get().endCall("failed");
       return;
     }
 
     clearTimers();
     soundEffects.stopAll();
-
+    const callType = session.callType || "audio";
     set({ status: "CONNECTING" });
 
+    webrtcManager.setOnLocalStream((s) => set({ localStream: s }));
+    webrtcManager.setOnRemoteTrack((s) => set({ remoteStream: s }));
+
     try {
-      // Initialize peer connection on Caller side
       await setupPeerConnection(
         session.callId,
+        callType,
         socket,
         () => get().handleWebRTCConnected(),
         () => get().endCall("failed"),
         () => get().status,
       );
-
-      // Create Offer and emit to callee
-      const offer = await webrtcManager.createOffer();
+      const offer = await webrtcManager.createOffer(callType);
       socket.emit(CALL_SOCKET_EVENTS.WEBRTC_OFFER, {
         callId: session.callId,
         sdp: offer,
@@ -108,10 +125,25 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     }
   },
 
+  handleToggleVideo: (payload: { callId: string; isVideoOff: boolean }) => {
+    const { session } = get();
+    if (!session || session.callId !== payload.callId) return;
+
+    set((state) => {
+      if (!state.session) return state;
+      return {
+        isRemoteVideoOff: payload.isVideoOff,
+        session: {
+          ...state.session,
+          isRemoteVideoOff: payload.isVideoOff,
+        },
+      };
+    });
+  },
+
   handleWebRTCOffer: async (payload: WebRTCOfferPayload) => {
     const { session, status } = get();
     if (!session || session.callId !== payload.callId) return;
-    // Guard: Only process offer on the tab that actually accepted or is connecting the call
     if (status !== "CONNECTING" && status !== "CONNECTED") return;
 
     const { socket } = useSocket.getState();
@@ -144,7 +176,6 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
   handleWebRTCIceCandidate: async (payload: WebRTCIceCandidatePayload) => {
     const { session } = get();
     if (!session || session.callId !== payload.callId) return;
-
     await webrtcManager.addIceCandidate(payload.candidate);
   },
 
@@ -156,10 +187,8 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     soundEffects.stopAll();
 
     const { socket } = useSocket.getState();
-    if (session && socket && socket.connected) {
-      socket.emit(CALL_SOCKET_EVENTS.CONNECTED, {
-        callId: session.callId,
-      });
+    if (session && socket?.connected) {
+      socket.emit(CALL_SOCKET_EVENTS.CONNECTED, { callId: session.callId });
     }
 
     set({
@@ -167,8 +196,7 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
       session: session ? { ...session, startTime: Date.now() } : null,
     });
 
-    // Start duration ticker every second
-    const timer = window.setInterval(() => {
+    const timer = setInterval(() => {
       set((state) => {
         if (!state.session) return state;
         return {
@@ -190,23 +218,10 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
     soundEffects.playCallEndTone();
     webrtcManager.cleanup();
 
-    const reasonMessages: Record<string, string> = {
-      busy: `${session.remoteUser.name} is currently busy`,
-      rejected: `${session.remoteUser.name} declined the call`,
-      offline: `${session.remoteUser.name} is offline`,
-      timeout: "Call timed out",
-    };
+    notifyCallRejectReason(session.remoteUser.name, payload.reason);
+    set({ status: "ENDED", endReason: payload.reason });
 
-    if (reasonMessages[payload.reason]) {
-      toast.info(reasonMessages[payload.reason]);
-    }
-
-    set({
-      status: "ENDED",
-      endReason: payload.reason,
-    });
-
-    const resetTimer = window.setTimeout(() => {
+    const resetTimer = setTimeout(() => {
       get().resetCallState();
     }, CALL_TIMINGS.RESET_STATE_DELAY_MS);
     setEndedResetTimer(resetTimer);
@@ -218,7 +233,6 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
 
     clearTimers();
 
-    // If answered on another tab of the same user, silently stop ringing and reset
     if (payload.reason === "answered_elsewhere") {
       soundEffects.stopAll();
       webrtcManager.cleanup();
@@ -233,12 +247,9 @@ export const createCallSignalingSlice: CallSlice<CallSignalingSlice> = (
       toast.info(`${session.remoteUser.name} disconnected`);
     }
 
-    set({
-      status: "ENDED",
-      endReason: payload.reason,
-    });
+    set({ status: "ENDED", endReason: payload.reason });
 
-    const resetTimer = window.setTimeout(() => {
+    const resetTimer = setTimeout(() => {
       get().resetCallState();
     }, CALL_TIMINGS.RESET_STATE_DELAY_MS);
     setEndedResetTimer(resetTimer);

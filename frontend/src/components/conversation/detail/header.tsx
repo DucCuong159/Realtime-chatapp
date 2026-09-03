@@ -16,31 +16,55 @@ interface Props {
   currentUserId: string | null;
 }
 
+const useConversationCalls = (
+  conversationId: string,
+  participant: ConversationType["participants"][number] | null | undefined,
+  isDisabled: boolean,
+) => {
+  const startCall = useCallback(
+    (callType: "audio" | "video") => {
+      if (isDisabled || !participant) return;
+      useCall.getState().initiateCall(
+        {
+          _id: participant._id,
+          name: participant.name,
+          avatar: participant.avatar,
+        },
+        conversationId,
+        callType,
+      );
+    },
+    [conversationId, participant, isDisabled],
+  );
+
+  return {
+    handleAudioCall: useCallback(() => startCall("audio"), [startCall]),
+    handleVideoCall: useCallback(() => startCall("video"), [startCall]),
+  };
+};
+
 const ConversationHeader = ({ conversation, currentUserId }: Props) => {
   const navigate = useNavigate();
-  const { name, subheading, avatar, isOnline, isGroup } =
-    useConversationDetails(conversation, currentUserId);
-
+  const isGroup = conversation.isGroup;
   const isAi = Boolean(
     conversation.isAiConversation ||
     conversation.participants?.some((p) => p.isAI),
+  );
+
+  const { name, subheading, avatar, isOnline } = useConversationDetails(
+    conversation,
+    currentUserId,
   );
 
   const otherParticipant = !isGroup
     ? conversation.participants?.find((p) => p._id !== currentUserId)
     : null;
 
-  const handleAudioCall = useCallback(() => {
-    if (isAi || isGroup || !otherParticipant) return;
-    useCall.getState().initiateCall(
-      {
-        _id: otherParticipant._id,
-        name: otherParticipant.name,
-        avatar: otherParticipant.avatar,
-      },
-      conversation._id,
-    );
-  }, [isAi, isGroup, otherParticipant, conversation._id]);
+  const { handleAudioCall, handleVideoCall } = useConversationCalls(
+    conversation._id,
+    otherParticipant,
+    isAi || isGroup,
+  );
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm">
@@ -80,6 +104,7 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
           isAiConversation={isAi}
           isGroup={isGroup}
           onAudioCall={handleAudioCall}
+          onVideoCall={handleVideoCall}
         />
       </div>
     </div>

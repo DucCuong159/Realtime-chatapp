@@ -35,7 +35,7 @@
 - 🤖 **Gemini AI Streaming & Dynamic Selector**: Real-time token streaming, live quota latency check (`checkModelQuota`), auto-fallback on 429 quota limits, and markdown rendering with XSS hardening.
 - 📜 **Cursor-Based Pagination & Infinite Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) and `useLayoutEffect` Element-Anchor scroll restoration (Zero Viewport Drift).
 - 💬 **Rich Messaging**: 1-on-1 and group chats, message replies with context quotes, Cloudinary media sharing (up to 15MB), and user search.
-- 📞 **Real-Time WebRTC Voice Calling**: Peer-to-peer ultra-low latency voice calls with pure Web Audio API sound synthesis, optimistic instant dial tone (<10ms), isolated duration tickers, STUN ICE race-condition handling, floating minimized pill widget, and automatic chat history call logging.
+- 📞📹 **Real-Time WebRTC Voice & Video Calling (1-on-1)**: Peer-to-peer ultra-low latency audio & video calls (up to 1080p), camera flip/toggle, remote video visibility synchronization, local PiP preview, responsive full-screen active modal, floating minimized pill widget, Web Audio API sound synthesis, and automatic chat history call logging with duration.
 - 🔐 **Hardened Security**: Stateless JWT in `HttpOnly` `SameSite` cookies, Passport authentication, bcrypt hashing, rate limiting, and Zod validation.
 
 ---
@@ -191,14 +191,16 @@ yarn --cwd frontend dev   # Terminal 2: Port 5173
 | `conversation:updated` | Server ➔ User | `{ conversationId, lastMessage }` | Update sidebar preview and bump rank |
 | `conversation:new` | Server ➔ User | `ConversationType` | Notify user of new conversation |
 | `conversation:ai` | Server ➔ Room | `{ chunk, done, message, error }` | Stream AI tokens and completion |
-| `call:initiate` | Caller ➔ Server | `{ callId, calleeId, conversationId, caller }` | Request starting a 1-on-1 audio call |
-| `call:incoming` | Server ➔ Callee | `{ callId, conversationId, caller }` | Trigger incoming call ring & modal |
-| `call:accept` | Callee ➔ Server | `{ callId, callerId }` | Callee accepts call, start timer |
-| `call:accepted` | Server ➔ Caller | `{ callId, calleeId }` | Notify caller to initiate SDP Offer |
-| `call:reject` / `call:rejected` | Bidirectional | `{ callId, targetUserId, reason }` | Decline/busy/timeout call & log to DB |
-| `call:end` / `call:ended` | Bidirectional | `{ callId, targetUserId, reason }` | End active call, teardown & log to DB |
-| `webrtc:offer` / `answer` | Client ➔ Client | `{ callId, targetUserId, sdp }` | Exchange SDP session descriptions |
-| `webrtc:ice-candidate` | Client ➔ Client | `{ callId, targetUserId, candidate }` | Exchange P2P network candidates |
+| `call:initiate` | Caller ➔ Server | `{ callId, calleeId, conversationId?, callType? }` | Request starting a 1-on-1 voice or video call |
+| `call:incoming` | Server ➔ Callee | `{ callId, conversationId?, caller, callType? }` | Trigger incoming call ring & modal |
+| `call:accept` | Callee ➔ Server | `{ callId }` | Callee accepts call, transitions to connecting |
+| `call:accepted` | Server ➔ Caller | `{ callId, calleeId }` | Notify caller to initiate WebRTC SDP Offer |
+| `call:connected`| Client ➔ Server | `{ callId }` | Notify P2P media is connected, starts duration accounting |
+| `call:toggle-video` | Bidirectional | `{ callId, isVideoOff }` | Sync camera on/off state between peers |
+| `call:reject` / `call:rejected` | Bidirectional | `{ callId, reason }` | Decline/busy/timeout call & log to DB |
+| `call:end` / `call:ended` | Bidirectional | `{ callId, reason }` | End active call, teardown & log to DB |
+| `webrtc:offer` / `answer` | Client ➔ Client | `{ callId, sdp }` | Exchange SDP session descriptions |
+| `webrtc:ice-candidate` | Client ➔ Client | `{ callId, candidate }` | Exchange P2P network candidates |
 
 ---
 

@@ -17,6 +17,8 @@ export type CallEndReason =
   | "peer_disconnected"
   | "answered_elsewhere";
 
+export type CallType = "audio" | "video";
+
 export interface CallUser {
   _id: string;
   name: string;
@@ -26,11 +28,14 @@ export interface CallUser {
 export interface CallSession {
   callId: string;
   conversationId?: string;
+  callType: CallType;
   remoteUser: CallUser;
   isCaller: boolean;
   startTime?: number;
   duration: number; // in seconds
   isMuted: boolean;
+  isVideoOff: boolean;
+  isRemoteVideoOff?: boolean;
   status: CallStatus;
   endReason?: CallEndReason;
 }
@@ -39,12 +44,20 @@ export interface CallInitiatePayload {
   callId: string;
   calleeId: string;
   conversationId?: string;
+  callType?: CallType;
 }
 
 export interface CallIncomingPayload {
   callId: string;
   conversationId?: string;
   caller: CallUser;
+  callType?: CallType;
+}
+
+export interface CallToggleVideoPayload {
+  callId: string;
+  senderId?: string;
+  isVideoOff: boolean;
 }
 
 export interface CallAcceptedPayload {

@@ -24,6 +24,7 @@ export interface ActiveCallRecord {
   startTime?: number;
   createdAt: number;
   status: "calling" | "connecting" | "connected" | "ended";
+  callType?: "audio" | "video";
 }
 
 const CALL_RING_TIMEOUT_MS = 40_000;
@@ -54,9 +55,13 @@ export const saveAndEmitCallMessage = async (
           ? "declined"
           : "missed";
 
+    const isVideo = callRecord.callType === "video";
+    const typeLabel = isVideo ? "Video call" : "Audio call";
+    const typeLabelLower = isVideo ? "video" : "audio";
+
     const contentText = isCompleted
-      ? `Audio call\n${formatDuration(duration)}`
-      : `${capitalize(callStatus)} audio call`;
+      ? `${typeLabel}\n${formatDuration(duration)}`
+      : `${capitalize(callStatus)} ${typeLabelLower} call`;
 
     const newMessage = await MessageModel.create({
       conversationId: callRecord.conversationId,
@@ -64,7 +69,7 @@ export const saveAndEmitCallMessage = async (
       receiver: callRecord.calleeId,
       contentType: "call",
       callInfo: {
-        callType: "audio",
+        callType: callRecord.callType || "audio",
         status: callStatus,
         duration: isCompleted ? duration : 0,
       },
@@ -181,6 +186,7 @@ const rejectInitiationEarly = async (
   calleeId: string,
   reason: "offline" | "busy",
   conversationId?: string,
+  callType: "audio" | "video" = "audio",
 ) => {
   socket.emit("call:rejected", { callId, reason });
   if (conversationId) {
@@ -194,6 +200,7 @@ const rejectInitiationEarly = async (
         callerSocketId: socket.id,
         createdAt: Date.now(),
         status: "calling",
+        callType,
       },
       reason,
     );
@@ -284,8 +291,9 @@ export const registerCallSignaling = (
       callId: string;
       calleeId: string;
       conversationId?: string;
+      callType?: "audio" | "video";
     }) => {
-      const { callId, calleeId, conversationId } = data;
+      const { callId, calleeId, conversationId, callType = "audio" } = data;
       if (!calleeId || !callId) return;
 
       const targetCalleeId = String(calleeId).trim();
@@ -334,6 +342,8 @@ export const registerCallSignaling = (
         );
       }
 
+      const resolvedCallType = callType === "video" ? "video" : "audio";
+
       // 2. Check if caller already has an active call
       if (isUserInActiveCall(currentUserId)) {
         await rejectInitiationEarly(
@@ -344,6 +354,7 @@ export const registerCallSignaling = (
           targetCalleeId,
           "busy",
           verifiedConversationId,
+          resolvedCallType,
         );
         return;
       }
@@ -362,6 +373,7 @@ export const registerCallSignaling = (
           targetCalleeId,
           "offline",
           verifiedConversationId,
+          resolvedCallType,
         );
         return;
       }
@@ -376,6 +388,7 @@ export const registerCallSignaling = (
           targetCalleeId,
           "busy",
           verifiedConversationId,
+          resolvedCallType,
         );
         return;
       }
@@ -389,6 +402,7 @@ export const registerCallSignaling = (
         callerSocketId: socket.id,
         createdAt: Date.now(),
         status: "calling",
+        callType: resolvedCallType,
       });
 
       // Forward to callee personal room (rings all callee's tabs)
@@ -396,6 +410,7 @@ export const registerCallSignaling = (
         callId,
         conversationId: verifiedConversationId,
         caller: verifiedCaller,
+        callType: resolvedCallType,
       });
     },
   );
@@ -462,6 +477,26 @@ export const registerCallSignaling = (
     "call:end",
     (data: { callId: string; reason?: "ended" | "missed" | "failed" }) =>
       handleTermination(data, "ended", "call:ended"),
+  );
+
+  socket.on(
+    "call:toggle-video",
+    (data: { callId: string; isVideoOff: boolean }) => {
+      const { callId, isVideoOff } = data;
+      if (!callId) return;
+
+      const callRecord = activeCalls.get(callId);
+      if (!callRecord) return;
+
+      const destination = getPeerDestinationFromRecord(callRecord);
+      if (!destination) return;
+
+      io.to(destination).emit("call:toggle-video", {
+        callId,
+        senderId: currentUserId,
+        isVideoOff,
+      });
+    },
   );
 
   socket.on(

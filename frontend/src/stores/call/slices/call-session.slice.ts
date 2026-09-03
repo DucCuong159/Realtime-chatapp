@@ -4,7 +4,12 @@ import { useSocket } from "@/hooks/use-socket";
 import { soundEffects } from "@/lib/sound-effects";
 import { generateUUID } from "@/lib/utils";
 import { webrtcManager } from "@/lib/webrtc";
-import type { CallEndReason, CallSession, CallUser } from "@/types/call.type";
+import type {
+  CallEndReason,
+  CallSession,
+  CallType,
+  CallUser,
+} from "@/types/call.type";
 import { toast } from "sonner";
 import {
   clearTimers,
@@ -22,71 +27,86 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
   session: null,
   endReason: null,
 
-  initiateCall: async (remoteUser: CallUser, conversationId?: string) => {
-    const { status } = get();
-    if (status !== "IDLE") {
+  initiateCall: async (
+    remoteUser: CallUser,
+    conversationId?: string,
+    callType: CallType = "audio",
+  ) => {
+    if (get().status !== "IDLE") {
       toast.error("You are already in a call");
       return;
     }
 
     const { socket } = useSocket.getState();
     const currentUser = useAuth.getState().user;
-
-    if (!socket || !socket.connected || !currentUser) {
+    if (!socket?.connected || !currentUser) {
       toast.error("Network connection not available");
       return;
     }
 
     clearTimers();
     const callId = generateUUID();
-
-    const newSession: CallSession = {
+    const session: CallSession = {
       callId,
       conversationId,
+      callType,
       remoteUser,
       isCaller: true,
       duration: 0,
       isMuted: false,
+      isVideoOff: false,
+      isRemoteVideoOff: false,
       status: "CALLING",
     };
 
-    // Instant optimistic UI & dial tone (< 10ms response)
     set({
       status: "CALLING",
-      session: newSession,
+      session,
       isMuted: false,
+      isVideoOff: false,
+      isRemoteVideoOff: false,
       isMinimized: false,
       endReason: null,
+      localStream: null,
+      remoteStream: null,
     });
 
+    webrtcManager.setOnLocalStream((s) => set({ localStream: s }));
+    webrtcManager.setOnRemoteTrack((s) => set({ remoteStream: s }));
     soundEffects.playOutgoingRing();
 
     socket.emit(CALL_SOCKET_EVENTS.INITIATE, {
       callId,
       calleeId: remoteUser._id,
       conversationId,
+      callType,
     });
 
-    // Acquire microphone in background without blocking UI
-    webrtcManager.getLocalAudioStream().catch((err: unknown) => {
-      const currentStatus = get().status;
-      // If the call was already ended, rejected, or reset, ignore cancellation
-      if (currentStatus === "IDLE" || currentStatus === "ENDED") {
-        return;
-      }
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Microphone access denied or unavailable";
-      toast.error(message);
-      get().endCall("failed");
-    });
+    webrtcManager
+      .getLocalStream(callType)
+      .then((stream) => {
+        const { isVideoOff, isMuted } = get();
+        webrtcManager.setVideoEnabled(!isVideoOff);
+        webrtcManager.setMute(isMuted);
+        set({ localStream: stream });
+      })
+      .catch((err: unknown) => {
+        const currentStatus = get().status;
+        if (currentStatus === "IDLE" || currentStatus === "ENDED") return;
+        const msg =
+          err instanceof Error
+            ? err.message
+            : callType === "video"
+              ? "Camera/Microphone access denied"
+              : "Microphone access denied";
+        toast.error(msg);
+        get().endCall("failed");
+      });
 
-    // Timeout if callee does not answer
-    const timeout = window.setTimeout(() => {
+    const timeout = setTimeout(() => {
       if (get().status === "CALLING") {
         get().endCall("timeout");
-        toast.info("No answer from " + remoteUser.name);
+        toast.info(`No answer from ${remoteUser.name}`);
       }
     }, CALL_TIMINGS.CALL_TIMEOUT_MS);
     setTimeoutTimer(timeout);
@@ -97,7 +117,7 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
     if (status !== "RINGING" || !session) return;
 
     const { socket } = useSocket.getState();
-    if (!socket || !socket.connected) {
+    if (!socket?.connected) {
       toast.error("Network connection not available");
       get().rejectCall("failed");
       return;
@@ -105,15 +125,25 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
 
     clearTimers();
     soundEffects.stopAll();
+    const callType = session.callType || "audio";
+
+    webrtcManager.setOnLocalStream((s) => set({ localStream: s }));
+    webrtcManager.setOnRemoteTrack((s) => set({ remoteStream: s }));
 
     try {
-      await webrtcManager.getLocalAudioStream();
+      const stream = await webrtcManager.getLocalStream(callType);
+      const { isVideoOff, isMuted } = get();
+      webrtcManager.setVideoEnabled(!isVideoOff);
+      webrtcManager.setMute(isMuted);
+      set({ localStream: stream });
     } catch (err: unknown) {
-      const message =
+      const msg =
         err instanceof Error
           ? err.message
-          : "Microphone access is required to join the call";
-      toast.error(message);
+          : callType === "video"
+            ? "Camera and microphone access required"
+            : "Microphone access required";
+      toast.error(msg);
       get().rejectCall("failed");
       return;
     }
@@ -121,25 +151,18 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
     set({ status: "CONNECTING" });
 
     try {
-      // Initialize peer connection on Callee side
       await setupPeerConnection(
         session.callId,
+        callType,
         socket,
         () => get().handleWebRTCConnected(),
         () => get().endCall("failed"),
         () => get().status,
       );
-
-      // Notify caller that call was accepted
-      socket.emit(CALL_SOCKET_EVENTS.ACCEPT, {
-        callId: session.callId,
-      });
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Failed to establish the call connection";
-      toast.error(message);
+      socket.emit(CALL_SOCKET_EVENTS.ACCEPT, { callId: session.callId });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Connection failed";
+      toast.error(msg);
       get().endCall("failed");
     }
   },
@@ -157,7 +180,6 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
         reason,
       });
     }
-
     get().resetCallState();
   },
 
@@ -166,7 +188,6 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
     if (status === "IDLE") return;
 
     const { socket } = useSocket.getState();
-
     clearTimers();
     soundEffects.playCallEndTone();
 
@@ -178,13 +199,9 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
     }
 
     webrtcManager.cleanup();
+    set({ status: "ENDED", endReason: reason });
 
-    set({
-      status: "ENDED",
-      endReason: reason,
-    });
-
-    const resetTimer = window.setTimeout(() => {
+    const resetTimer = setTimeout(() => {
       get().resetCallState();
     }, CALL_TIMINGS.RESET_STATE_DELAY_MS);
     setEndedResetTimer(resetTimer);

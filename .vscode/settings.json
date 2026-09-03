@@ -1,6 +1,9 @@
 {
   "css.lint.unknownAtRules": "ignore",
   "tailwindCSS.lint.cssConflict": "ignore",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
   "sonarlint.connectedMode.project": {
     "connectionId": "duccuong159",
     "projectKey": "DucCuong159_Realtime-chatapp"

@@ -8,6 +8,7 @@ export const CALL_SOCKET_EVENTS = {
   REJECTED: "call:rejected",
   END: "call:end",
   ENDED: "call:ended",
+  TOGGLE_VIDEO: "call:toggle-video",
   WEBRTC_OFFER: "webrtc:offer",
   WEBRTC_ANSWER: "webrtc:answer",
   WEBRTC_ICE_CANDIDATE: "webrtc:ice-candidate",
