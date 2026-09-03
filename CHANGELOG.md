@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.4.0...realtime-chatapp-v1.5.0) (2026-09-03)
+
+
+### Features
+
+* **call:** add WebRTC 1-on-1 video call support and active controls ([#87](https://github.com/DucCuong159/Realtime-chatapp/issues/87)) ([95a3b95](https://github.com/DucCuong159/Realtime-chatapp/commit/95a3b95a886c61f5587c788c172a70661b9b7ac0))
+
 ## [1.4.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.3.0...realtime-chatapp-v1.4.0) (2026-09-02)
 
 
