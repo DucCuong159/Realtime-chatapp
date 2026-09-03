@@ -91,6 +91,28 @@ describe("WebRTCManager", () => {
     expect(mockVideoTrack.enabled).toBe(true);
   });
 
+  it("should persist camera-off choice if setVideoEnabled(false) is called before getLocalStream resolves", async () => {
+    // User toggles camera off while getUserMedia is pending / not yet acquired
+    webrtcManager.setVideoEnabled(false);
+
+    // Media acquisition completes
+    const stream = await webrtcManager.getLocalStream("video");
+
+    expect(stream).toBe(mockStream);
+    expect(mockVideoTrack.enabled).toBe(false);
+  });
+
+  it("should persist mute choice if setMute(true) is called before getLocalStream resolves", async () => {
+    // User mutes mic before getUserMedia resolves
+    webrtcManager.setMute(true);
+
+    // Media acquisition completes
+    const stream = await webrtcManager.getLocalStream("video");
+
+    expect(stream).toBe(mockStream);
+    expect(mockAudioTrack.enabled).toBe(false);
+  });
+
   it("should cleanup all tracks and listeners on cleanup", async () => {
     await webrtcManager.getLocalStream("video");
 

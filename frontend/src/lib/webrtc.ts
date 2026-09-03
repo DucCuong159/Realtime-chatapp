@@ -46,6 +46,8 @@ class WebRTCManager {
   private remoteAudioElement: HTMLAudioElement | null = null;
   private queuedIceCandidates: RTCIceCandidateInit[] = [];
   private isCleanedUp = false;
+  private isVideoEnabled = true;
+  private isAudioEnabled = true;
   private pendingMediaPromise: Promise<MediaStream> | null = null;
   private onRemoteTrackListener: ((stream: MediaStream) => void) | null = null;
   private onLocalStreamListener: ((stream: MediaStream) => void) | null = null;
@@ -89,6 +91,14 @@ class WebRTCManager {
           stream.getTracks().forEach((track) => track.stop());
           throw new Error("Call ended before media access was granted");
         }
+
+        // Apply persisted track enabled states (e.g., pre-connect camera-off or mute action)
+        stream.getVideoTracks().forEach((track) => {
+          track.enabled = this.isVideoEnabled;
+        });
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = this.isAudioEnabled;
+        });
 
         this.localStream = stream;
         this.onLocalStreamListener?.(stream);
@@ -292,6 +302,7 @@ class WebRTCManager {
    * Toggle local microphone mute
    */
   setMute(isMuted: boolean): void {
+    this.isAudioEnabled = !isMuted;
     if (this.localStream) {
       this.localStream.getAudioTracks().forEach((track) => {
         track.enabled = !isMuted;
@@ -303,6 +314,7 @@ class WebRTCManager {
    * Toggle local camera track enabled/disabled
    */
   setVideoEnabled(enabled: boolean): void {
+    this.isVideoEnabled = enabled;
     if (this.localStream) {
       this.localStream.getVideoTracks().forEach((track) => {
         track.enabled = enabled;
@@ -333,6 +345,7 @@ class WebRTCManager {
       });
       const newVideoTrack = newStream.getVideoTracks()[0];
       if (!newVideoTrack) return false;
+      newVideoTrack.enabled = this.isVideoEnabled;
 
       if (this.peerConnection) {
         const sender = this.peerConnection
@@ -381,6 +394,8 @@ class WebRTCManager {
    */
   cleanup(): void {
     this.isCleanedUp = true;
+    this.isVideoEnabled = true;
+    this.isAudioEnabled = true;
     this.onRemoteTrackListener = null;
     this.onLocalStreamListener = null;
     this.cleanupPeerConnection();

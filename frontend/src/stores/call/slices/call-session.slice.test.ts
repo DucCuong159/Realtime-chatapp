@@ -11,6 +11,8 @@ vi.mock("@/lib/webrtc", () => ({
       getVideoTracks: () => [],
     }),
     initializePeerConnection: vi.fn().mockResolvedValue({}),
+    setVideoEnabled: vi.fn(),
+    setMute: vi.fn(),
     cleanup: vi.fn(),
     setOnLocalStream: vi.fn(),
     setOnRemoteTrack: vi.fn(),
@@ -114,6 +116,33 @@ describe("CallSessionSlice", () => {
 
       expect(useCall.getState().status).toBe("ENDED");
       expect(useCall.getState().endReason).toBe("failed");
+    });
+
+    it("should persist and apply camera-off choice if toggled while media acquisition is pending", async () => {
+      let resolveStream!: (stream: unknown) => void;
+      const mediaPromise = new Promise((resolve) => {
+        resolveStream = resolve;
+      });
+      vi.mocked(webrtcManager.getLocalStream).mockReturnValueOnce(mediaPromise as never);
+
+      await useCall.getState().initiateCall(
+        { _id: "user_callee_1", name: "Callee" },
+        "conv_1",
+        "video",
+      );
+
+      // User turns camera off while getUserMedia is still awaiting
+      useCall.getState().toggleVideo();
+      expect(useCall.getState().isVideoOff).toBe(true);
+
+      // Media acquisition resolves
+      const mockStream = { getTracks: () => [] };
+      resolveStream(mockStream);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // Applied state when stream resolved
+      expect(webrtcManager.setVideoEnabled).toHaveBeenCalledWith(false);
+      expect(useCall.getState().localStream).toBe(mockStream);
     });
   });
 

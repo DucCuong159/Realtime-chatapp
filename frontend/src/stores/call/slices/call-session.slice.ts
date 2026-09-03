@@ -84,7 +84,12 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
 
     webrtcManager
       .getLocalStream(callType)
-      .then((stream) => set({ localStream: stream }))
+      .then((stream) => {
+        const { isVideoOff, isMuted } = get();
+        webrtcManager.setVideoEnabled(!isVideoOff);
+        webrtcManager.setMute(isMuted);
+        set({ localStream: stream });
+      })
       .catch((err: unknown) => {
         const currentStatus = get().status;
         if (currentStatus === "IDLE" || currentStatus === "ENDED") return;
@@ -127,6 +132,9 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
 
     try {
       const stream = await webrtcManager.getLocalStream(callType);
+      const { isVideoOff, isMuted } = get();
+      webrtcManager.setVideoEnabled(!isVideoOff);
+      webrtcManager.setMute(isMuted);
       set({ localStream: stream });
     } catch (err: unknown) {
       const msg =

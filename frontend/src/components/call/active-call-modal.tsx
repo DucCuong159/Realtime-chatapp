@@ -247,13 +247,13 @@ const VideoPip = ({
   const isCameraOff = isVideoOff || !localStream;
 
   return (
-    <div className="absolute bottom-24 right-4 sm:right-6 w-32 h-44 sm:w-44 sm:h-60 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-inset ring-white/20 bg-neutral-900 z-20 transition-all isolate [clip-path:inset(0_round_1rem)]">
+    <div className="absolute bottom-24 right-4 sm:right-6 w-32 h-44 sm:w-44 sm:h-60 rounded-2xl overflow-hidden shadow-2xl ring-1 ring-inset ring-white/20 bg-neutral-900 z-20 transition-all isolate">
       <video
         ref={localVideoRef}
         autoPlay
         playsInline
         muted
-        className={`w-full h-full object-cover scale-x-[-1] rounded-2xl bg-black ${
+        className={`w-full h-full object-cover -scale-x-100 rounded-2xl bg-black ${
           isCameraOff ? "hidden" : "block"
         }`}
       />
@@ -276,6 +276,7 @@ const VideoControls = ({
   status,
   isMuted,
   isVideoOff,
+  localStream,
   onToggleMute,
   onToggleVideo,
   onSwitchCamera,
@@ -284,12 +285,13 @@ const VideoControls = ({
   status: CallStatus;
   isMuted: boolean;
   isVideoOff: boolean;
+  localStream: MediaStream | null;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onSwitchCamera: () => void;
   onEndCall: () => void;
 }) => (
-  <div className="relative z-30 pb-6 flex items-center justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent pt-12">
+  <div className="relative z-30 pb-6 flex items-center justify-center bg-linear-to-t from-black/80 via-black/40 to-transparent pt-12">
     <div className="flex items-center gap-4 px-6 py-3 rounded-full bg-neutral-900/80 backdrop-blur-xl ring-1 ring-inset ring-white/15 shadow-2xl">
       <Button
         size="icon"
@@ -322,7 +324,7 @@ const VideoControls = ({
         variant="secondary"
         className="size-12 rounded-full bg-white/15 hover:bg-white/25 text-white transition-all"
         onClick={onSwitchCamera}
-        disabled={status === "ENDED" || isVideoOff}
+        disabled={status === "ENDED" || isVideoOff || !localStream}
         aria-label="Switch camera"
       >
         <FlipHorizontal2 className="size-5" />
@@ -377,7 +379,7 @@ const ActiveVideoCallView = ({ session }: { session: CallSession }) => {
     : "U";
 
   return (
-    <div className="relative w-full max-w-4xl h-[90vh] max-h-[720px] rounded-3xl overflow-hidden bg-black ring-1 ring-inset ring-white/10 shadow-2xl flex flex-col justify-between select-none isolate [clip-path:inset(0_round_1.5rem)]">
+    <div className="relative w-full max-w-4xl h-[90vh] max-h-180 rounded-3xl overflow-hidden bg-black ring-1 ring-inset ring-white/10 shadow-2xl flex flex-col justify-between select-none isolate">
       {/* Remote Video — always in DOM, visibility toggled via CSS */}
       <div className="absolute inset-0 z-0 flex items-center justify-center bg-black overflow-hidden">
         <video
@@ -423,7 +425,7 @@ const ActiveVideoCallView = ({ session }: { session: CallSession }) => {
       />
 
       {/* Top Header Overlay */}
-      <div className="relative z-30 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+      <div className="relative z-30 flex items-center justify-between px-6 py-5 bg-linear-to-b from-black/80 via-black/40 to-transparent">
         <div className="flex items-center gap-3">
           <Avatar className="size-10 border border-white/20">
             {remoteUser.avatar ? (
@@ -466,6 +468,7 @@ const ActiveVideoCallView = ({ session }: { session: CallSession }) => {
         status={status}
         isMuted={isMuted}
         isVideoOff={isVideoOff}
+        localStream={localStream}
         onToggleMute={toggleMute}
         onToggleVideo={toggleVideo}
         onSwitchCamera={switchCamera}
