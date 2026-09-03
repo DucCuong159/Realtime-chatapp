@@ -56,9 +56,11 @@ export const createCallUiSlice: CallSlice<CallUiSlice> = (set, get) => ({
   },
 
   switchCamera: async () => {
-    const switched = await webrtcManager.switchCamera();
-    if (!switched) {
+    const result = await webrtcManager.switchCamera();
+    if (result === "no-alternate") {
       toast.info("No alternative camera found");
+    } else if (result === "failed") {
+      toast.error("Failed to switch camera");
     }
   },
 

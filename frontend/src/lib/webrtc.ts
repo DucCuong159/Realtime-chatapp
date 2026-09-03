@@ -1,6 +1,8 @@
 import { DEFAULT_ICE_SERVERS } from "@/constants/call.constant";
 import type { CallType } from "@/types/call.type";
 
+export type SwitchCameraResult = "success" | "no-alternate" | "failed";
+
 const getMediaConstraints = (callType: CallType): MediaStreamConstraints => {
   if (callType === "video") {
     return {
@@ -325,26 +327,36 @@ class WebRTCManager {
   /**
    * Switch between available cameras (e.g., front and back on mobile/tablet)
    */
-  async switchCamera(): Promise<boolean> {
-    if (!this.localStream) return false;
+  async switchCamera(): Promise<SwitchCameraResult> {
+    if (!this.localStream) return "no-alternate";
     const currentVideoTrack = this.localStream.getVideoTracks()[0];
-    if (!currentVideoTrack) return false;
+    if (!currentVideoTrack) return "no-alternate";
 
+    let newStream: MediaStream | null = null;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter((d) => d.kind === "videoinput");
-      if (videoDevices.length < 2) return false;
+      if (videoDevices.length < 2) return "no-alternate";
 
       const currentDeviceId = currentVideoTrack.getSettings().deviceId;
       const nextDevice =
         videoDevices.find((d) => d.deviceId !== currentDeviceId) ||
         videoDevices[0];
 
-      const newStream = await navigator.mediaDevices.getUserMedia({
+      newStream = await navigator.mediaDevices.getUserMedia({
         video: { deviceId: { exact: nextDevice.deviceId } },
       });
+
+      if (this.isCleanedUp) {
+        newStream.getTracks().forEach((track) => track.stop());
+        return "failed";
+      }
+
       const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) return false;
+      if (!newVideoTrack) {
+        newStream.getTracks().forEach((track) => track.stop());
+        return "failed";
+      }
       newVideoTrack.enabled = this.isVideoEnabled;
 
       if (this.peerConnection) {
@@ -360,10 +372,13 @@ class WebRTCManager {
       currentVideoTrack.stop();
       this.localStream.addTrack(newVideoTrack);
       this.onLocalStreamListener?.(this.localStream);
-      return true;
+      return "success";
     } catch (err) {
+      if (newStream) {
+        newStream.getTracks().forEach((track) => track.stop());
+      }
       console.error("Failed to switch camera:", err);
-      return false;
+      return "failed";
     }
   }
 

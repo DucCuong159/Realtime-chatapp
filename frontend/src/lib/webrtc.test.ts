@@ -113,6 +113,76 @@ describe("WebRTCManager", () => {
     expect(mockAudioTrack.enabled).toBe(false);
   });
 
+  describe("switchCamera", () => {
+    it("should return 'no-alternate' if localStream has no video track or does not exist", async () => {
+      const result = await webrtcManager.switchCamera();
+      expect(result).toBe("no-alternate");
+    });
+
+    it("should return 'no-alternate' if fewer than 2 video devices exist", async () => {
+      await webrtcManager.getLocalStream("video");
+
+      vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValueOnce([
+        { kind: "videoinput", deviceId: "camera_1" } as MediaDeviceInfo,
+      ]);
+
+      const result = await webrtcManager.switchCamera();
+      expect(result).toBe("no-alternate");
+    });
+
+    it("should switch camera and return 'success' when alternative camera exists", async () => {
+      await webrtcManager.getLocalStream("video");
+
+      const newVideoTrack = {
+        id: "video_2",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const result = await webrtcManager.switchCamera();
+      expect(result).toBe("success");
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+    });
+
+    it("should stop newly acquired tracks and return 'failed' if newStream has no video track", async () => {
+      await webrtcManager.getLocalStream("video");
+
+      const newAudioTrack = { stop: vi.fn() };
+      const newStream = {
+        getTracks: () => [newAudioTrack],
+        getVideoTracks: () => [],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const result = await webrtcManager.switchCamera();
+      expect(result).toBe("failed");
+      expect(newAudioTrack.stop).toHaveBeenCalled();
+    });
+
+    it("should stop newly acquired tracks and return 'failed' if getUserMedia throws an error", async () => {
+      await webrtcManager.getLocalStream("video");
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
+        new Error("Camera error"),
+      );
+
+      const result = await webrtcManager.switchCamera();
+      expect(result).toBe("failed");
+    });
+  });
+
   it("should cleanup all tracks and listeners on cleanup", async () => {
     await webrtcManager.getLocalStream("video");
 

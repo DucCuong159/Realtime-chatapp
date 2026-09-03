@@ -26,7 +26,7 @@ vi.mock("@/lib/webrtc", () => ({
     }),
     setMute: vi.fn(),
     setVideoEnabled: vi.fn(),
-    switchCamera: vi.fn().mockResolvedValue(true),
+    switchCamera: vi.fn().mockResolvedValue("success"),
     setOnLocalStream: vi.fn(),
     setOnRemoteTrack: vi.fn(),
     cleanup: vi.fn(),

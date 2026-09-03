@@ -1,14 +1,23 @@
 import { useSocket } from "@/hooks/use-socket";
 import { webrtcManager } from "@/lib/webrtc";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCall } from "../index";
+
+vi.mock("sonner", () => ({
+  toast: {
+    info: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
 
 vi.mock("@/lib/webrtc", () => ({
   webrtcManager: {
     cleanup: vi.fn(),
     setVideoEnabled: vi.fn(),
     setMute: vi.fn(),
-    switchCamera: vi.fn().mockResolvedValue(true),
+    switchCamera: vi.fn().mockResolvedValue("success"),
   },
 }));
 
@@ -116,5 +125,30 @@ describe("Call UI Slice - Video Actions", () => {
 
     expect(useCall.getState().isRemoteVideoOff).toBe(true);
     expect(useCall.getState().session?.isRemoteVideoOff).toBe(true);
+  });
+
+  it("shows info toast when switchCamera returns 'no-alternate'", async () => {
+    vi.mocked(webrtcManager.switchCamera).mockResolvedValueOnce("no-alternate");
+
+    await useCall.getState().switchCamera();
+
+    expect(toast.info).toHaveBeenCalledWith("No alternative camera found");
+  });
+
+  it("shows error toast when switchCamera returns 'failed'", async () => {
+    vi.mocked(webrtcManager.switchCamera).mockResolvedValueOnce("failed");
+
+    await useCall.getState().switchCamera();
+
+    expect(toast.error).toHaveBeenCalledWith("Failed to switch camera");
+  });
+
+  it("does not show toast when switchCamera returns 'success'", async () => {
+    vi.mocked(webrtcManager.switchCamera).mockResolvedValueOnce("success");
+
+    await useCall.getState().switchCamera();
+
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

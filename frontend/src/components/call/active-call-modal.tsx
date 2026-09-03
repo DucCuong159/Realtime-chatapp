@@ -392,29 +392,36 @@ const ActiveVideoCallView = ({ session }: { session: CallSession }) => {
         />
 
         {/* Center Fallback / Calling State */}
-        {!hasRemoteVideo && (
-          <div className="flex flex-col items-center justify-center text-center p-6 z-10 animate-in fade-in duration-200">
-            <Avatar className="size-24 border-2 border-white/20 shadow-xl my-4">
-              {remoteUser.avatar ? (
-                <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} />
-              ) : null}
-              <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <h3 className="text-2xl font-bold text-white tracking-tight">
-              {remoteUser.name}
-            </h3>
-            {isConnected && isRemoteVideoOff ? (
-              <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs text-white/80 backdrop-blur-md">
-                <VideoOff className="size-3.5" />
-                <span>Camera is off</span>
-              </div>
-            ) : (
-              <CallStatusText status={status} endReason={endReason} />
-            )}
-          </div>
-        )}
+        <div
+          className={`flex flex-col items-center justify-center text-center p-6 z-10 transition-opacity duration-200 ${
+            hasRemoteVideo
+              ? "opacity-0 pointer-events-none"
+              : "animate-in fade-in duration-200"
+          }`}
+        >
+          <Avatar className="size-24 border-2 border-white/20 shadow-xl my-4">
+            {remoteUser.avatar ? (
+              <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} />
+            ) : null}
+            <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <h3
+            id="active-call-title"
+            className="text-2xl font-bold text-white tracking-tight"
+          >
+            {remoteUser.name}
+          </h3>
+          {isConnected && isRemoteVideoOff ? (
+            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs text-white/80 backdrop-blur-md">
+              <VideoOff className="size-3.5" />
+              <span>Camera is off</span>
+            </div>
+          ) : (
+            <CallStatusText status={status} endReason={endReason} />
+          )}
+        </div>
       </div>
 
       {/* Local PiP Preview */}
