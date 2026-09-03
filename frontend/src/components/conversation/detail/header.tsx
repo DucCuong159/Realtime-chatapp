@@ -43,59 +43,17 @@ const useConversationCalls = (
   };
 };
 
-interface InfoProps {
-  conversation: ConversationType;
-  currentUserId: string | null;
-  onBack: () => void;
-}
-
-const HeaderInfoSection = ({
-  conversation,
-  currentUserId,
-  onBack,
-}: InfoProps) => {
-  const { name, subheading, avatar, isOnline, isGroup } =
-    useConversationDetails(conversation, currentUserId);
-
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="shrink-0 md:hidden"
-        onClick={onBack}
-        aria-label="Back to conversation list"
-      >
-        <ArrowLeft className="size-5 text-muted-foreground" />
-      </Button>
-
-      {isGroup ? (
-        <HeaderGroupInfo
-          participants={conversation.participants}
-          name={name}
-          subheading={subheading}
-          avatar={avatar}
-          isOnline={isOnline}
-        />
-      ) : (
-        <HeaderUserInfo
-          name={name}
-          subheading={subheading}
-          avatar={avatar}
-          isGroup={isGroup}
-          isOnline={isOnline}
-        />
-      )}
-    </div>
-  );
-};
-
 const ConversationHeader = ({ conversation, currentUserId }: Props) => {
   const navigate = useNavigate();
   const isGroup = conversation.isGroup;
   const isAi = Boolean(
     conversation.isAiConversation ||
     conversation.participants?.some((p) => p.isAI),
+  );
+
+  const { name, subheading, avatar, isOnline } = useConversationDetails(
+    conversation,
+    currentUserId,
   );
 
   const otherParticipant = !isGroup
@@ -110,11 +68,35 @@ const ConversationHeader = ({ conversation, currentUserId }: Props) => {
 
   return (
     <div className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card/80 px-4 backdrop-blur-sm">
-      <HeaderInfoSection
-        conversation={conversation}
-        currentUserId={currentUserId}
-        onBack={() => navigate(PROTECTED_ROUTES.CONVERSATION)}
-      />
+      <div className="flex min-w-0 items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 md:hidden"
+          onClick={() => navigate(PROTECTED_ROUTES.CONVERSATION)}
+          aria-label="Back to conversation list"
+        >
+          <ArrowLeft className="size-5 text-muted-foreground" />
+        </Button>
+
+        {isGroup ? (
+          <HeaderGroupInfo
+            participants={conversation.participants}
+            name={name}
+            subheading={subheading}
+            avatar={avatar}
+            isOnline={isOnline}
+          />
+        ) : (
+          <HeaderUserInfo
+            name={name}
+            subheading={subheading}
+            avatar={avatar}
+            isGroup={isGroup}
+            isOnline={isOnline}
+          />
+        )}
+      </div>
 
       <div className="flex shrink-0 items-center gap-2">
         {isAi && <AiModelSelector />}

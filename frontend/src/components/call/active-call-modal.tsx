@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useCall } from "@/hooks/use-call";
 import { formatCallTimer } from "@/lib/utils";
-import type { CallEndReason, CallStatus, CallUser } from "@/types/call.type";
+import type { CallEndReason, CallSession, CallStatus } from "@/types/call.type";
 import {
   CameraOff,
   FlipHorizontal2,
@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useRef } from "react";
 
-// --- Custom Hooks for Modal Logic ---
+// --- Accessibility Hooks & Helpers ---
 
 const useCallModalFocus = (
   modalRef: React.RefObject<HTMLDivElement | null>,
@@ -53,7 +53,10 @@ const handleModalTabKey = (
   const first = focusables[0];
   const last = focusables[focusables.length - 1];
 
-  if (e.shiftKey && (document.activeElement === first || document.activeElement === modal)) {
+  if (
+    e.shiftKey &&
+    (document.activeElement === first || document.activeElement === modal)
+  ) {
     e.preventDefault();
     last.focus();
   } else if (!e.shiftKey && document.activeElement === last) {
@@ -67,10 +70,7 @@ const handleModalTabKey = (
  * Deps include `status` so srcObject re-attaches when the video element
  * mounts on status transition (e.g. CONNECTING → CONNECTED).
  */
-const useVideoStream = (
-  stream: MediaStream | null,
-  status: CallStatus,
-) => {
+const useVideoStream = (stream: MediaStream | null, status: CallStatus) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -84,13 +84,12 @@ const useVideoStream = (
 
 // --- Helper UI Components ---
 
-const getReasonLabel = (endReason: CallEndReason | null): string => {
-  if (endReason === "busy") return "User is busy";
-  if (endReason === "rejected") return "Call declined";
-  if (endReason === "timeout") return "No answer";
-  if (endReason === "offline") return "User offline";
-  if (endReason === "peer_disconnected") return "Disconnected";
-  return "Call ended";
+const REASON_LABELS: Record<string, string> = {
+  busy: "User is busy",
+  rejected: "Call declined",
+  timeout: "No answer",
+  offline: "User offline",
+  peer_disconnected: "Disconnected",
 };
 
 const getStatusLabel = (
@@ -101,7 +100,8 @@ const getStatusLabel = (
   if (status === "CALLING") return "Calling...";
   if (status === "CONNECTING") return "Connecting...";
   if (status === "CONNECTED") return formatCallTimer(duration);
-  if (status === "ENDED") return getReasonLabel(endReason);
+  if (status === "ENDED")
+    return (endReason && REASON_LABELS[endReason]) || "Call ended";
   return "";
 };
 
@@ -138,26 +138,18 @@ const CallStatusText = ({
 
 // --- Audio Call View ---
 
-interface AudioLayoutProps {
-  remoteUser: CallUser;
-  status: CallStatus;
-  endReason: CallEndReason | null;
-  isMuted: boolean;
-  onToggleMute: () => void;
-  onMinimize: () => void;
-  onEndCall: () => void;
-}
+const ActiveAudioCallView = ({ session }: { session: CallSession }) => {
+  const status = useCall((s) => s.status);
+  const endReason = useCall((s) => s.endReason);
+  const isMuted = useCall((s) => s.isMuted);
+  const toggleMute = useCall((s) => s.toggleMute);
+  const toggleMinimize = useCall((s) => s.toggleMinimize);
+  const endCall = useCall((s) => s.endCall);
 
-const ActiveAudioCallView = ({
-  remoteUser,
-  status,
-  endReason,
-  isMuted,
-  onToggleMute,
-  onMinimize,
-  onEndCall,
-}: AudioLayoutProps) => {
-  const initials = remoteUser.name ? remoteUser.name.slice(0, 2).toUpperCase() : "U";
+  const { remoteUser } = session;
+  const initials = remoteUser.name
+    ? remoteUser.name.slice(0, 2).toUpperCase()
+    : "U";
 
   return (
     <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-card/95 backdrop-blur-md p-8 shadow-2xl flex flex-col items-center text-center">
@@ -166,7 +158,7 @@ const ActiveAudioCallView = ({
           size="icon"
           variant="ghost"
           className="size-8 rounded-full text-muted-foreground hover:text-foreground"
-          onClick={onMinimize}
+          onClick={toggleMinimize}
           aria-label="Minimize call"
         >
           <Minimize2 className="size-4" />
@@ -193,7 +185,10 @@ const ActiveAudioCallView = ({
         </Avatar>
       </div>
 
-      <h3 id="active-call-title" className="text-2xl font-bold text-foreground tracking-tight">
+      <h3
+        id="active-call-title"
+        className="text-2xl font-bold text-foreground tracking-tight"
+      >
         {remoteUser.name}
       </h3>
 
@@ -205,11 +200,15 @@ const ActiveAudioCallView = ({
             size="icon"
             variant={isMuted ? "destructive" : "secondary"}
             className="size-12 rounded-full shadow-md transition-all"
-            onClick={onToggleMute}
+            onClick={toggleMute}
             disabled={status === "ENDED" || status === "CALLING"}
             aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
           >
-            {isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+            {isMuted ? (
+              <MicOff className="size-5" />
+            ) : (
+              <Mic className="size-5" />
+            )}
           </Button>
           <span className="text-xs text-muted-foreground font-medium">
             {isMuted ? "Unmute" : "Mute"}
@@ -221,7 +220,7 @@ const ActiveAudioCallView = ({
             size="icon"
             variant="destructive"
             className="size-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-xl shadow-red-600/30 hover:scale-105 transition-transform"
-            onClick={onEndCall}
+            onClick={() => endCall("normal")}
             disabled={status === "ENDED"}
             aria-label="End call"
           >
@@ -235,22 +234,6 @@ const ActiveAudioCallView = ({
 };
 
 // --- Video Call View ---
-
-interface VideoLayoutProps {
-  remoteUser: CallUser;
-  status: CallStatus;
-  endReason: CallEndReason | null;
-  isMuted: boolean;
-  isVideoOff: boolean;
-  isRemoteVideoOff?: boolean;
-  localStream: MediaStream | null;
-  remoteStream: MediaStream | null;
-  toggleMute: () => void;
-  toggleVideo: () => void;
-  switchCamera: () => void;
-  toggleMinimize: () => void;
-  endCall: (reason?: CallEndReason) => void;
-}
 
 const VideoPip = ({
   isVideoOff,
@@ -277,7 +260,9 @@ const VideoPip = ({
       {isCameraOff && (
         <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-900 text-neutral-400 gap-2 p-2">
           <CameraOff className="size-6 text-neutral-500" />
-          <span className="text-[11px] font-medium text-neutral-400">Camera off</span>
+          <span className="text-[11px] font-medium text-neutral-400">
+            Camera off
+          </span>
         </div>
       )}
       <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-sm text-[11px] text-white font-medium">
@@ -325,7 +310,11 @@ const VideoControls = ({
         disabled={status === "ENDED"}
         aria-label={isVideoOff ? "Turn camera on" : "Turn camera off"}
       >
-        {isVideoOff ? <VideoOff className="size-5" /> : <Video className="size-5" />}
+        {isVideoOff ? (
+          <VideoOff className="size-5" />
+        ) : (
+          <Video className="size-5" />
+        )}
       </Button>
 
       <Button
@@ -353,33 +342,39 @@ const VideoControls = ({
   </div>
 );
 
-const ActiveVideoCallView = ({
-  remoteUser,
-  status,
-  endReason,
-  isMuted,
-  isVideoOff,
-  isRemoteVideoOff,
-  localStream,
-  remoteStream,
-  toggleMute,
-  toggleVideo,
-  switchCamera,
-  toggleMinimize,
-  endCall,
-}: VideoLayoutProps) => {
+const ActiveVideoCallView = ({ session }: { session: CallSession }) => {
+  const status = useCall((s) => s.status);
+  const endReason = useCall((s) => s.endReason);
+  const isMuted = useCall((s) => s.isMuted);
+  const isVideoOff = useCall((s) => s.isVideoOff);
+  const isRemoteVideoOff = useCall((s) => s.isRemoteVideoOff);
+  const localStream = useCall((s) => s.localStream);
+  const remoteStream = useCall((s) => s.remoteStream);
+  const duration = useCall((s) => s.session?.duration || 0);
+
+  const toggleMute = useCall((s) => s.toggleMute);
+  const toggleVideo = useCall((s) => s.toggleVideo);
+  const switchCamera = useCall((s) => s.switchCamera);
+  const toggleMinimize = useCall((s) => s.toggleMinimize);
+  const endCall = useCall((s) => s.endCall);
+
   const remoteVideoRef = useVideoStream(remoteStream, status);
   const localVideoRef = useVideoStream(localStream, status);
-  const duration = useCall((s) => s.session?.duration || 0);
   const isConnected = status === "CONNECTED";
   const hasRemoteVideo =
     isConnected &&
     !isRemoteVideoOff &&
     Boolean(
       remoteStream &&
-        remoteStream.getVideoTracks().some((t) => t.enabled && t.readyState === "live"),
+      remoteStream
+        .getVideoTracks()
+        .some((t) => t.enabled && t.readyState === "live"),
     );
-  const initials = remoteUser.name ? remoteUser.name.slice(0, 2).toUpperCase() : "U";
+
+  const { remoteUser } = session;
+  const initials = remoteUser.name
+    ? remoteUser.name.slice(0, 2).toUpperCase()
+    : "U";
 
   return (
     <div className="relative w-full max-w-4xl h-[90vh] max-h-[720px] rounded-3xl overflow-hidden bg-black ring-1 ring-inset ring-white/10 shadow-2xl flex flex-col justify-between select-none isolate [clip-path:inset(0_round_1.5rem)]">
@@ -398,10 +393,16 @@ const ActiveVideoCallView = ({
         {!hasRemoteVideo && (
           <div className="flex flex-col items-center justify-center text-center p-6 z-10 animate-in fade-in duration-200">
             <Avatar className="size-24 border-2 border-white/20 shadow-xl my-4">
-              {remoteUser.avatar ? <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} /> : null}
-              <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">{initials}</AvatarFallback>
+              {remoteUser.avatar ? (
+                <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} />
+              ) : null}
+              <AvatarFallback className="bg-primary/20 text-primary font-bold text-2xl">
+                {initials}
+              </AvatarFallback>
             </Avatar>
-            <h3 className="text-2xl font-bold text-white tracking-tight">{remoteUser.name}</h3>
+            <h3 className="text-2xl font-bold text-white tracking-tight">
+              {remoteUser.name}
+            </h3>
             {isConnected && isRemoteVideoOff ? (
               <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-xs text-white/80 backdrop-blur-md">
                 <VideoOff className="size-3.5" />
@@ -425,14 +426,24 @@ const ActiveVideoCallView = ({
       <div className="relative z-30 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <div className="flex items-center gap-3">
           <Avatar className="size-10 border border-white/20">
-            {remoteUser.avatar ? <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} /> : null}
-            <AvatarFallback className="bg-primary/30 text-white font-semibold text-sm">{initials}</AvatarFallback>
+            {remoteUser.avatar ? (
+              <AvatarImage src={remoteUser.avatar} alt={remoteUser.name} />
+            ) : null}
+            <AvatarFallback className="bg-primary/30 text-white font-semibold text-sm">
+              {initials}
+            </AvatarFallback>
           </Avatar>
           <div className="flex flex-col items-start text-left">
-            <span className="text-sm font-semibold text-white truncate max-w-48">{remoteUser.name}</span>
+            <span className="text-sm font-semibold text-white truncate max-w-48">
+              {remoteUser.name}
+            </span>
             <div className="flex items-center justify-start gap-1.5 text-xs text-white/70">
               <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className={isConnected ? "font-mono font-semibold text-emerald-400" : ""}>
+              <span
+                className={
+                  isConnected ? "font-mono font-semibold text-emerald-400" : ""
+                }
+              >
                 {isConnected ? formatCallTimer(duration) : "Video Call"}
               </span>
             </div>
@@ -466,40 +477,27 @@ const ActiveVideoCallView = ({
 
 // --- Active Call Modal Root Component ---
 
-const useActiveCallModalState = () => ({
-  status: useCall((s) => s.status),
-  session: useCall((s) => s.session),
-  isMuted: useCall((s) => s.isMuted),
-  isVideoOff: useCall((s) => s.isVideoOff),
-  isRemoteVideoOff: useCall((s) => s.isRemoteVideoOff),
-  isMinimized: useCall((s) => s.isMinimized),
-  endReason: useCall((s) => s.endReason),
-  localStream: useCall((s) => s.localStream),
-  remoteStream: useCall((s) => s.remoteStream),
-  endCall: useCall((s) => s.endCall),
-  toggleMute: useCall((s) => s.toggleMute),
-  toggleVideo: useCall((s) => s.toggleVideo),
-  switchCamera: useCall((s) => s.switchCamera),
-  toggleMinimize: useCall((s) => s.toggleMinimize),
-});
-
 const ActiveCallModal = () => {
-  const call = useActiveCallModalState();
+  const status = useCall((s) => s.status);
+  const session = useCall((s) => s.session);
+  const isMinimized = useCall((s) => s.isMinimized);
+  const toggleMinimize = useCall((s) => s.toggleMinimize);
+
   const modalRef = useRef<HTMLDivElement>(null);
   const isVisible =
-    (call.status === "CALLING" ||
-      call.status === "CONNECTING" ||
-      call.status === "CONNECTED" ||
-      call.status === "ENDED") &&
-    !call.isMinimized;
+    (status === "CALLING" ||
+      status === "CONNECTING" ||
+      status === "CONNECTED" ||
+      status === "ENDED") &&
+    !isMinimized;
 
   useCallModalFocus(modalRef, isVisible);
 
-  if (!isVisible || !call.session) return null;
+  if (!isVisible || !session) return null;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") {
-      call.toggleMinimize();
+      toggleMinimize();
     } else if (e.key === "Tab" && modalRef.current) {
       handleModalTabKey(e, modalRef.current);
     }
@@ -515,32 +513,10 @@ const ActiveCallModal = () => {
       onKeyDown={handleKeyDown}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-150 outline-none"
     >
-      {call.session.callType === "video" ? (
-        <ActiveVideoCallView
-          remoteUser={call.session.remoteUser}
-          status={call.status}
-          endReason={call.endReason}
-          isMuted={call.isMuted}
-          isVideoOff={call.isVideoOff}
-          isRemoteVideoOff={call.isRemoteVideoOff}
-          localStream={call.localStream}
-          remoteStream={call.remoteStream}
-          toggleMute={call.toggleMute}
-          toggleVideo={call.toggleVideo}
-          switchCamera={call.switchCamera}
-          toggleMinimize={call.toggleMinimize}
-          endCall={call.endCall}
-        />
+      {session.callType === "video" ? (
+        <ActiveVideoCallView session={session} />
       ) : (
-        <ActiveAudioCallView
-          remoteUser={call.session.remoteUser}
-          status={call.status}
-          endReason={call.endReason}
-          isMuted={call.isMuted}
-          onToggleMute={call.toggleMute}
-          onMinimize={call.toggleMinimize}
-          onEndCall={() => call.endCall("normal")}
-        />
+        <ActiveAudioCallView session={session} />
       )}
     </div>
   );

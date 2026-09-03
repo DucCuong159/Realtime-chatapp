@@ -13,24 +13,21 @@ const useCallSocketListeners = (
     if (!socket) return;
 
     const s = useCall.getState();
-    socket.on(CALL_SOCKET_EVENTS.INCOMING, s.handleIncomingCall);
-    socket.on(CALL_SOCKET_EVENTS.ACCEPTED, s.handleCallAccepted);
-    socket.on(CALL_SOCKET_EVENTS.REJECTED, s.handleCallRejected);
-    socket.on(CALL_SOCKET_EVENTS.ENDED, s.handleCallEnded);
-    socket.on(CALL_SOCKET_EVENTS.TOGGLE_VIDEO, s.handleToggleVideo);
-    socket.on(CALL_SOCKET_EVENTS.WEBRTC_OFFER, s.handleWebRTCOffer);
-    socket.on(CALL_SOCKET_EVENTS.WEBRTC_ANSWER, s.handleWebRTCAnswer);
-    socket.on(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, s.handleWebRTCIceCandidate);
+    type SocketListener = Parameters<NonNullable<typeof socket>["on"]>[1];
+    const eventMap: [string, SocketListener][] = [
+      [CALL_SOCKET_EVENTS.INCOMING, s.handleIncomingCall],
+      [CALL_SOCKET_EVENTS.ACCEPTED, s.handleCallAccepted],
+      [CALL_SOCKET_EVENTS.REJECTED, s.handleCallRejected],
+      [CALL_SOCKET_EVENTS.ENDED, s.handleCallEnded],
+      [CALL_SOCKET_EVENTS.TOGGLE_VIDEO, s.handleToggleVideo],
+      [CALL_SOCKET_EVENTS.WEBRTC_OFFER, s.handleWebRTCOffer],
+      [CALL_SOCKET_EVENTS.WEBRTC_ANSWER, s.handleWebRTCAnswer],
+      [CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, s.handleWebRTCIceCandidate],
+    ];
 
+    eventMap.forEach(([event, handler]) => socket.on(event, handler));
     return () => {
-      socket.off(CALL_SOCKET_EVENTS.INCOMING, s.handleIncomingCall);
-      socket.off(CALL_SOCKET_EVENTS.ACCEPTED, s.handleCallAccepted);
-      socket.off(CALL_SOCKET_EVENTS.REJECTED, s.handleCallRejected);
-      socket.off(CALL_SOCKET_EVENTS.ENDED, s.handleCallEnded);
-      socket.off(CALL_SOCKET_EVENTS.TOGGLE_VIDEO, s.handleToggleVideo);
-      socket.off(CALL_SOCKET_EVENTS.WEBRTC_OFFER, s.handleWebRTCOffer);
-      socket.off(CALL_SOCKET_EVENTS.WEBRTC_ANSWER, s.handleWebRTCAnswer);
-      socket.off(CALL_SOCKET_EVENTS.WEBRTC_ICE_CANDIDATE, s.handleWebRTCIceCandidate);
+      eventMap.forEach(([event, handler]) => socket.off(event, handler));
     };
   }, [socket]);
 };
