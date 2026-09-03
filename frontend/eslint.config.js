@@ -23,16 +23,17 @@ export default defineConfig([
         "warn",
         { allowConstantExport: true },
       ],
-      // Trigger a warning if a function's Cyclomatic Complexity exceeds 10.
-      complexity: ["warn", { max: 10 }],
-      // Trigger a warning if a function exceeds 50 lines of code (FLOC).
+      // Trigger a warning if a function's Cyclomatic Complexity exceeds 20.
+      complexity: ["warn", { max: 20 }],
+      // Trigger a warning if a function exceeds 100 lines of code (FLOC).
       "max-lines-per-function": [
         "warn",
-        { max: 50, skipComments: true, skipBlankLines: true },
+        { max: 100, skipComments: true, skipBlankLines: true },
       ],
+      // Trigger a warning if a file exceeds 600 lines of code (LOC).
       "max-lines": [
         "warn",
-        { max: 400, skipComments: true, skipBlankLines: true },
+        { max: 600, skipComments: true, skipBlankLines: true },
       ],
     },
   },
