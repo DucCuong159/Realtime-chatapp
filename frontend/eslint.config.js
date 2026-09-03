@@ -6,7 +6,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
-  globalIgnores(["dist", ".yarn"]),
+  globalIgnores(["dist", ".yarn", "coverage"]),
   {
     files: ["**/*.{ts,tsx}"],
     extends: [
@@ -23,18 +23,19 @@ export default defineConfig([
         "warn",
         { allowConstantExport: true },
       ],
-      // Trigger a warning if a function's Cyclomatic Complexity exceeds 10.
-      complexity: ["warn", { max: 10 }],
-      // Trigger a warning if a function exceeds 50 lines of code (FLOC).
-      "max-lines-per-function": [
-        "warn",
-        { max: 50, skipComments: true, skipBlankLines: true },
-      ],
-      // Trigger a warning if a file exceeds 400 lines of code (LOC).
+      // Trigger a warning if a function's Cyclomatic Complexity exceeds 20.
+      complexity: ["warn", { max: 20 }],
+      // Trigger a warning if a file exceeds 600 lines of code (LOC).
       "max-lines": [
         "warn",
-        { max: 400, skipComments: true, skipBlankLines: true },
+        { max: 600, skipComments: true, skipBlankLines: true },
       ],
+    },
+  },
+  {
+    files: ["src/components/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
 ]);

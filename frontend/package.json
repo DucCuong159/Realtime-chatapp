@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "type-check": "tsc -b",
+    "lint": "eslint . --cache --max-warnings=0",
+    "test:fast": "vitest run --changed",
+    "test:coverage": "vitest run --coverage",
+    "verify": "yarn run type-check && yarn run lint && yarn run test:fast"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -40,6 +44,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.5.4",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -50,7 +55,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.65.0",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
   },
   "dependenciesMeta": {
     "esbuild": {
