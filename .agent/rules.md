@@ -124,7 +124,7 @@ Trước khi kết thúc bất kỳ tác vụ nào, tự động xác nhận cá
 ## 6. HARNESS PROTOCOL & VERIFICATION LOOP
 
 > Đây là **quy trình bắt buộc** để Agent hoạt động đáng tin cậy ở Level 3 (Autonomous).
-> Mọi vi phạm sẽ bị Husky pre-commit hook chặn lại.
+> Các mục 6.1 - 6.4 là quy chuẩn hành vi bắt buộc của Agent (Agent Policy). Các lỗi Type, Lint và Commit Message (6.3 & 6.5) sẽ được Husky Git hooks cưỡng chế cơ học trên máy local.
 
 ### 6.1 Nguyên tắc Nghiên cứu trước (Research-First)
 
@@ -171,13 +171,14 @@ Số lần retry tối đa: **3 vòng**. Nếu sau 3 vòng vẫn fail → dừng
 
 Khi `yarn run verify` thành công, tạo commit theo chuẩn:
 
-```
+```text
 <type>(<scope>): <mô tả ngắn>
 
 <body — giải thích why, không phải what>
 ```
 
 **Các type hợp lệ:**
+
 | Type | Khi nào dùng |
 |------|-------------|
 | `feat` | Thêm tính năng mới |
@@ -191,7 +192,7 @@ Khi `yarn run verify` thành công, tạo commit theo chuẩn:
 **Scope** = tên module bị ảnh hưởng: `auth`, `chat`, `call`, `ui`, `api`, `socket`, `db`.
 
 Ví dụ:
-```
+```text
 feat(chat): add message read receipts with socket broadcast
 fix(auth): prevent token refresh race condition on concurrent requests
 refactor(call): extract WebRTC peer connection into dedicated hook

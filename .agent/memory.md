@@ -31,7 +31,7 @@
 
 ## 2. Cấu trúc thư mục (Directory Conventions)
 
-```
+```text
 backend/src/
 ├── @types/          # Custom type declarations
 ├── config/          # App configuration (env, cloudinary, etc.)
