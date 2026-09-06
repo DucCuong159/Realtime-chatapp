@@ -2,19 +2,19 @@
 # yarn lockfile v1
 
 
-"@ai-sdk/gateway@4.0.73":
-  version "4.0.73"
-  resolved "https://registry.yarnpkg.com/@ai-sdk/gateway/-/gateway-4.0.73.tgz#31139ac75d54b819962a4e123f31b87632a63662"
-  integrity sha512-1Gp6QtVHfegKoMcf1pjk4fpgDg1cUdK5NnrEiUsYhLWa6owDMmF7kP+qL7ZgQNDYKTOijT+5cTeHrL281kUiiQ==
+"@ai-sdk/gateway@4.0.75":
+  version "4.0.75"
+  resolved "https://registry.yarnpkg.com/@ai-sdk/gateway/-/gateway-4.0.75.tgz#911f6d681b94bb4a2d1cacb058485d62035feb19"
+  integrity sha512-HOnhw3oXtBnboBF7kAKipjToCN6+5w6EuukiUKiULcxBitS+vbHRRv9IUBcq+Z1wkXcJjfywKrt5r++I6OYyXg==
   dependencies:
     "@ai-sdk/provider" "4.0.10"
     "@ai-sdk/provider-utils" "5.0.36"
     "@vercel/oidc" "3.2.0"
 
-"@ai-sdk/google@4.0.63":
-  version "4.0.63"
-  resolved "https://registry.yarnpkg.com/@ai-sdk/google/-/google-4.0.63.tgz#f2d7ef02c9da496140563ebe702842caf3118489"
-  integrity sha512-SlKcqnN0oKC8JWahecs3IvFnIFgbrEE4i/bmom5xsPFUjkIVvXAJAhRzjfgfROSOOeyvouKUFPWJEjn11FWf3A==
+"@ai-sdk/google@4.0.64":
+  version "4.0.64"
+  resolved "https://registry.yarnpkg.com/@ai-sdk/google/-/google-4.0.64.tgz#466138fb7d038b1f9e080f2b68ef4e344cecd7fc"
+  integrity sha512-D8+74xfXkzPi5qCe7iRzQRH/1WW805gBrXfwz7KKEBa0SMY2TENdsTrJnVqFZaT7UYow1Ls6qroaklLd9veU9w==
   dependencies:
     "@ai-sdk/provider" "4.0.10"
     "@ai-sdk/provider-utils" "5.0.36"
@@ -455,12 +455,12 @@ accepts@~1.3.4:
     mime-types "~2.1.34"
     negotiator "0.6.3"
 
-ai@7.0.91:
-  version "7.0.91"
-  resolved "https://registry.yarnpkg.com/ai/-/ai-7.0.91.tgz#8d5a9da5ba12d4f009e3982275059a57c3d3baa2"
-  integrity sha512-Hn0iIQY1FXow2wd+DxzdA/4ijY+6TP9CREqpN3aIs01wnBW9119yHW0Dvn53sTQzkk7+rSVXaXlDAYM5hhMJZA==
+ai@7.0.93:
+  version "7.0.93"
+  resolved "https://registry.yarnpkg.com/ai/-/ai-7.0.93.tgz#744c0631415c7772e28e4425132a2363fa209384"
+  integrity sha512-CJss6zb9mlltk/mCr8qom20NBnqEQxVawkqwtT62tCwsxilZpXfHNRMRwcS3XRpzdP1kEluVuDBUayYWEEd95g==
   dependencies:
-    "@ai-sdk/gateway" "4.0.73"
+    "@ai-sdk/gateway" "4.0.75"
     "@ai-sdk/provider" "4.0.10"
     "@ai-sdk/provider-utils" "5.0.36"
 
@@ -1021,9 +1021,9 @@ mongodb@~7.5:
     mongodb-connection-string-url "^7.0.1"
 
 mongoose@^9.9.2:
-  version "9.9.4"
-  resolved "https://registry.yarnpkg.com/mongoose/-/mongoose-9.9.4.tgz#34598615ad4db617f6a8b53f89be69e3cf1cbfdb"
-  integrity sha512-Gc7buf0ExrOZ3t8MD8tVzTek7Qr5d+tEwj4GRFmHCtTZvpaDb38EVsXgCkYacPL9ICAftgS+FGe+dQHLRLHhcw==
+  version "9.9.5"
+  resolved "https://registry.yarnpkg.com/mongoose/-/mongoose-9.9.5.tgz#c39970435accc2314edeea172ac22edfd3f00290"
+  integrity sha512-t/kUoeDjlHmav7yCaq//YKU3wiIgUPaTj4GrluiTHUw4jQ77/CXtdMDSor4f1u3SKLhIK6NgCF+AzzUqU02Aag==
   dependencies:
     "@standard-schema/spec" "^1.1.0"
     kareem "3.3.0"
