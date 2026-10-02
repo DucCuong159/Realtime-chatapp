@@ -83,14 +83,14 @@ export const initializeSocket = (httpServer: HTTPServer) => {
     io?.emit("online:users", Array.from(onlineUsers.keys()));
 
     // create personal room for user
-    socket.join(`user:${userId}`);
+    void socket.join(`user:${userId}`);
 
     socket.on(
       "conversation:join",
       async (conversationId: string, callback?: (err?: string) => void) => {
         try {
           await validateConversationParticipantsService(conversationId, userId);
-          socket.join(`conversation:${conversationId}`);
+          await socket.join(`conversation:${conversationId}`);
           callback?.();
         } catch (error) {
           callback?.("Error joining conversation");
@@ -100,7 +100,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
 
     socket.on("conversation:leave", (conversationId: string) => {
       if (conversationId) {
-        socket.leave(`conversation:${conversationId}`);
+        void socket.leave(`conversation:${conversationId}`);
         console.log(`User ${userId} left conversation ${conversationId}`);
       }
     });

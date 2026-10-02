@@ -36,7 +36,7 @@ const SingleConversation = () => {
 
   useEffect(() => {
     if (!conversationId) return;
-    fetchSingleConversation(conversationId);
+    void fetchSingleConversation(conversationId);
   }, [fetchSingleConversation, conversationId]);
 
   useEffect(() => {
