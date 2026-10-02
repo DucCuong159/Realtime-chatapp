@@ -6,8 +6,10 @@ import type {
   CreateConversationType,
   CreateMessageType,
   MessageType,
+  MessageReactionType,
   PaginationType,
 } from "@/types/conversation.type";
+import { getReactionUserId, toggleUserReaction } from "@/lib/reaction.utils";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { useAuth } from "./use-auth";
@@ -59,9 +61,20 @@ interface ConversationState {
     sender?: UserType,
   ) => void;
   clearStreamingAIMessage: (conversationId: string) => void;
+  updateMessageReactions: (
+    conversationId: string,
+    messageId: string,
+    reactions: MessageReactionType[],
+  ) => void;
+  toggleReaction: (
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ) => Promise<void>;
 }
 
 let activeFetchingConversationId: string | null = null;
+const inFlightReactions = new Set<string>();
 
 function rollbackFailedConversation(
   currentConversations: ConversationType[],
@@ -513,5 +526,120 @@ export const useConversation = create<ConversationState>()((set, get) => ({
         },
       };
     });
+  },
+
+  updateMessageReactions: (
+    conversationId: string,
+    messageId: string,
+    reactions: MessageReactionType[],
+  ) => {
+    set((state) => {
+      const single = state.singleConversation;
+      if (!single || single.conversation._id !== conversationId) return state;
+
+      const targetMsg = single.messages.find((m) => m._id === messageId);
+      if (!targetMsg) return state;
+
+      // Enforce at most 1 reaction per user on a message
+      const userMap = new Map<string, MessageReactionType>();
+      for (const r of reactions) {
+        if (!r.emoji) continue;
+        const uId = getReactionUserId(r.user);
+        if (uId) userMap.set(uId, r);
+      }
+      const deduplicatedReactions = Array.from(userMap.values());
+
+      // Optimization: avoid state update and re-renders if reactions are already identical
+      const currentReactions = targetMsg.reactions || [];
+      if (
+        currentReactions.length === deduplicatedReactions.length &&
+        currentReactions.every((cr, idx) => {
+          const dr = deduplicatedReactions[idx];
+          return (
+            dr &&
+            cr.emoji === dr.emoji &&
+            getReactionUserId(cr.user) === getReactionUserId(dr.user)
+          );
+        })
+      ) {
+        return state;
+      }
+
+      const updatedMessages = single.messages.map((m) =>
+        m._id === messageId ? { ...m, reactions: deduplicatedReactions } : m,
+      );
+
+      return {
+        singleConversation: {
+          ...single,
+          messages: updatedMessages,
+        },
+      };
+    });
+  },
+
+  toggleReaction: async (
+    conversationId: string,
+    messageId: string,
+    emoji: string,
+  ) => {
+    const key = messageId;
+    if (inFlightReactions.has(key)) {
+      return;
+    }
+    inFlightReactions.add(key);
+
+    try {
+      const { user } = useAuth.getState();
+      const single = get().singleConversation;
+      if (!single || single.conversation._id !== conversationId || !user?._id)
+        return;
+
+      const targetMsg = single.messages.find((m) => m._id === messageId);
+      if (!targetMsg) return;
+
+      const priorReactions = targetMsg.reactions || [];
+      const currentUserId = user._id;
+
+      // Single reaction per user: clicking same emoji toggles off; clicking different emoji switches
+      const optimisticReactions = toggleUserReaction(
+        priorReactions,
+        currentUserId,
+        emoji,
+        {
+          name: user.name,
+          avatar: user.avatar,
+        },
+      );
+
+      get().updateMessageReactions(
+        conversationId,
+        messageId,
+        optimisticReactions,
+      );
+
+      try {
+        const { data } = await API.post(
+          `/conversation/message/${messageId}/reaction`,
+          { emoji },
+        );
+        if (data?.reactions) {
+          get().updateMessageReactions(
+            conversationId,
+            messageId,
+            data.reactions,
+          );
+        }
+      } catch {
+        get().updateMessageReactions(
+          conversationId,
+          messageId,
+          priorReactions,
+        );
+        toast.error("Failed to update reaction");
+      }
+    } finally {
+      inFlightReactions.delete(key);
+    }
   },
 }));

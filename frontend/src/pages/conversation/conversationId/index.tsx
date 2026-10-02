@@ -8,7 +8,10 @@ import { useConversation } from "@/hooks/use-conversation";
 import useConversationId from "@/hooks/use-conversation-id";
 import { useSocket } from "@/hooks/use-socket";
 import { isArrayEmpty } from "@/lib/utils";
-import type { MessageType } from "@/types/conversation.type";
+import type {
+  MessageReactionUpdatePayload,
+  MessageType,
+} from "@/types/conversation.type";
 import { useEffect, useState } from "react";
 
 const SingleConversation = () => {
@@ -18,6 +21,7 @@ const SingleConversation = () => {
     isSingleConversationLoading,
     singleConversation,
     addNewMessage,
+    updateMessageReactions,
   } = useConversation();
 
   const { socket } = useSocket();
@@ -60,11 +64,23 @@ const SingleConversation = () => {
     const handleNewMessage = (msg: MessageType) =>
       addNewMessage(msg.conversationId, msg);
 
+    const handleReactionUpdate = (payload: MessageReactionUpdatePayload) => {
+      if (payload.conversationId === conversationId) {
+        updateMessageReactions(
+          payload.conversationId,
+          payload.messageId,
+          payload.reactions,
+        );
+      }
+    };
+
     socket.on("message:new", handleNewMessage);
+    socket.on("message:reaction:update", handleReactionUpdate);
     return () => {
       socket.off("message:new", handleNewMessage);
+      socket.off("message:reaction:update", handleReactionUpdate);
     };
-  }, [socket, addNewMessage, conversationId]);
+  }, [socket, addNewMessage, updateMessageReactions, conversationId]);
 
   if (
     isSingleConversationLoading ||

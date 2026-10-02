@@ -1,25 +1,27 @@
 import AvatarWithBadge from "@/components/avatar-with-badge";
-import Response from "@/components/ui/ai-response";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversation } from "@/hooks/use-conversation";
 import { useSocket } from "@/hooks/use-socket";
+import { getReactionUserId } from "@/lib/reaction.utils";
 import { cn, formatConversationTime } from "@/lib/utils";
 import type { AIStreamPayload, MessageType } from "@/types/conversation.type";
-import { RiCircleFill } from "@remixicon/react";
-import { ChevronDown, Reply } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   memo,
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import CallMessageItem from "./call-message-item";
+import MessageActions from "./message-actions";
+import MessageBubble from "./message-bubble";
 
 interface ConversationBodyProps {
   conversationId: string;
@@ -35,6 +37,7 @@ interface MessageItemProps {
   isSendingMsg: boolean;
   onReply: (message: MessageType) => void;
   onScrollToMessage: (targetId: string) => void;
+  onToggleReaction: (messageId: string, emoji: string) => void;
 }
 
 const CallMessageRow = ({
@@ -68,155 +71,13 @@ const CallMessageRow = ({
   </div>
 );
 
-const MessageReplyPreview = ({
-  replyTo,
-  isCurrentUser,
-  currentUserId,
-  onScrollToMessage,
-}: {
-  replyTo: NonNullable<MessageType["replyTo"]>;
-  isCurrentUser: boolean;
-  currentUserId: string | null;
-  onScrollToMessage: (targetId: string) => void;
-}) => {
-  const replySenderName =
-    replyTo.sender?._id === currentUserId
-      ? "You"
-      : replyTo.sender?.name || "User";
-
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        if (replyTo._id) {
-          onScrollToMessage(replyTo._id);
-        }
-      }}
-      className={cn(
-        "mb-0.5 rounded border-l-2 p-1.5 text-xs text-left overflow-hidden min-w-0 cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all select-none",
-        isCurrentUser
-          ? "border-white/60 bg-white/10 text-white"
-          : "border-[#3d61ff] bg-[#3d61ff]/5 text-foreground",
-      )}
-    >
-      <span className="block font-medium text-[11px] opacity-90 truncate">
-        {replySenderName}
-      </span>
-      <span className="block font-normal opacity-80 truncate">
-        {replyTo.image ? "📷 Photo" : replyTo.content}
-      </span>
-    </button>
-  );
-};
-
-const MessageAttachment = ({
-  image,
-  isImageOnly,
-  isCurrentUser,
-}: {
-  image: string;
-  isImageOnly: boolean;
-  isCurrentUser: boolean;
-}) => {
-  const imageClassName = isImageOnly
-    ? cn(
-        "rounded-2xl max-w-sm w-auto",
-        isCurrentUser ? "rounded-br-xs" : "rounded-bl-xs",
-      )
-    : "rounded-xl w-full";
-
-  return (
-    <img
-      src={image}
-      alt="Attachment"
-      className={cn("max-h-80 object-cover", imageClassName)}
-    />
-  );
-};
-
-const MessageContent = ({
-  content,
-  isAI,
-  isStreaming,
-}: {
-  content?: string | null;
-  isAI?: boolean;
-  isStreaming?: boolean;
-}) => (
-  <>
-    {content &&
-      (isAI ? (
-        <Response>{content}</Response>
-      ) : (
-        <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
-      ))}
-
-    {isStreaming && (
-      <div className="flex items-center gap-2">
-        <RiCircleFill
-          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-          style={{ animationDelay: "0s" }}
-        />
-        <RiCircleFill
-          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-          style={{ animationDelay: "0.2s" }}
-        />
-        <RiCircleFill
-          className="size-2.5 animate-bounce rounded-full dark:text-white mt-1"
-          style={{ animationDelay: "0.4s" }}
-        />
-      </div>
-    )}
-  </>
-);
-
-const MessageActions = ({
-  formattedTime,
-  onReply,
-  disabled,
-  side,
-}: {
-  formattedTime: string;
-  onReply: () => void;
-  disabled: boolean;
-  side: "left" | "right";
-}) => {
-  const replyButton = (
-    <Button
-      variant="ghost"
-      size="icon-xs"
-      onClick={onReply}
-      disabled={disabled}
-      className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full size-7 shrink-0 self-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-0"
-      aria-label="Reply"
-    >
-      <Reply className={cn("size-3.5", side === "right" && "scale-x-[-1]")} />
-    </Button>
-  );
-
-  const timeLabel = (
-    <span className="text-[11px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity select-none self-center shrink-0">
-      {formattedTime}
+const MessageStatus = ({ status }: { status?: string }) => (
+  <div className="flex justify-end pr-2 pt-0.5 select-none">
+    <span className="text-[11px] text-muted-foreground">
+      {status === "sending..." ? "Sending..." : "Sent"}
     </span>
-  );
-
-  if (side === "right") {
-    return (
-      <>
-        {timeLabel}
-        {replyButton}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {replyButton}
-      {timeLabel}
-    </>
-  );
-};
+  </div>
+);
 
 const MessageItem = memo(
   ({
@@ -227,7 +88,59 @@ const MessageItem = memo(
     isSendingMsg,
     onReply,
     onScrollToMessage,
+    onToggleReaction,
   }: MessageItemProps) => {
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
+    const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const isActionDisabled =
+      isSendingMsg ||
+      message.status === "sending..." ||
+      Boolean(message.streaming);
+
+    const currentUserReaction = useMemo(() => {
+      const r = message.reactions?.find(
+        (reaction) => getReactionUserId(reaction.user) === currentUserId,
+      );
+      return r?.emoji;
+    }, [message.reactions, currentUserId]);
+
+    const handleTouchStart = () => {
+      if (isActionDisabled) return;
+      touchTimerRef.current = setTimeout(() => {
+        setIsPickerOpen(true);
+      }, 500);
+    };
+
+    const handleTouchEnd = () => {
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+    };
+
+    const handleTouchMove = () => {
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+    };
+
+    useEffect(() => {
+      return () => {
+        if (touchTimerRef.current) {
+          clearTimeout(touchTimerRef.current);
+        }
+      };
+    }, []);
+
+    const handleToggleReactionForMessage = useCallback(
+      (emoji: string) => {
+        onToggleReaction(message._id, emoji);
+      },
+      [message._id, onToggleReaction],
+    );
+
     if (message.contentType === "call") {
       return (
         <CallMessageRow
@@ -239,18 +152,6 @@ const MessageItem = memo(
     }
 
     const formattedTime = formatConversationTime(message.createdAt);
-    const isImageOnly = Boolean(
-      message.image && !message.content && !message.replyTo,
-    );
-
-    const bubbleClassName = isImageOnly
-      ? "bg-transparent p-0 shadow-none"
-      : cn(
-          "gap-1.5 rounded-2xl px-3.5 py-2.5 shadow-xs",
-          isCurrentUser
-            ? "rounded-br-xs bg-[#3d61ff] text-white"
-            : "rounded-bl-xs bg-muted text-foreground",
-        );
 
     return (
       <div className="flex flex-col w-full transition-colors duration-500 rounded-2xl">
@@ -272,58 +173,42 @@ const MessageItem = memo(
             <MessageActions
               formattedTime={formattedTime}
               onReply={() => onReply(message)}
-              disabled={isSendingMsg}
+              onToggleReaction={handleToggleReactionForMessage}
+              isPickerOpen={isPickerOpen}
+              setIsPickerOpen={setIsPickerOpen}
+              disabled={isActionDisabled}
               side="right"
+              currentUserReaction={currentUserReaction}
             />
           )}
 
-          <div
-            id={`message-${message._id}`}
-            className={cn(
-              "relative flex max-w-[80%] flex-col text-sm wrap-break-word wrap-anywhere",
-              bubbleClassName,
-            )}
-          >
-            {message.replyTo && (
-              <MessageReplyPreview
-                replyTo={message.replyTo}
-                isCurrentUser={isCurrentUser}
-                currentUserId={currentUserId}
-                onScrollToMessage={onScrollToMessage}
-              />
-            )}
-
-            {message.image && (
-              <MessageAttachment
-                image={message.image}
-                isImageOnly={isImageOnly}
-                isCurrentUser={isCurrentUser}
-              />
-            )}
-
-            <MessageContent
-              content={message.content}
-              isAI={message.sender?.isAI}
-              isStreaming={message.streaming}
-            />
-          </div>
+          <MessageBubble
+            message={message}
+            isCurrentUser={isCurrentUser}
+            currentUserId={currentUserId}
+            onScrollToMessage={onScrollToMessage}
+            onToggleReaction={handleToggleReactionForMessage}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchMove={handleTouchMove}
+          />
 
           {!isCurrentUser && (
             <MessageActions
               formattedTime={formattedTime}
               onReply={() => onReply(message)}
-              disabled={isSendingMsg}
+              onToggleReaction={handleToggleReactionForMessage}
+              isPickerOpen={isPickerOpen}
+              setIsPickerOpen={setIsPickerOpen}
+              disabled={isActionDisabled}
               side="left"
+              currentUserReaction={currentUserReaction}
             />
           )}
         </div>
 
         {isCurrentUser && isLastFromUser && (
-          <div className="flex justify-end pr-2 pt-0.5 select-none">
-            <span className="text-[11px] text-muted-foreground">
-              {message.status === "sending..." ? "Sending..." : "Sent"}
-            </span>
-          </div>
+          <MessageStatus status={message.status} />
         )}
       </div>
     );
@@ -351,6 +236,7 @@ const ConversationBody = ({
     isFetchingMoreMessages,
     hasMore,
     isSendingMsg,
+    toggleReaction,
   } = useConversation(
     useShallow((state) => ({
       addOrUpdateMessage: state.addOrUpdateMessage,
@@ -360,6 +246,7 @@ const ConversationBody = ({
       isFetchingMoreMessages: state.isFetchingMoreMessages,
       hasMore: Boolean(state.singleConversation?.pagination?.hasMore),
       isSendingMsg: state.isSendingMsg,
+      toggleReaction: state.toggleReaction,
     })),
   );
 
@@ -371,12 +258,20 @@ const ConversationBody = ({
   const isInitialLoadRef = useRef<boolean>(true);
   const canAutoFetchMoreMessagesRef = useRef<boolean>(true);
   const prevConversationIdRef = useRef<string>(conversationId);
+  const prevMessagesLengthRef = useRef<number>(messages.length);
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  const handleToggleReaction = useCallback(
+    (messageId: string, emoji: string) => {
+      void toggleReaction(conversationId, messageId, emoji);
+    },
+    [conversationId, toggleReaction],
+  );
 
   // Reset initial load flag and scroll-to-bottom button when conversation switches
   useEffect(() => {
@@ -386,6 +281,7 @@ const ConversationBody = ({
       prependAnchorRef.current = null;
       canAutoFetchMoreMessagesRef.current = true;
       prevConversationIdRef.current = conversationId;
+      prevMessagesLengthRef.current = 0;
       setShowScrollToBottom(false);
     }
   }, [conversationId]);
@@ -435,6 +331,9 @@ const ConversationBody = ({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    const prevLength = prevMessagesLengthRef.current;
+    prevMessagesLengthRef.current = messages.length;
+
     if (isInitialLoadRef.current && messages.length > 0) {
       container.scrollTop = container.scrollHeight;
       isInitialLoadRef.current = false;
@@ -459,11 +358,18 @@ const ConversationBody = ({
         prependAnchorRef.current = null;
       }
       return;
-    } else {
+    }
+
+    // Only auto-scroll down if a NEW message was appended or if actively streaming.
+    // Reaction updates, edits, or status updates must NEVER scroll the view down!
+    const isNewMessageAppended = messages.length > prevLength;
+    const lastMessage = messages[messages.length - 1];
+    const isStreaming = Boolean(lastMessage?.streaming);
+
+    if (isNewMessageAppended || isStreaming) {
       const isNearBottom =
         container.scrollHeight - container.scrollTop - container.clientHeight <
         150;
-      const lastMessage = messages[messages.length - 1];
       const isLastFromCurrentUser = lastMessage?.sender?._id === currentUserId;
 
       if (isNearBottom || isLastFromCurrentUser) {
@@ -602,6 +508,7 @@ const ConversationBody = ({
                 isSendingMsg={isSendingMsg}
                 onReply={onReply}
                 onScrollToMessage={handleScrollToMessage}
+                onToggleReaction={handleToggleReaction}
               />
             );
           })}
