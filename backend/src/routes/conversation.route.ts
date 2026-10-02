@@ -5,7 +5,10 @@ import {
   getSingleConversationsController,
   getUserConversationsController,
 } from "../controllers/conversation.controller.js";
-import { sendMessageController } from "../controllers/message.controller.js";
+import {
+  reactToMessageController,
+  sendMessageController,
+} from "../controllers/message.controller.js";
 
 // Allow 16mb for JSON parser (15MB Base64 image payload + 1MB envelope overhead for JSON fields)
 const MESSAGE_SEND_PAYLOAD_LIMIT = "16mb";
@@ -18,6 +21,7 @@ const conversationRouters = Router()
     express.json({ limit: MESSAGE_SEND_PAYLOAD_LIMIT }),
     sendMessageController,
   )
+  .post("/message/:id/reaction", reactToMessageController)
   .get("/all", getUserConversationsController)
   .get("/:conversationId", getSingleConversationsController);
 

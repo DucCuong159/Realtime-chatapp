@@ -105,6 +105,44 @@ export const initializeSocket = (httpServer: HTTPServer) => {
       }
     });
 
+    socket.on(
+      "message:reaction",
+      async (
+        data: { conversationId?: string; messageId?: string; emoji?: string },
+        callback?: (res: {
+          status: "ok" | "error";
+          message?: string;
+          data?: any;
+        }) => void,
+      ) => {
+        try {
+          const { messageId, emoji } = data || {};
+          if (!messageId || !emoji) {
+            callback?.({
+              status: "error",
+              message: "messageId and emoji are required",
+            });
+            return;
+          }
+
+          const { toggleMessageReactionService } = await import(
+            "../services/message.service.js"
+          );
+          const result = await toggleMessageReactionService(
+            userId,
+            messageId,
+            emoji,
+          );
+          callback?.({ status: "ok", data: result });
+        } catch (error: any) {
+          callback?.({
+            status: "error",
+            message: error?.message || "Failed to toggle reaction",
+          });
+        }
+      },
+    );
+
     // ================= WebRTC Voice Call Signaling =================
     if (io) {
       registerCallSignaling(io, socket, userId, onlineUsers, activeCallBySocket);
@@ -236,3 +274,17 @@ export const emitConversationAI = ({
     return;
   }
 };
+
+export const emitMessageReactionUpdate = (
+  conversationId: string,
+  messageId: string,
+  reactions: unknown[] | undefined = [],
+) => {
+  if (!io) return;
+  io.to(`conversation:${conversationId}`).emit("message:reaction:update", {
+    conversationId,
+    messageId,
+    reactions,
+  });
+};
+

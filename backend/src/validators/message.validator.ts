@@ -45,3 +45,22 @@ export const sendMessageSchema = z
   });
 
 export type sendMessageSchemaType = z.infer<typeof sendMessageSchema>;
+
+export const ALLOWED_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🔥"] as const;
+
+export const reactionSchema = z.object({
+  emoji: z.enum(ALLOWED_EMOJIS, {
+    message: "Invalid emoji reaction. Allowed: 👍, ❤️, 😂, 😮, 😢, 🔥",
+  }),
+});
+
+export const messageIdParamSchema = z.object({
+  id: z
+    .string()
+    .trim()
+    .regex(objectIdRegex, "Invalid message ID"),
+});
+
+export type ReactionSchemaType = z.infer<typeof reactionSchema>;
+export type MessageIdParamSchemaType = z.infer<typeof messageIdParamSchema>;
+

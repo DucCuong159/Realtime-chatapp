@@ -6,16 +6,18 @@ import { HTTPSTATUS } from "../config/http.config.js";
 import {
   emitConversationAI,
   emitLastMessageToParticipants,
+  emitMessageReactionUpdate,
   emitNewMessageToConversationRoom,
   isSocketOwnedByUser,
 } from "../lib/socket.js";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
-import { AIModelInfo, getAvailableTextOutModelsService } from "./ai.service.js";
 import { BadRequestException, NotFoundException } from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
+import { toggleReactionInList } from "../utils/reaction.util.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
+import { getAvailableTextOutModelsService } from "./ai.service.js";
 import { validateConversationParticipantsService } from "./conversation.service.js";
 
 const google = createGoogleGenerativeAI({
@@ -418,4 +420,35 @@ const getConversationHistory = async (
     .lean();
 
   return messages.reverse();
+};
+
+export const toggleMessageReactionService = async (
+  userId: string,
+  messageId: string,
+  emoji: string,
+) => {
+  const message = await MessageModel.findById(messageId);
+  if (!message) {
+    throw new NotFoundException("Message not found");
+  }
+
+  const conversationId = message.conversationId.toString();
+  await validateConversationParticipantsService(conversationId, userId);
+
+  message.reactions = toggleReactionInList(
+    Array.isArray(message.reactions) ? message.reactions : [],
+    userId,
+    emoji,
+  ) as any;
+
+  await message.save();
+  await message.populate("reactions.user", "name avatar");
+
+  emitMessageReactionUpdate(conversationId, messageId, message.reactions || []);
+
+  return {
+    messageId,
+    conversationId,
+    reactions: message.reactions,
+  };
 };
