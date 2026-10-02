@@ -23,6 +23,17 @@ export type CallInfoType = {
   duration?: number;
 };
 
+export type ReactionUserType = {
+  _id: string;
+  name: string;
+  avatar?: string | null;
+};
+
+export type MessageReactionType = {
+  user: ReactionUserType | string;
+  emoji: string;
+};
+
 export type MessageType = {
   _id: string;
   content: string | null;
@@ -32,11 +43,18 @@ export type MessageType = {
   sender: UserType | null;
   replyTo: MessageType | null;
   conversationId: string;
+  reactions?: MessageReactionType[];
   createdAt: string;
   updatedAt: string;
   // only frontend
   status?: string;
   streaming?: boolean;
+};
+
+export type MessageReactionUpdatePayload = {
+  conversationId: string;
+  messageId: string;
+  reactions: MessageReactionType[];
 };
 
 export type CreateConversationType = {

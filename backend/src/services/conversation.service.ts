@@ -222,6 +222,7 @@ export const getSingleConversationService = async (
         select: "name avatar isAI",
       },
     })
+    .populate("reactions.user", "name avatar")
     .lean();
 
   const hasMore = items.length > limit;

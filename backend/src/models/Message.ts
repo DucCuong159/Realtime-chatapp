@@ -2,7 +2,7 @@ import mongoose, { Document, Schema, Types } from "mongoose";
 
 export interface IReaction {
   user: Types.ObjectId;
-  emoji?: string;
+  emoji: string;
 }
 
 export interface ICallInfo {
@@ -66,16 +66,20 @@ const messageSchema = new Schema<MessageDocument>(
       },
       default: undefined,
     },
-    reactions: [
-      {
-        user: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-          required: true,
+    reactions: {
+      type: [
+        {
+          _id: false,
+          user: {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+          },
+          emoji: { type: String, required: true },
         },
-        emoji: { type: String },
-      },
-    ],
+      ],
+      default: [],
+    },
     messageStatus: { type: String, default: "send" },
   },
   { timestamps: true },

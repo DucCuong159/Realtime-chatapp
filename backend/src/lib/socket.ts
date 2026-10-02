@@ -11,6 +11,7 @@ import {
   registerCallSignaling,
   terminateCallSession,
 } from "./call-signaling.js";
+import { socketReactionSchema } from "../validators/message.validator.js";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -83,14 +84,14 @@ export const initializeSocket = (httpServer: HTTPServer) => {
     io?.emit("online:users", Array.from(onlineUsers.keys()));
 
     // create personal room for user
-    socket.join(`user:${userId}`);
+    void socket.join(`user:${userId}`);
 
     socket.on(
       "conversation:join",
       async (conversationId: string, callback?: (err?: string) => void) => {
         try {
           await validateConversationParticipantsService(conversationId, userId);
-          socket.join(`conversation:${conversationId}`);
+          await socket.join(`conversation:${conversationId}`);
           callback?.();
         } catch (error) {
           callback?.("Error joining conversation");
@@ -100,10 +101,41 @@ export const initializeSocket = (httpServer: HTTPServer) => {
 
     socket.on("conversation:leave", (conversationId: string) => {
       if (conversationId) {
-        socket.leave(`conversation:${conversationId}`);
+        void socket.leave(`conversation:${conversationId}`);
         console.log(`User ${userId} left conversation ${conversationId}`);
       }
     });
+
+    socket.on(
+      "message:reaction",
+      async (
+        data: unknown,
+        callback?: (res: {
+          status: "ok" | "error";
+          message?: string;
+          data?: any;
+        }) => void,
+      ) => {
+        try {
+          const { messageId, emoji } = socketReactionSchema.parse(data);
+
+          const { toggleMessageReactionService } = await import(
+            "../services/message.service.js"
+          );
+          const result = await toggleMessageReactionService(
+            userId,
+            messageId,
+            emoji,
+          );
+          callback?.({ status: "ok", data: result });
+        } catch (error: any) {
+          callback?.({
+            status: "error",
+            message: error?.message || "Failed to toggle reaction",
+          });
+        }
+      },
+    );
 
     // ================= WebRTC Voice Call Signaling =================
     if (io) {
@@ -236,3 +268,17 @@ export const emitConversationAI = ({
     return;
   }
 };
+
+export const emitMessageReactionUpdate = (
+  conversationId: string,
+  messageId: string,
+  reactions: unknown[] | undefined = [],
+) => {
+  if (!io) return;
+  io.to(`conversation:${conversationId}`).emit("message:reaction:update", {
+    conversationId,
+    messageId,
+    reactions,
+  });
+};
+
