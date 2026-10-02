@@ -11,6 +11,7 @@ import {
   registerCallSignaling,
   terminateCallSession,
 } from "./call-signaling.js";
+import { socketReactionSchema } from "../validators/message.validator.js";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -108,7 +109,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
     socket.on(
       "message:reaction",
       async (
-        data: { conversationId?: string; messageId?: string; emoji?: string },
+        data: unknown,
         callback?: (res: {
           status: "ok" | "error";
           message?: string;
@@ -116,14 +117,7 @@ export const initializeSocket = (httpServer: HTTPServer) => {
         }) => void,
       ) => {
         try {
-          const { messageId, emoji } = data || {};
-          if (!messageId || !emoji) {
-            callback?.({
-              status: "error",
-              message: "messageId and emoji are required",
-            });
-            return;
-          }
+          const { messageId, emoji } = socketReactionSchema.parse(data);
 
           const { toggleMessageReactionService } = await import(
             "../services/message.service.js"

@@ -427,28 +427,67 @@ export const toggleMessageReactionService = async (
   messageId: string,
   emoji: string,
 ) => {
-  const message = await MessageModel.findById(messageId);
-  if (!message) {
+  const initialMessage = await MessageModel.findById(messageId).select(
+    "conversationId",
+  );
+  if (!initialMessage) {
     throw new NotFoundException("Message not found");
   }
 
-  const conversationId = message.conversationId.toString();
+  const conversationId = initialMessage.conversationId.toString();
   await validateConversationParticipantsService(conversationId, userId);
 
-  message.reactions = toggleReactionInList(
-    Array.isArray(message.reactions) ? message.reactions : [],
-    userId,
-    emoji,
-  ) as any;
+  let updatedMessage: MessageDocument | null = null;
+  const MAX_RETRIES = 5;
 
-  await message.save();
-  await message.populate("reactions.user", "name avatar");
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      throw new NotFoundException("Message not found");
+    }
 
-  emitMessageReactionUpdate(conversationId, messageId, message.reactions || []);
+    const currentReactions = Array.isArray(message.reactions)
+      ? message.reactions
+      : [];
+    const newReactions = toggleReactionInList(currentReactions, userId, emoji);
+
+    const filter: Record<string, unknown> = { _id: messageId };
+    if (typeof message.__v === "number") {
+      filter.__v = message.__v;
+    }
+
+    const updated = await MessageModel.findOneAndUpdate(
+      filter,
+      {
+        $set: { reactions: newReactions },
+        $inc: { __v: 1 },
+      },
+      { returnDocument: "after" },
+    );
+
+    if (updated) {
+      updatedMessage = updated;
+      break;
+    }
+  }
+
+  if (!updatedMessage) {
+    throw new Error(
+      "Failed to update reaction due to concurrent modifications. Please try again.",
+    );
+  }
+
+  await updatedMessage.populate("reactions.user", "name avatar");
+
+  emitMessageReactionUpdate(
+    conversationId,
+    messageId,
+    updatedMessage.reactions || [],
+  );
 
   return {
     messageId,
     conversationId,
-    reactions: message.reactions,
+    reactions: updatedMessage.reactions,
   };
 };

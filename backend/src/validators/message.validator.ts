@@ -61,6 +61,17 @@ export const messageIdParamSchema = z.object({
     .regex(objectIdRegex, "Invalid message ID"),
 });
 
+export const socketReactionSchema = z.object({
+  messageId: z
+    .string()
+    .trim()
+    .regex(objectIdRegex, "Invalid message ID"),
+  emoji: z.enum(ALLOWED_EMOJIS, {
+    message: "Invalid emoji reaction. Allowed: 👍, ❤️, 😂, 😮, 😢, 🔥",
+  }),
+});
+
 export type ReactionSchemaType = z.infer<typeof reactionSchema>;
 export type MessageIdParamSchemaType = z.infer<typeof messageIdParamSchema>;
+export type SocketReactionSchemaType = z.infer<typeof socketReactionSchema>;
 
