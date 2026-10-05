@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALLOWED_REACTION_EMOJIS,
+  areReactionsEqual,
   formatReactionTooltip,
   groupReactions,
   toggleUserReaction,
@@ -162,6 +163,46 @@ describe("reaction.utils", () => {
       );
       expect(u1Reaction?.emoji).toBe("🔥");
       expect(result.some((r) => r.emoji === "❤️")).toBe(false);
+    });
+  });
+
+  describe("areReactionsEqual", () => {
+    it("returns true for both undefined or empty arrays", () => {
+      expect(areReactionsEqual(undefined, undefined)).toBe(true);
+      expect(areReactionsEqual([], [])).toBe(true);
+      expect(areReactionsEqual(undefined, [])).toBe(true);
+    });
+
+    it("returns true for identical reactions regardless of string or object user representation", () => {
+      const listA: MessageReactionType[] = [
+        { emoji: "❤️", user: { _id: "u1", name: "User 1", avatar: null } },
+        { emoji: "👍", user: "u2" },
+      ];
+      const listB: MessageReactionType[] = [
+        { emoji: "❤️", user: "u1" },
+        { emoji: "👍", user: { _id: "u2", name: "Alice", avatar: null } },
+      ];
+      expect(areReactionsEqual(listA, listB)).toBe(true);
+    });
+
+    it("returns false when reactions differ in length, emoji, or user", () => {
+      const listA: MessageReactionType[] = [
+        { emoji: "❤️", user: "u1" },
+      ];
+      const listDifferentLength: MessageReactionType[] = [
+        { emoji: "❤️", user: "u1" },
+        { emoji: "👍", user: "u2" },
+      ];
+      const listDifferentEmoji: MessageReactionType[] = [
+        { emoji: "🔥", user: "u1" },
+      ];
+      const listDifferentUser: MessageReactionType[] = [
+        { emoji: "❤️", user: "u2" },
+      ];
+
+      expect(areReactionsEqual(listA, listDifferentLength)).toBe(false);
+      expect(areReactionsEqual(listA, listDifferentEmoji)).toBe(false);
+      expect(areReactionsEqual(listA, listDifferentUser)).toBe(false);
     });
   });
 });

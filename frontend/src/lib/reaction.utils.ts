@@ -82,6 +82,28 @@ export function getReactionUserId(
 }
 
 /**
+ * Compares two reaction lists for equality based on emoji and user ID.
+ */
+export function areReactionsEqual(
+  a: MessageReactionType[] | undefined,
+  b: MessageReactionType[] | undefined,
+): boolean {
+  const listA = a || [];
+  const listB = b || [];
+
+  if (listA.length !== listB.length) return false;
+
+  return listA.every((itemA, index) => {
+    const itemB = listB[index];
+    return (
+      itemB !== undefined &&
+      itemA.emoji === itemB.emoji &&
+      getReactionUserId(itemA.user) === getReactionUserId(itemB.user)
+    );
+  });
+}
+
+/**
  * Group message reactions by emoji with total count, current user state, and tooltip label.
  */
 export function groupReactions(

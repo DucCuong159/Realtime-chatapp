@@ -9,7 +9,11 @@ import type {
   MessageReactionType,
   PaginationType,
 } from "@/types/conversation.type";
-import { getReactionUserId, toggleUserReaction } from "@/lib/reaction.utils";
+import {
+  areReactionsEqual,
+  getReactionUserId,
+  toggleUserReaction,
+} from "@/lib/reaction.utils";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { useAuth } from "./use-auth";
@@ -551,17 +555,7 @@ export const useConversation = create<ConversationState>()((set, get) => ({
 
       // Optimization: avoid state update and re-renders if reactions are already identical
       const currentReactions = targetMsg.reactions || [];
-      if (
-        currentReactions.length === deduplicatedReactions.length &&
-        currentReactions.every((cr, idx) => {
-          const dr = deduplicatedReactions[idx];
-          return (
-            dr &&
-            cr.emoji === dr.emoji &&
-            getReactionUserId(cr.user) === getReactionUserId(dr.user)
-          );
-        })
-      ) {
+      if (areReactionsEqual(currentReactions, deduplicatedReactions)) {
         return state;
       }
 
@@ -624,18 +618,30 @@ export const useConversation = create<ConversationState>()((set, get) => ({
           { emoji },
         );
         if (data?.reactions) {
+          const currentMsg = get().singleConversation?.messages.find(
+            (m) => m._id === messageId,
+          );
+          // Apply HTTP response only if reactions have not changed since optimistic update
+          // (prevents overwriting newer reactions received via WebSocket)
+          if (areReactionsEqual(currentMsg?.reactions, optimisticReactions)) {
+            get().updateMessageReactions(
+              conversationId,
+              messageId,
+              data.reactions,
+            );
+          }
+        }
+      } catch {
+        const currentMsg = get().singleConversation?.messages.find(
+          (m) => m._id === messageId,
+        );
+        if (areReactionsEqual(currentMsg?.reactions, optimisticReactions)) {
           get().updateMessageReactions(
             conversationId,
             messageId,
-            data.reactions,
+            priorReactions,
           );
         }
-      } catch {
-        get().updateMessageReactions(
-          conversationId,
-          messageId,
-          priorReactions,
-        );
         toast.error("Failed to update reaction");
       }
     } finally {
