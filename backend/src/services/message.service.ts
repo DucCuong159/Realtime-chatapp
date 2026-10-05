@@ -6,16 +6,22 @@ import { HTTPSTATUS } from "../config/http.config.js";
 import {
   emitConversationAI,
   emitLastMessageToParticipants,
+  emitMessageReactionUpdate,
   emitNewMessageToConversationRoom,
   isSocketOwnedByUser,
 } from "../lib/socket.js";
 import ConversationModel from "../models/Conversation.js";
 import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
-import { AIModelInfo, getAvailableTextOutModelsService } from "./ai.service.js";
-import { BadRequestException, NotFoundException } from "../utils/app-error.js";
+import {
+  AppError,
+  BadRequestException,
+  NotFoundException,
+} from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
+import { toggleReactionInList } from "../utils/reaction.util.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
+import { getAvailableTextOutModelsService } from "./ai.service.js";
 import { validateConversationParticipantsService } from "./conversation.service.js";
 
 const google = createGoogleGenerativeAI({
@@ -418,4 +424,75 @@ const getConversationHistory = async (
     .lean();
 
   return messages.reverse();
+};
+
+export const toggleMessageReactionService = async (
+  userId: string,
+  messageId: string,
+  emoji: string,
+) => {
+  const initialMessage = await MessageModel.findById(messageId).select(
+    "conversationId",
+  );
+  if (!initialMessage) {
+    throw new NotFoundException("Message not found");
+  }
+
+  const conversationId = initialMessage.conversationId.toString();
+  await validateConversationParticipantsService(conversationId, userId);
+
+  let updatedMessage: MessageDocument | null = null;
+  const MAX_RETRIES = 5;
+
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const message = await MessageModel.findById(messageId);
+    if (!message) {
+      throw new NotFoundException("Message not found");
+    }
+
+    const currentReactions = Array.isArray(message.reactions)
+      ? message.reactions
+      : [];
+    const newReactions = toggleReactionInList(currentReactions, userId, emoji);
+
+    const filter: Record<string, unknown> = { _id: messageId };
+    if (typeof message.__v === "number") {
+      filter.__v = message.__v;
+    }
+
+    const updated = await MessageModel.findOneAndUpdate(
+      filter,
+      {
+        $set: { reactions: newReactions },
+        $inc: { __v: 1 },
+      },
+      { returnDocument: "after" },
+    );
+
+    if (updated) {
+      updatedMessage = updated;
+      break;
+    }
+  }
+
+  if (!updatedMessage) {
+    throw new AppError(
+      "Failed to update reaction due to concurrent modifications. Please try again.",
+      HTTPSTATUS.CONFLICT,
+    );
+  }
+
+  await updatedMessage.populate("reactions.user", "name avatar");
+
+  emitMessageReactionUpdate(
+    conversationId,
+    messageId,
+    updatedMessage.reactions || [],
+  );
+
+  return {
+    messageId,
+    conversationId,
+    reactions: updatedMessage.reactions,
+  };
 };
