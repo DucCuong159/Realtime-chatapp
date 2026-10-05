@@ -13,7 +13,11 @@ import {
 import ConversationModel from "../models/Conversation.js";
 import MessageModel, { MessageDocument } from "../models/Message.js";
 import UserModel from "../models/User.js";
-import { BadRequestException, NotFoundException } from "../utils/app-error.js";
+import {
+  AppError,
+  BadRequestException,
+  NotFoundException,
+} from "../utils/app-error.js";
 import { getImageFileInfo } from "../utils/image.js";
 import { toggleReactionInList } from "../utils/reaction.util.js";
 import { sendMessageSchemaType } from "../validators/message.validator.js";
@@ -472,8 +476,9 @@ export const toggleMessageReactionService = async (
   }
 
   if (!updatedMessage) {
-    throw new Error(
+    throw new AppError(
       "Failed to update reaction due to concurrent modifications. Please try again.",
+      HTTPSTATUS.CONFLICT,
     );
   }
 

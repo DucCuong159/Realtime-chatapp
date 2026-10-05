@@ -11,7 +11,9 @@ import {
   registerCallSignaling,
   terminateCallSession,
 } from "./call-signaling.js";
+import { AppError } from "../utils/app-error.js";
 import { socketReactionSchema } from "../validators/message.validator.js";
+import { z } from "zod";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -128,10 +130,30 @@ export const initializeSocket = (httpServer: HTTPServer) => {
             emoji,
           );
           callback?.({ status: "ok", data: result });
-        } catch (error: any) {
+        } catch (error: unknown) {
+          if (error instanceof AppError) {
+            callback?.({
+              status: "error",
+              message: error.message,
+            });
+            return;
+          }
+
+          if (error instanceof z.ZodError) {
+            callback?.({
+              status: "error",
+              message: error.issues[0]?.message || "Invalid reaction payload",
+            });
+            return;
+          }
+
+          console.error(
+            "Unexpected error in message:reaction socket handler:",
+            error,
+          );
           callback?.({
             status: "error",
-            message: error?.message || "Failed to toggle reaction",
+            message: "Failed to toggle reaction",
           });
         }
       },
