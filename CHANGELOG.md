@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.5.0...realtime-chatapp-v1.6.0) (2026-10-05)
+
+
+### Features
+
+* **chat:** add real-time emoji message reactions with optimistic updates ([#93](https://github.com/DucCuong159/Realtime-chatapp/issues/93)) ([e1bf6d2](https://github.com/DucCuong159/Realtime-chatapp/commit/e1bf6d21246420eb1770ab864b120a504f5a8353))
+
 ## [1.5.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.4.0...realtime-chatapp-v1.5.0) (2026-09-03)
 
 
