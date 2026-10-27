@@ -43,7 +43,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js 24.x
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24.x
 
@@ -90,7 +90,7 @@ jobs:
 
       # ─── SonarCloud Analysis ─────────────────────────────────────────────
       - name: SonarCloud Scan
-        uses: sonarsource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        uses: sonarsource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
