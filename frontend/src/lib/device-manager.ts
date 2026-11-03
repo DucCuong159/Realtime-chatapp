@@ -16,12 +16,15 @@ export const getMediaConstraints = (
     echoCancellation: true,
     noiseSuppression: true,
     autoGainControl: true,
+    sampleRate: { ideal: 48000 },
+    channelCount: { ideal: 1 },
   },
   video:
     callType === "video"
       ? {
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30, max: 60 },
           facingMode: "user",
         }
       : false,
