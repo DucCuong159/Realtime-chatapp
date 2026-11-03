@@ -452,5 +452,185 @@ describe("DeviceManager", () => {
       });
       expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
     });
+
+    it("should restore original camera track if retry fails after hardware lock", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const restoredVideoTrack = {
+        id: "video_restored",
+        kind: "video",
+        enabled: false,
+        stop: vi.fn(),
+      };
+      const restoredStream = {
+        getTracks: () => [restoredVideoTrack],
+        getVideoTracks: () => [restoredVideoTrack],
+      };
+
+      const lockError = new Error("Sensor locked");
+      lockError.name = "NotReadableError";
+      const retryError = new Error("Retry failed");
+      retryError.name = "TrackStartError";
+
+      const mockSender = {
+        track: { kind: "video" },
+        replaceTrack: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockPC = {
+        getSenders: () => [mockSender],
+      } as unknown as RTCPeerConnection;
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(lockError)
+        .mockRejectedValueOnce(retryError)
+        .mockResolvedValueOnce(restoredStream as unknown as MediaStream);
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: mockPC,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("failed");
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(3);
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        video: { deviceId: { exact: "camera_1" } },
+      });
+      expect(restoredVideoTrack.enabled).toBe(true);
+      expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
+      expect(mockStream.addTrack).toHaveBeenCalledWith(restoredVideoTrack);
+      expect(mockSender.replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
+    });
+
+    it("should return 'no-alternate' when acquired track has same facingMode as current track", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const acquiredVideoTrack = {
+        id: "video_same_facing",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+        getSettings: () => ({ facingMode: "user", deviceId: "camera_1" }),
+      };
+      const acquiredStream = {
+        getTracks: () => [acquiredVideoTrack],
+        getVideoTracks: () => [acquiredVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        acquiredStream as unknown as MediaStream,
+      );
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("no-alternate");
+      expect(acquiredVideoTrack.stop).toHaveBeenCalled();
+      expect(mockVideoTrack.stop).not.toHaveBeenCalled();
+      expect(mockStream.addTrack).not.toHaveBeenCalled();
+    });
+
+    it("should return 'no-alternate' when acquired track has same deviceId", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        deviceId: "camera_1",
+      });
+
+      const acquiredVideoTrack = {
+        id: "video_same_device",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+        getSettings: () => ({ deviceId: "camera_1" }),
+      };
+      const acquiredStream = {
+        getTracks: () => [acquiredVideoTrack],
+        getVideoTracks: () => [acquiredVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        acquiredStream as unknown as MediaStream,
+      );
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("no-alternate");
+      expect(acquiredVideoTrack.stop).toHaveBeenCalled();
+      expect(mockVideoTrack.stop).not.toHaveBeenCalled();
+      expect(mockStream.addTrack).not.toHaveBeenCalled();
+    });
+
+    it("should restore original camera track and return 'no-alternate' if acquired track is same camera after retry", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const lockError = new Error("Sensor locked");
+      lockError.name = "NotReadableError";
+
+      const acquiredVideoTrack = {
+        id: "video_same",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+        getSettings: () => ({ facingMode: "user" }),
+      };
+      const acquiredStream = {
+        getTracks: () => [acquiredVideoTrack],
+        getVideoTracks: () => [acquiredVideoTrack],
+      };
+
+      const restoredVideoTrack = {
+        id: "video_restored",
+        kind: "video",
+        enabled: false,
+        stop: vi.fn(),
+      };
+      const restoredStream = {
+        getTracks: () => [restoredVideoTrack],
+        getVideoTracks: () => [restoredVideoTrack],
+      };
+
+      const mockSender = {
+        track: { kind: "video" },
+        replaceTrack: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockPC = {
+        getSenders: () => [mockSender],
+      } as unknown as RTCPeerConnection;
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(lockError)
+        .mockResolvedValueOnce(acquiredStream as unknown as MediaStream)
+        .mockResolvedValueOnce(restoredStream as unknown as MediaStream);
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: mockPC,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("no-alternate");
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+      expect(acquiredVideoTrack.stop).toHaveBeenCalled();
+      expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
+      expect(mockStream.addTrack).toHaveBeenCalledWith(restoredVideoTrack);
+      expect(mockSender.replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
+      expect(restoredVideoTrack.enabled).toBe(true);
+    });
   });
 });
