@@ -1,37 +1,39 @@
-let callTimer: number | null = null;
-let timeoutTimer: number | null = null;
-let endedResetTimer: number | null = null;
-let disconnectRecoveryTimer: number | null = null;
+type TimerHandle = number | ReturnType<typeof setTimeout>;
 
-export const setCallTimer = (timer: number | null): void => {
+let callTimer: TimerHandle | null = null;
+let timeoutTimer: TimerHandle | null = null;
+let endedResetTimer: TimerHandle | null = null;
+let disconnectRecoveryTimer: TimerHandle | null = null;
+
+export const setCallTimer = (timer: TimerHandle | null): void => {
   if (callTimer !== null) {
     clearInterval(callTimer);
   }
   callTimer = timer;
 };
 
-export const setTimeoutTimer = (timer: number | null): void => {
+export const setTimeoutTimer = (timer: TimerHandle | null): void => {
   if (timeoutTimer !== null) {
     clearTimeout(timeoutTimer);
   }
   timeoutTimer = timer;
 };
 
-export const setEndedResetTimer = (timer: number | null): void => {
+export const setEndedResetTimer = (timer: TimerHandle | null): void => {
   if (endedResetTimer !== null) {
     clearTimeout(endedResetTimer);
   }
   endedResetTimer = timer;
 };
 
-export const setDisconnectRecoveryTimer = (timer: number | null): void => {
+export const setDisconnectRecoveryTimer = (timer: TimerHandle | null): void => {
   if (disconnectRecoveryTimer !== null) {
     clearTimeout(disconnectRecoveryTimer);
   }
   disconnectRecoveryTimer = timer;
 };
 
-export const getDisconnectRecoveryTimer = (): number | null => disconnectRecoveryTimer;
+export const getDisconnectRecoveryTimer = (): TimerHandle | null => disconnectRecoveryTimer;
 
 export const clearTimers = (): void => {
   if (callTimer !== null) {

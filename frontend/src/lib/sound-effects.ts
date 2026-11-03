@@ -3,6 +3,16 @@ import incomingRingUrl from "@/assets/sounds/incoming-ring.wav";
 import outgoingRingUrl from "@/assets/sounds/outgoing-ring.wav";
 import { Howl, Howler } from "howler";
 
+let requestedSound: Howl | null = null;
+let requestVersion = 0;
+
+const selectSound = (sound: Howl | null): void => {
+  if (requestedSound !== sound) {
+    requestedSound = sound;
+    requestVersion += 1;
+  }
+};
+
 const createHowl = (src: string, loop: boolean, volume = 0.7): Howl => {
   const sound = new Howl({
     src: [src],
@@ -12,8 +22,12 @@ const createHowl = (src: string, loop: boolean, volume = 0.7): Howl => {
     preload: true,
     html5: true,
     onplayerror: () => {
+      if (requestedSound !== sound) return;
+      const version = requestVersion;
       sound.once("unlock", () => {
-        sound.play();
+        if (requestedSound === sound && requestVersion === version) {
+          sound.play();
+        }
       });
     },
   });
@@ -29,6 +43,7 @@ const ALL_SOUNDS: Howl[] = [outgoingRing, incomingRing, callEnd];
 export const soundEffects = {
   /** Plays outgoing ring back tone (loops until stopAll/destroy). */
   playOutgoingRing(): void {
+    selectSound(outgoingRing);
     incomingRing.stop();
     callEnd.stop();
     if (!outgoingRing.playing()) {
@@ -38,6 +53,7 @@ export const soundEffects = {
 
   /** Plays incoming ringtone (loops until stopAll/destroy). */
   playIncomingRing(): void {
+    selectSound(incomingRing);
     outgoingRing.stop();
     callEnd.stop();
     if (!incomingRing.playing()) {
@@ -47,6 +63,7 @@ export const soundEffects = {
 
   /** Plays a short call-ended tone (does not loop). */
   playCallEndTone(): void {
+    selectSound(callEnd);
     outgoingRing.stop();
     incomingRing.stop();
     callEnd.play();
@@ -54,12 +71,14 @@ export const soundEffects = {
 
   /** Stops all playing sounds immediately. */
   stopAll(): void {
+    selectSound(null);
     ALL_SOUNDS.forEach((s) => s.stop());
     Howler.stop();
   },
 
   /** Stops and unloads all sounds (full cleanup on unmount). */
   destroy(): void {
+    selectSound(null);
     ALL_SOUNDS.forEach((s) => {
       s.stop();
       s.unload();

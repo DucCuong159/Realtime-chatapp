@@ -9,6 +9,7 @@ const {
   mockPlaying,
   mockHowlConstructor,
   mockHowlerStop,
+  mockOnce,
   constructorArgs,
 } = vi.hoisted(() => {
   const mockPlay = vi.fn();
@@ -16,6 +17,7 @@ const {
   const mockUnload = vi.fn();
   const mockPlaying = vi.fn().mockReturnValue(false);
   const mockHowlerStop = vi.fn();
+  const mockOnce = vi.fn<(event: string, callback: () => void) => void>();
   const constructorArgs: unknown[] = [];
   const mockHowlConstructor = vi.fn((opts: unknown) => {
     constructorArgs.push(opts);
@@ -28,6 +30,7 @@ const {
     mockPlaying,
     mockHowlConstructor,
     mockHowlerStop,
+    mockOnce,
     constructorArgs,
   };
 });
@@ -38,7 +41,7 @@ vi.mock("howler", () => {
     stop = mockStop;
     unload = mockUnload;
     playing = mockPlaying;
-    once = vi.fn();
+    once = mockOnce;
     options: unknown;
 
     constructor(options: unknown) {
@@ -58,11 +61,55 @@ import { soundEffects } from "./sound-effects";
 
 describe("soundEffects (Howler.js)", () => {
   beforeEach(() => {
+    soundEffects.stopAll();
     mockPlay.mockClear();
     mockStop.mockClear();
     mockUnload.mockClear();
     mockHowlerStop.mockClear();
+    mockOnce.mockClear();
     mockPlaying.mockReturnValue(false);
+  });
+
+  describe("unlock retry", () => {
+    const failPlayback = (index: number): (() => void) => {
+      const options = constructorArgs[index] as { onplayerror: () => void };
+      options.onplayerror();
+      expect(mockOnce).toHaveBeenCalledWith("unlock", expect.any(Function));
+      return mockOnce.mock.calls[mockOnce.mock.calls.length - 1][1];
+    };
+
+    it.each([
+      [0, () => soundEffects.playOutgoingRing()],
+      [1, () => soundEffects.playIncomingRing()],
+      [2, () => soundEffects.playCallEndTone()],
+    ])("retries requested sound %i after unlocking", (index, play) => {
+      play();
+      const retry = failPlayback(index);
+      mockPlay.mockClear();
+      retry();
+      expect(mockPlay).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ["stopAll", () => soundEffects.stopAll()],
+      ["destroy", () => soundEffects.destroy()],
+      ["a different sound", () => soundEffects.playIncomingRing()],
+      ["stopping and selecting the same sound again", () => {
+        soundEffects.stopAll();
+        soundEffects.playOutgoingRing();
+      }],
+      ["switching away and back", () => {
+        soundEffects.playIncomingRing();
+        soundEffects.playOutgoingRing();
+      }],
+    ])("does not retry a sound after %s", (_description, invalidate) => {
+      soundEffects.playOutgoingRing();
+      const retry = failPlayback(0);
+      invalidate();
+      mockPlay.mockClear();
+      retry();
+      expect(mockPlay).not.toHaveBeenCalled();
+    });
   });
 
   describe("playOutgoingRing", () => {
