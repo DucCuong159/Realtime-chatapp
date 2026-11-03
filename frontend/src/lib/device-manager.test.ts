@@ -83,7 +83,6 @@ describe("DeviceManager", () => {
     });
   });
 
-  
   describe("findNextCameraDevice", () => {
     it("should return null if fewer than 2 video devices exist", async () => {
       vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValueOnce([
@@ -182,6 +181,26 @@ describe("DeviceManager", () => {
   });
 
   describe("switchCameraDevice", () => {
+  const makeTrack = (id = "video_2", enabled = true) => ({
+    id,
+    kind: "video",
+    enabled,
+    stop: vi.fn(),
+  });
+  const makeStream = (track = makeTrack()) => ({
+    getTracks: () => [track],
+    getVideoTracks: () => [track],
+  });
+  const makePC = (replaceTrack = vi.fn().mockResolvedValue(undefined)) =>
+    ({ getSenders: () => [{ track: { kind: "video" }, replaceTrack }] }) as unknown as RTCPeerConnection;
+  const runSwitch = (opts = {}) =>
+    switchCameraDevice({
+      localStream: mockStream as unknown as MediaStream,
+      peerConnection: null,
+      isVideoEnabled: true,
+      ...opts,
+    });
+
     it("should return 'no-alternate' if stream has no video tracks", async () => {
       const result = await switchCameraDevice({
         localStream: {
@@ -198,11 +217,7 @@ describe("DeviceManager", () => {
         { kind: "videoinput", deviceId: "camera_1" } as MediaDeviceInfo,
       ]);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
       expect(result).toBe("no-alternate");
     });
 
@@ -211,68 +226,39 @@ describe("DeviceManager", () => {
         new Error("Device enumeration failure"),
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
       expect(result).toBe("failed");
     });
 
     it("should switch camera and return 'success' when alternative camera exists", async () => {
-      const newVideoTrack = {
-        id: "video_2",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_2");
+      const newStream = makeStream(newVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         newStream as unknown as MediaStream,
       );
 
-      const mockSender = {
-        track: { kind: "video" },
-        replaceTrack: vi.fn().mockResolvedValue(undefined),
-      };
-      const mockPC = {
-        getSenders: () => [mockSender],
-      } as unknown as RTCPeerConnection;
+      const replaceTrack = vi.fn().mockResolvedValue(undefined);
+      const mockPC = makePC(replaceTrack);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: mockPC,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch({ peerConnection: mockPC });
 
       expect(result).toBe("success");
       expect(mockVideoTrack.stop).toHaveBeenCalled();
-      expect(mockSender.replaceTrack).toHaveBeenCalledWith(newVideoTrack);
+      expect(replaceTrack).toHaveBeenCalledWith(newVideoTrack);
       expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
       expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
     });
 
     it("should return 'failed' and stop new tracks if aborted", async () => {
-      const newVideoTrack = { stop: vi.fn() };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack();
+      const newStream = makeStream(newVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         newStream as unknown as MediaStream,
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-        isAborted: () => true,
-      });
+      const result = await runSwitch({ isAborted: () => true });
 
       expect(result).toBe("failed");
       expect(newVideoTrack.stop).toHaveBeenCalled();
@@ -280,38 +266,16 @@ describe("DeviceManager", () => {
 
     it("should return 'failed' and stop new tracks if aborted while replaceTrack is pending", async () => {
       let aborted = false;
-      const newVideoTrack = {
-        id: "video_2",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_2");
+      const newStream = makeStream(newVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         newStream as unknown as MediaStream,
       );
 
-      const mockSender = {
-        track: { kind: "video" },
-        replaceTrack: vi.fn().mockImplementation(async () => {
-          // Simulate call cleanup occurring while replaceTrack was pending
-          aborted = true;
-        }),
-      };
-      const mockPC = {
-        getSenders: () => [mockSender],
-      } as unknown as RTCPeerConnection;
+      const mockPC = makePC(vi.fn().mockImplementation(async () => { aborted = true; }));
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: mockPC,
-        isVideoEnabled: true,
-        isAborted: () => aborted,
-      });
+      const result = await runSwitch({ peerConnection: mockPC, isAborted: () => aborted });
 
       expect(result).toBe("failed");
       expect(newVideoTrack.stop).toHaveBeenCalled();
@@ -323,11 +287,7 @@ describe("DeviceManager", () => {
         new Error("Hardware fail"),
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("failed");
     });
@@ -338,26 +298,14 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const newVideoTrack = {
-        id: "video_rear",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_rear");
+      const newStream = makeStream(newVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         newStream as unknown as MediaStream,
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
@@ -374,26 +322,14 @@ describe("DeviceManager", () => {
         deviceId: "camera_rear",
       });
 
-      const newVideoTrack = {
-        id: "video_front",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_front");
+      const newStream = makeStream(newVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         newStream as unknown as MediaStream,
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
@@ -407,16 +343,8 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const newVideoTrack = {
-        id: "video_2",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_2");
+      const newStream = makeStream(newVideoTrack);
 
       const lockError = new Error("Camera sensor locked");
       lockError.name = "NotReadableError";
@@ -425,11 +353,7 @@ describe("DeviceManager", () => {
         .mockRejectedValueOnce(lockError)
         .mockResolvedValueOnce(newStream as unknown as MediaStream);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("success");
       expect(mockVideoTrack.stop).toHaveBeenCalled();
@@ -443,16 +367,8 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const newVideoTrack = {
-        id: "video_fallback",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_fallback");
+      const newStream = makeStream(newVideoTrack);
 
       const overconstrainedError = new Error("OverconstrainedError");
       overconstrainedError.name = "OverconstrainedError";
@@ -461,11 +377,7 @@ describe("DeviceManager", () => {
         .mockRejectedValueOnce(overconstrainedError)
         .mockResolvedValueOnce(newStream as unknown as MediaStream);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
@@ -480,16 +392,8 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const newVideoTrack = {
-        id: "video_fallback_generic",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-      };
-      const newStream = {
-        getTracks: () => [newVideoTrack],
-        getVideoTracks: () => [newVideoTrack],
-      };
+      const newVideoTrack = makeTrack("video_fallback_generic");
+      const newStream = makeStream(newVideoTrack);
 
       const overconstrainedError = new Error("OverconstrainedError");
       overconstrainedError.name = "OverconstrainedError";
@@ -498,11 +402,7 @@ describe("DeviceManager", () => {
         .mockRejectedValueOnce(overconstrainedError)
         .mockResolvedValueOnce(newStream as unknown as MediaStream);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
@@ -518,40 +418,23 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const restoredVideoTrack = {
-        id: "video_restored",
-        kind: "video",
-        enabled: false,
-        stop: vi.fn(),
-      };
-      const restoredStream = {
-        getTracks: () => [restoredVideoTrack],
-        getVideoTracks: () => [restoredVideoTrack],
-      };
+      const restoredVideoTrack = makeTrack("video_restored", false);
+      const restoredStream = makeStream(restoredVideoTrack);
 
       const lockError = new Error("Sensor locked");
       lockError.name = "NotReadableError";
       const retryError = new Error("Retry failed");
       retryError.name = "TrackStartError";
 
-      const mockSender = {
-        track: { kind: "video" },
-        replaceTrack: vi.fn().mockResolvedValue(undefined),
-      };
-      const mockPC = {
-        getSenders: () => [mockSender],
-      } as unknown as RTCPeerConnection;
+      const replaceTrack = vi.fn().mockResolvedValue(undefined);
+      const mockPC = makePC(replaceTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia)
         .mockRejectedValueOnce(lockError)
         .mockRejectedValueOnce(retryError)
         .mockResolvedValueOnce(restoredStream as unknown as MediaStream);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: mockPC,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch({ peerConnection: mockPC });
 
       expect(result).toBe("failed");
       expect(mockVideoTrack.stop).toHaveBeenCalled();
@@ -562,7 +445,7 @@ describe("DeviceManager", () => {
       expect(restoredVideoTrack.enabled).toBe(true);
       expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
       expect(mockStream.addTrack).toHaveBeenCalledWith(restoredVideoTrack);
-      expect(mockSender.replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
+      expect(replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
     });
 
     it("should return 'no-alternate' when acquired track has same facingMode as current track", async () => {
@@ -571,27 +454,14 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const acquiredVideoTrack = {
-        id: "video_same_facing",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-        getSettings: () => ({ facingMode: "user", deviceId: "camera_1" }),
-      };
-      const acquiredStream = {
-        getTracks: () => [acquiredVideoTrack],
-        getVideoTracks: () => [acquiredVideoTrack],
-      };
+      const acquiredVideoTrack = { ...makeTrack("video_same_facing"), getSettings: () => ({ facingMode: "user", deviceId: "camera_1" }) };
+      const acquiredStream = makeStream(acquiredVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         acquiredStream as unknown as MediaStream,
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("no-alternate");
       expect(acquiredVideoTrack.stop).toHaveBeenCalled();
@@ -604,27 +474,14 @@ describe("DeviceManager", () => {
         deviceId: "camera_1",
       });
 
-      const acquiredVideoTrack = {
-        id: "video_same_device",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-        getSettings: () => ({ deviceId: "camera_1" }),
-      };
-      const acquiredStream = {
-        getTracks: () => [acquiredVideoTrack],
-        getVideoTracks: () => [acquiredVideoTrack],
-      };
+      const acquiredVideoTrack = { ...makeTrack("video_same_device"), getSettings: () => ({ deviceId: "camera_1" }) };
+      const acquiredStream = makeStream(acquiredVideoTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
         acquiredStream as unknown as MediaStream,
       );
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: null,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch();
 
       expect(result).toBe("no-alternate");
       expect(acquiredVideoTrack.stop).toHaveBeenCalled();
@@ -641,55 +498,96 @@ describe("DeviceManager", () => {
       const lockError = new Error("Sensor locked");
       lockError.name = "NotReadableError";
 
-      const acquiredVideoTrack = {
-        id: "video_same",
-        kind: "video",
-        enabled: true,
-        stop: vi.fn(),
-        getSettings: () => ({ facingMode: "user" }),
-      };
-      const acquiredStream = {
-        getTracks: () => [acquiredVideoTrack],
-        getVideoTracks: () => [acquiredVideoTrack],
-      };
+      const acquiredVideoTrack = { ...makeTrack("video_same"), getSettings: () => ({ facingMode: "user" }) };
+      const acquiredStream = makeStream(acquiredVideoTrack);
 
-      const restoredVideoTrack = {
-        id: "video_restored",
-        kind: "video",
-        enabled: false,
-        stop: vi.fn(),
-      };
-      const restoredStream = {
-        getTracks: () => [restoredVideoTrack],
-        getVideoTracks: () => [restoredVideoTrack],
-      };
+      const restoredVideoTrack = makeTrack("video_restored", false);
+      const restoredStream = makeStream(restoredVideoTrack);
 
-      const mockSender = {
-        track: { kind: "video" },
-        replaceTrack: vi.fn().mockResolvedValue(undefined),
-      };
-      const mockPC = {
-        getSenders: () => [mockSender],
-      } as unknown as RTCPeerConnection;
+      const replaceTrack = vi.fn().mockResolvedValue(undefined);
+      const mockPC = makePC(replaceTrack);
 
       vi.mocked(navigator.mediaDevices.getUserMedia)
         .mockRejectedValueOnce(lockError)
         .mockResolvedValueOnce(acquiredStream as unknown as MediaStream)
         .mockResolvedValueOnce(restoredStream as unknown as MediaStream);
 
-      const result = await switchCameraDevice({
-        localStream: mockStream as unknown as MediaStream,
-        peerConnection: mockPC,
-        isVideoEnabled: true,
-      });
+      const result = await runSwitch({ peerConnection: mockPC });
 
       expect(result).toBe("no-alternate");
       expect(mockVideoTrack.stop).toHaveBeenCalled();
       expect(acquiredVideoTrack.stop).toHaveBeenCalled();
       expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
       expect(mockStream.addTrack).toHaveBeenCalledWith(restoredVideoTrack);
-      expect(mockSender.replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
+      expect(replaceTrack).toHaveBeenCalledWith(restoredVideoTrack);
       expect(restoredVideoTrack.enabled).toBe(true);
+    });
+
+    it("should skip restoring original camera if switch was aborted", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const lockError = new Error("Sensor locked");
+      lockError.name = "NotReadableError";
+      const retryError = new Error("Retry failed");
+      retryError.name = "TrackStartError";
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(lockError)
+        .mockRejectedValueOnce(retryError);
+
+      const result = await runSwitch({ isAborted: () => true });
+
+      expect(result).toBe("failed");
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    });
+
+    it("should stop newly acquired stream in restoreOriginalCamera if aborted while acquiring", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const lockError = new Error("Sensor locked");
+      lockError.name = "NotReadableError";
+      const retryError = new Error("Retry failed");
+      retryError.name = "TrackStartError";
+
+      const restoredTrack = makeTrack("video_restored");
+      const restoredStream = makeStream(restoredTrack);
+
+      let aborted = false;
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(lockError)
+        .mockRejectedValueOnce(retryError)
+        .mockImplementationOnce(async () => {
+          aborted = true;
+          return restoredStream as unknown as MediaStream;
+        });
+
+      const result = await runSwitch({ isAborted: () => aborted });
+
+      expect(result).toBe("failed");
+      expect(restoredTrack.stop).toHaveBeenCalled();
+    });
+
+    it("should handle rejection from replacePeerConnectionTrack, stop newStream, and return 'failed'", async () => {
+      const newVideoTrack = makeTrack("video_new");
+      const newStream = makeStream(newVideoTrack);
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const mockPC = makePC(vi.fn().mockRejectedValue(new Error("PeerConnection closed")));
+
+      const result = await runSwitch({ peerConnection: mockPC });
+
+      expect(result).toBe("failed");
+      expect(newVideoTrack.stop).toHaveBeenCalled();
     });
   });
 });

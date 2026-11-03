@@ -205,9 +205,7 @@ describe("WebRTCManager", () => {
         close: vi.fn(),
       } as unknown as RTCPeerConnection;
 
-      (
-        webrtcManager as unknown as { peerConnection: RTCPeerConnection }
-      ).peerConnection = mockPC;
+      webrtcManager.setPeerConnection(mockPC);
 
       await webrtcManager.tuneSenderParameters();
 

@@ -169,12 +169,17 @@ const restoreOriginalCamera = async (
   deviceId?: string,
   facingMode?: string,
   isVideoEnabled?: boolean,
+  isAborted?: () => boolean,
 ): Promise<void> => {
   try {
     const rollbackStream = await acquireCameraStream(
       deviceId,
       facingMode as "user" | "environment",
     );
+    if (isAborted?.()) {
+      stopMediaTracks(rollbackStream);
+      return;
+    }
     const restoredTrack = rollbackStream.getVideoTracks()[0];
     if (restoredTrack) {
       restoredTrack.enabled = Boolean(isVideoEnabled);
@@ -244,7 +249,7 @@ export const switchCameraDevice = async ({
   let oldTrackStopped = false;
 
   const rollback = async (): Promise<void> => {
-    if (!oldTrackStopped) return;
+    if (!oldTrackStopped || isAborted?.()) return;
     await restoreOriginalCamera(
       localStream,
       peerConnection,
@@ -252,6 +257,7 @@ export const switchCameraDevice = async ({
       currentDeviceId,
       currentFacingMode,
       isVideoEnabled,
+      isAborted,
     );
   };
 
@@ -291,7 +297,14 @@ export const switchCameraDevice = async ({
   }
 
   newTrack.enabled = isVideoEnabled;
-  await replacePeerConnectionTrack(peerConnection, newTrack);
+  try {
+    await replacePeerConnectionTrack(peerConnection, newTrack);
+  } catch (err) {
+    console.error("Failed to replace track on peer connection:", err);
+    stopMediaTracks(newStream);
+    await rollback();
+    return "failed";
+  }
 
   if (isAborted?.()) {
     stopMediaTracks(newStream);

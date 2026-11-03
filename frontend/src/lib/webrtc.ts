@@ -97,6 +97,13 @@ class WebRTCManager {
     return this.remoteStream;
   }
 
+  /**
+   * Inject or update peer connection instance (primarily for test environments).
+   */
+  setPeerConnection(pc: RTCPeerConnection | null): void {
+    this.peerConnection = pc;
+  }
+
   setOnRemoteTrack(listener: ((stream: MediaStream) => void) | null): void {
     this.onRemoteTrackListener = listener;
     if (this.remoteStream && listener) {
