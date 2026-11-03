@@ -219,6 +219,46 @@ describe("DeviceManager", () => {
       expect(newVideoTrack.stop).toHaveBeenCalled();
     });
 
+    it("should return 'failed' and stop new tracks if aborted while replaceTrack is pending", async () => {
+      let aborted = false;
+      const newVideoTrack = {
+        id: "video_2",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const mockSender = {
+        track: { kind: "video" },
+        replaceTrack: vi.fn().mockImplementation(async () => {
+          // Simulate call cleanup occurring while replaceTrack was pending
+          aborted = true;
+        }),
+      };
+      const mockPC = {
+        getSenders: () => [mockSender],
+      } as unknown as RTCPeerConnection;
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: mockPC,
+        isVideoEnabled: true,
+        isAborted: () => aborted,
+      });
+
+      expect(result).toBe("failed");
+      expect(newVideoTrack.stop).toHaveBeenCalled();
+      expect(mockStream.addTrack).not.toHaveBeenCalled();
+    });
+
     it("should return 'failed' if getUserMedia throws", async () => {
       vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
         new Error("Hardware fail"),

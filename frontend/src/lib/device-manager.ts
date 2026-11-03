@@ -137,6 +137,11 @@ export const switchCameraDevice = async ({
       }
     }
 
+    if (isAborted?.()) {
+      stopMediaTracks(newStream);
+      return "failed";
+    }
+
     localStream.removeTrack(currentVideoTrack);
     currentVideoTrack.stop();
     localStream.addTrack(newVideoTrack);
