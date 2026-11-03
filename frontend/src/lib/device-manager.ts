@@ -2,36 +2,39 @@ import type { CallType } from "@/types/call.type";
 
 export type SwitchCameraResult = "success" | "no-alternate" | "failed";
 
-export const getMediaConstraints = (
-  callType: CallType,
-): MediaStreamConstraints => {
-  if (callType === "video") {
-    return {
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        facingMode: "user",
-      },
-    };
-  }
-  return {
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
-    video: false,
-  };
+export interface SwitchCameraOptions {
+  localStream: MediaStream | null;
+  peerConnection: RTCPeerConnection | null;
+  isVideoEnabled: boolean;
+  isAborted?: () => boolean;
+}
+
+interface CameraTargetConstraints {
+  primary: MediaStreamConstraints;
+  fallback: MediaStreamConstraints;
+  targetFacingMode?: "user" | "environment";
+}
+
+const AUDIO_CONSTRAINTS = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
 };
 
-/**
- * Requests media stream with constraints and fallback logic.
- */
+export const getMediaConstraints = (
+  callType: CallType,
+): MediaStreamConstraints => ({
+  audio: AUDIO_CONSTRAINTS,
+  video:
+    callType === "video"
+      ? {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          facingMode: "user",
+        }
+      : false,
+});
+
 export const requestUserMedia = async (
   callType: CallType,
 ): Promise<MediaStream> => {
@@ -47,96 +50,52 @@ export const requestUserMedia = async (
   }
 };
 
-/**
- * Stops all tracks in a MediaStream to release camera/mic sensors.
- */
 export const stopMediaTracks = (stream: MediaStream | null): void => {
-  if (!stream) return;
-  stream.getTracks().forEach((track) => track.stop());
+  stream?.getTracks().forEach((track) => track.stop());
 };
 
-/**
- * Toggles audio tracks enabled/disabled.
- */
 export const setAudioTracksEnabled = (
   stream: MediaStream | null,
   enabled: boolean,
 ): void => {
-  if (!stream) return;
-  stream.getAudioTracks().forEach((track) => {
+  stream?.getAudioTracks().forEach((track) => {
     track.enabled = enabled;
   });
 };
 
-/**
- * Toggles video tracks enabled/disabled.
- */
 export const setVideoTracksEnabled = (
   stream: MediaStream | null,
   enabled: boolean,
 ): void => {
-  if (!stream) return;
-  stream.getVideoTracks().forEach((track) => {
+  stream?.getVideoTracks().forEach((track) => {
     track.enabled = enabled;
   });
 };
 
-export interface SwitchCameraOptions {
-  localStream: MediaStream | null;
-  peerConnection: RTCPeerConnection | null;
-  isVideoEnabled: boolean;
-  isAborted?: () => boolean;
-}
-
-interface CameraTargetConstraints {
-  primary: MediaStreamConstraints;
-  fallback: MediaStreamConstraints;
-  targetFacingMode?: "user" | "environment";
-}
-
-const isOverconstrainedError = (err: unknown): boolean => {
+const isErrorNamed = (err: unknown, ...names: string[]): boolean => {
   if (!err) return false;
-  if (typeof err === "string") return err.includes("OverconstrainedError");
-  if (typeof err === "object") {
-    const error = err as { name?: string; message?: string };
-    return (
-      error.name === "OverconstrainedError" ||
-      error.message?.includes("OverconstrainedError") === true
-    );
-  }
-  return false;
+  if (typeof err === "string") return names.some((n) => err.includes(n));
+  const error = err as { name?: string; message?: string };
+  return names.some((n) => error.name === n || error.message?.includes(n));
 };
 
-const isHardwareLockError = (err: unknown): boolean => {
-  if (!err) return false;
-  if (typeof err === "string") {
-    return err.includes("NotReadableError") || err.includes("TrackStartError");
-  }
-  if (typeof err === "object") {
-    const error = err as { name?: string; message?: string };
-    return (
-      error.name === "NotReadableError" ||
-      error.name === "TrackStartError" ||
-      error.message?.includes("NotReadableError") === true ||
-      error.message?.includes("TrackStartError") === true
-    );
-  }
-  return false;
-};
+const isOverconstrainedError = (err: unknown): boolean =>
+  isErrorNamed(err, "OverconstrainedError");
 
-const resolveCameraConstraints = async (
-  currentVideoTrack: MediaStreamTrack,
+const isHardwareLockError = (err: unknown): boolean =>
+  isErrorNamed(err, "NotReadableError", "TrackStartError");
+
+const getTrackSettings = (track: MediaStreamTrack): MediaTrackSettings =>
+  typeof track.getSettings === "function" ? track.getSettings() : {};
+
+const resolveCameraTarget = async (
+  currentTrack: MediaStreamTrack,
 ): Promise<CameraTargetConstraints | "no-alternate"> => {
-  const settings =
-    typeof currentVideoTrack.getSettings === "function"
-      ? currentVideoTrack.getSettings()
-      : {};
-  const currentFacingMode = settings.facingMode;
-  const currentDeviceId = settings.deviceId;
+  const settings = getTrackSettings(currentTrack);
 
-  if (currentFacingMode) {
+  if (settings.facingMode) {
     const targetFacingMode =
-      currentFacingMode === "environment" ? "user" : "environment";
+      settings.facingMode === "environment" ? "user" : "environment";
     return {
       primary: { video: { facingMode: { ideal: targetFacingMode } } },
       fallback: { video: { facingMode: targetFacingMode } },
@@ -150,9 +109,9 @@ const resolveCameraConstraints = async (
 
   const nextDevice =
     videoDevices.find(
-      (d) => Boolean(d.deviceId) && d.deviceId !== currentDeviceId,
+      (d) => Boolean(d.deviceId) && d.deviceId !== settings.deviceId,
     ) ||
-    videoDevices.find((d) => d.deviceId !== currentDeviceId) ||
+    videoDevices.find((d) => d.deviceId !== settings.deviceId) ||
     videoDevices[0];
 
   return {
@@ -163,101 +122,107 @@ const resolveCameraConstraints = async (
   };
 };
 
-const acquireCameraStream = async (
-  constraints: CameraTargetConstraints,
+const acquireStreamWithFallback = async (
+  target: CameraTargetConstraints,
+): Promise<MediaStream> => {
+  const attempts: MediaStreamConstraints[] = [
+    target.primary,
+    target.fallback,
+    ...(target.targetFacingMode ? [{ video: true }] : []),
+  ];
+
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(attempts[i]);
+    } catch (err) {
+      if (!isOverconstrainedError(err) || i === attempts.length - 1) throw err;
+    }
+  }
+  throw new Error("Failed to acquire camera stream");
+};
+
+const acquireReplacementStream = async (
+  target: CameraTargetConstraints,
+  currentTrack: MediaStreamTrack,
+  onTrackStopped: () => void,
+  isAborted?: () => boolean,
 ): Promise<MediaStream> => {
   try {
-    return await navigator.mediaDevices.getUserMedia(constraints.primary);
+    return await acquireStreamWithFallback(target);
   } catch (err) {
-    if (!isOverconstrainedError(err)) throw err;
+    if (!isHardwareLockError(err)) throw err;
 
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints.fallback);
-    } catch (fallbackErr) {
-      if (constraints.targetFacingMode && isOverconstrainedError(fallbackErr)) {
-        return await navigator.mediaDevices.getUserMedia({ video: true });
-      }
-      throw fallbackErr;
+    currentTrack.stop();
+    onTrackStopped();
+    if (isAborted?.()) {
+      throw new Error("Aborted after hardware unlock", { cause: err });
     }
+
+    return acquireStreamWithFallback(target);
   }
 };
 
 const replacePeerConnectionTrack = async (
   peerConnection: RTCPeerConnection | null,
-  newVideoTrack: MediaStreamTrack,
+  track: MediaStreamTrack,
 ): Promise<void> => {
-  if (!peerConnection) return;
   const sender = peerConnection
-    .getSenders()
+    ?.getSenders()
     .find((s) => s.track?.kind === "video");
-  if (sender) {
-    await sender.replaceTrack(newVideoTrack);
-  }
+  await sender?.replaceTrack(track);
 };
 
-const isMismatchedCamera = (
-  newVideoTrack: MediaStreamTrack,
-  targetConstraints: CameraTargetConstraints,
+const isCameraMismatch = (
+  newTrack: MediaStreamTrack,
+  target: CameraTargetConstraints,
   currentDeviceId?: string,
 ): boolean => {
-  const acquiredSettings =
-    typeof newVideoTrack.getSettings === "function"
-      ? newVideoTrack.getSettings()
-      : {};
-
-  const isWrongFacingMode = Boolean(
-    targetConstraints.targetFacingMode &&
-      acquiredSettings.facingMode &&
-      acquiredSettings.facingMode !== targetConstraints.targetFacingMode,
+  const settings = getTrackSettings(newTrack);
+  const wrongFacing = Boolean(
+    target.targetFacingMode &&
+      settings.facingMode &&
+      settings.facingMode !== target.targetFacingMode,
   );
-
-  const isSameDevice = Boolean(
+  const sameDevice = Boolean(
     currentDeviceId &&
-      acquiredSettings.deviceId &&
-      acquiredSettings.deviceId === currentDeviceId,
+      settings.deviceId &&
+      settings.deviceId === currentDeviceId,
   );
-
-  return isWrongFacingMode || isSameDevice;
+  return wrongFacing || sameDevice;
 };
 
 interface RestoreCameraParams {
-  currentVideoTrack: MediaStreamTrack;
-  currentDeviceId?: string;
-  currentFacingMode?: string;
+  currentTrack: MediaStreamTrack;
+  deviceId?: string;
+  facingMode?: string;
   localStream: MediaStream;
   peerConnection: RTCPeerConnection | null;
   isVideoEnabled: boolean;
 }
 
 const restoreOriginalCameraTrack = async ({
-  currentVideoTrack,
-  currentDeviceId,
-  currentFacingMode,
+  currentTrack,
+  deviceId,
+  facingMode,
   localStream,
   peerConnection,
   isVideoEnabled,
 }: RestoreCameraParams): Promise<void> => {
   try {
-    const restoreConstraints: MediaStreamConstraints = currentDeviceId
-      ? { video: { deviceId: { exact: currentDeviceId } } }
-      : currentFacingMode
-        ? { video: { facingMode: { ideal: currentFacingMode } } }
+    const constraints: MediaStreamConstraints = deviceId
+      ? { video: { deviceId: { exact: deviceId } } }
+      : facingMode
+        ? { video: { facingMode: { ideal: facingMode } } }
         : { video: true };
 
-    let restoredStream: MediaStream;
-    try {
-      restoredStream =
-        await navigator.mediaDevices.getUserMedia(restoreConstraints);
-    } catch {
-      restoredStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-      });
-    }
+    const restoredStream = await navigator.mediaDevices
+      .getUserMedia(constraints)
+      .catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
     const restoredTrack = restoredStream.getVideoTracks()[0];
     if (restoredTrack) {
       restoredTrack.enabled = isVideoEnabled;
-      localStream.removeTrack(currentVideoTrack);
+      localStream.removeTrack(currentTrack);
       localStream.addTrack(restoredTrack);
       await replacePeerConnectionTrack(peerConnection, restoredTrack);
     }
@@ -279,24 +244,21 @@ export const switchCameraDevice = async ({
   const currentVideoTrack = localStream.getVideoTracks()[0];
   if (!currentVideoTrack) return "no-alternate";
 
-  const currentSettings =
-    typeof currentVideoTrack.getSettings === "function"
-      ? currentVideoTrack.getSettings()
-      : {};
-  const currentDeviceId = currentSettings.deviceId;
-  const currentFacingMode = currentSettings.facingMode;
+  const target = await resolveCameraTarget(currentVideoTrack);
+  if (target === "no-alternate") return "no-alternate";
 
+  const { deviceId, facingMode } = getTrackSettings(currentVideoTrack);
   let newStream: MediaStream | null = null;
-  let currentTrackStopped = false;
-  let originalTrackRestored = false;
+  let oldTrackStopped = false;
 
-  const restoreOriginalCamera = async (): Promise<void> => {
-    if (!currentTrackStopped || originalTrackRestored) return;
-    originalTrackRestored = true;
+  const rollback = async (): Promise<void> => {
+    stopMediaTracks(newStream);
+    if (!oldTrackStopped) return;
+    oldTrackStopped = false;
     await restoreOriginalCameraTrack({
-      currentVideoTrack,
-      currentDeviceId,
-      currentFacingMode,
+      currentTrack: currentVideoTrack,
+      deviceId,
+      facingMode,
       localStream,
       peerConnection,
       isVideoEnabled,
@@ -304,71 +266,40 @@ export const switchCameraDevice = async ({
   };
 
   try {
-    const targetConstraints =
-      await resolveCameraConstraints(currentVideoTrack);
-    if (targetConstraints === "no-alternate") return "no-alternate";
-
-    try {
-      newStream = await acquireCameraStream(targetConstraints);
-    } catch (err) {
-      if (isHardwareLockError(err) && !currentTrackStopped) {
-        currentVideoTrack.stop();
-        currentTrackStopped = true;
-        if (isAborted?.()) {
-          await restoreOriginalCamera();
-          return "failed";
-        }
-        try {
-          newStream = await acquireCameraStream(targetConstraints);
-        } catch (retryErr) {
-          await restoreOriginalCamera();
-          throw retryErr;
-        }
-      } else {
-        throw err;
-      }
-    }
-
-    if (isAborted?.()) {
-      stopMediaTracks(newStream);
-      await restoreOriginalCamera();
-      return "failed";
-    }
+    newStream = await acquireReplacementStream(
+      target,
+      currentVideoTrack,
+      () => {
+        oldTrackStopped = true;
+      },
+      isAborted,
+    );
 
     const newVideoTrack = newStream.getVideoTracks()[0];
-    if (!newVideoTrack) {
-      stopMediaTracks(newStream);
-      await restoreOriginalCamera();
+    if (isAborted?.() || !newVideoTrack) {
+      await rollback();
       return "failed";
     }
 
-    if (isMismatchedCamera(newVideoTrack, targetConstraints, currentDeviceId)) {
-      stopMediaTracks(newStream);
-      await restoreOriginalCamera();
+    if (isCameraMismatch(newVideoTrack, target, deviceId)) {
+      await rollback();
       return "no-alternate";
     }
 
     newVideoTrack.enabled = isVideoEnabled;
-
     await replacePeerConnectionTrack(peerConnection, newVideoTrack);
 
     if (isAborted?.()) {
-      stopMediaTracks(newStream);
-      await restoreOriginalCamera();
+      await rollback();
       return "failed";
     }
 
     localStream.removeTrack(currentVideoTrack);
-    if (!currentTrackStopped) {
-      currentVideoTrack.stop();
-    }
+    if (!oldTrackStopped) currentVideoTrack.stop();
     localStream.addTrack(newVideoTrack);
     return "success";
   } catch (err) {
-    if (newStream) {
-      stopMediaTracks(newStream);
-    }
-    await restoreOriginalCamera();
+    await rollback();
     console.error("Failed to switch camera:", err);
     return "failed";
   }
