@@ -37,7 +37,7 @@ const ConversationList = () => {
     ) || [];
 
   useEffect(() => {
-    fetchConversations();
+    void fetchConversations();
   }, [fetchConversations]);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ const ConversationList = () => {
   }, [socket, updateConversationLastMessage]);
 
   const onRoute = (id: string) => {
-    navigate(`/conversation/${id}`);
+    void navigate(`/conversation/${id}`);
   };
 
   return (

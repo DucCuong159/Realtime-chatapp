@@ -96,6 +96,6 @@ async function startServer() {
   }
 }
 
-startServer();
+void startServer();
 
 app.use(errorHandler);
