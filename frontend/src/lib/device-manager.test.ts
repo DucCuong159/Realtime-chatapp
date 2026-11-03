@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  findNextCameraDevice,
   getMediaConstraints,
   requestUserMedia,
   setAudioTracksEnabled,
@@ -68,6 +69,40 @@ describe("DeviceManager", () => {
       expect(constraints.audio).toEqual(
         expect.objectContaining({ echoCancellation: true }),
       );
+    });
+  });
+
+  
+  describe("findNextCameraDevice", () => {
+    it("should return null if fewer than 2 video devices exist", async () => {
+      vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValueOnce([
+        { kind: "videoinput", deviceId: "cam_1" } as MediaDeviceInfo,
+      ]);
+      const result = await findNextCameraDevice("cam_1", "user");
+      expect(result).toBeNull();
+    });
+
+    it("should select the MAIN rear camera and exclude auxiliary lenses", async () => {
+      vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValueOnce([
+        { kind: "videoinput", deviceId: "front_1", label: "Front Camera" },
+        { kind: "videoinput", deviceId: "rear_ultra", label: "Back Ultra-Wide Camera 0.5x" },
+        { kind: "videoinput", deviceId: "rear_main", label: "Back Camera (main wide)" },
+        { kind: "videoinput", deviceId: "rear_macro", label: "Back Macro Lens" },
+        { kind: "videoinput", deviceId: "rear_tele", label: "Back Telephoto 3x" },
+      ] as MediaDeviceInfo[]);
+
+      const result = await findNextCameraDevice("front_1", "user");
+      expect(result?.deviceId).toBe("rear_main");
+    });
+
+    it("should select front camera when switching from rear camera", async () => {
+      vi.mocked(navigator.mediaDevices.enumerateDevices).mockResolvedValueOnce([
+        { kind: "videoinput", deviceId: "front_1", label: "Front Camera (user)" },
+        { kind: "videoinput", deviceId: "rear_main", label: "Back Camera" },
+      ] as MediaDeviceInfo[]);
+
+      const result = await findNextCameraDevice("rear_main", "environment");
+      expect(result?.deviceId).toBe("front_1");
     });
   });
 
@@ -302,7 +337,7 @@ describe("DeviceManager", () => {
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
-        video: { facingMode: { ideal: "environment" } },
+        video: { deviceId: { exact: "camera_2" } },
       });
       expect(mockVideoTrack.stop).toHaveBeenCalled();
       expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
@@ -338,7 +373,7 @@ describe("DeviceManager", () => {
 
       expect(result).toBe("success");
       expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
-        video: { facingMode: { ideal: "user" } },
+        video: { deviceId: { exact: "camera_1" } },
       });
     });
 
