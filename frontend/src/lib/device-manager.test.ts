@@ -206,6 +206,19 @@ describe("DeviceManager", () => {
       expect(result).toBe("no-alternate");
     });
 
+    it("should return 'failed' if enumerateDevices rejects during camera switch", async () => {
+      vi.mocked(navigator.mediaDevices.enumerateDevices).mockRejectedValueOnce(
+        new Error("Device enumeration failure"),
+      );
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+      expect(result).toBe("failed");
+    });
+
     it("should switch camera and return 'success' when alternative camera exists", async () => {
       const newVideoTrack = {
         id: "video_2",

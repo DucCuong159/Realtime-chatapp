@@ -220,10 +220,17 @@ export const switchCameraDevice = async ({
       : {};
   const { deviceId: currentDeviceId, facingMode: currentFacingMode } = settings;
 
-  const nextCamera = await findNextCameraDevice(
-    currentDeviceId,
-    currentFacingMode,
-  );
+  let nextCamera: MediaDeviceInfo | null;
+  try {
+    nextCamera = await findNextCameraDevice(
+      currentDeviceId,
+      currentFacingMode,
+    );
+  } catch (err) {
+    console.error("Failed to enumerate devices during camera switch:", err);
+    return "failed";
+  }
+
   if (!nextCamera) return "no-alternate";
 
   const targetFacing =
