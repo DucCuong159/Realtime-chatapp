@@ -16,6 +16,7 @@ import {
   setEndedResetTimer,
   setTimeoutTimer,
 } from "../helpers/call-timers";
+import { setupLocalMedia } from "../helpers/media-stream";
 import { setupPeerConnection } from "../helpers/peer-connection";
 import type { CallSessionSlice, CallSlice } from "../types";
 
@@ -71,8 +72,6 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
       remoteStream: null,
     });
 
-    webrtcManager.setOnLocalStream((s) => set({ localStream: s }));
-    webrtcManager.setOnRemoteTrack((s) => set({ remoteStream: s }));
     soundEffects.playOutgoingRing();
 
     socket.emit(CALL_SOCKET_EVENTS.INITIATE, {
@@ -82,26 +81,18 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
       callType,
     });
 
-    webrtcManager
-      .getLocalStream(callType)
-      .then((stream) => {
-        const { isVideoOff, isMuted } = get();
-        webrtcManager.setVideoEnabled(!isVideoOff);
-        webrtcManager.setMute(isMuted);
-        set({ localStream: stream });
-      })
-      .catch((err: unknown) => {
-        const currentStatus = get().status;
-        if (currentStatus === "IDLE" || currentStatus === "ENDED") return;
-        const msg =
-          err instanceof Error
-            ? err.message
-            : callType === "video"
-              ? "Camera/Microphone access denied"
-              : "Microphone access denied";
-        toast.error(msg);
-        get().endCall("failed");
-      });
+    setupLocalMedia({ callType, set, get }).catch((err: unknown) => {
+      const currentStatus = get().status;
+      if (currentStatus === "IDLE" || currentStatus === "ENDED") return;
+      const msg =
+        err instanceof Error
+          ? err.message
+          : callType === "video"
+            ? "Camera/Microphone access denied"
+            : "Microphone access denied";
+      toast.error(msg);
+      get().endCall("failed");
+    });
 
     const timeout = setTimeout(() => {
       if (get().status === "CALLING") {
@@ -127,15 +118,8 @@ export const createCallSessionSlice: CallSlice<CallSessionSlice> = (
     soundEffects.stopAll();
     const callType = session.callType || "audio";
 
-    webrtcManager.setOnLocalStream((s) => set({ localStream: s }));
-    webrtcManager.setOnRemoteTrack((s) => set({ remoteStream: s }));
-
     try {
-      const stream = await webrtcManager.getLocalStream(callType);
-      const { isVideoOff, isMuted } = get();
-      webrtcManager.setVideoEnabled(!isVideoOff);
-      webrtcManager.setMute(isMuted);
-      set({ localStream: stream });
+      await setupLocalMedia({ callType, set, get });
     } catch (err: unknown) {
       const msg =
         err instanceof Error
