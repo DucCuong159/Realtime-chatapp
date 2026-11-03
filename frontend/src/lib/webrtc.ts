@@ -1,45 +1,15 @@
 import { DEFAULT_ICE_SERVERS } from "@/constants/call.constant";
 import type { CallType } from "@/types/call.type";
+import {
+  requestUserMedia,
+  setAudioTracksEnabled,
+  setVideoTracksEnabled,
+  stopMediaTracks,
+  switchCameraDevice,
+  type SwitchCameraResult,
+} from "./device-manager";
 
-export type SwitchCameraResult = "success" | "no-alternate" | "failed";
-
-const getMediaConstraints = (callType: CallType): MediaStreamConstraints => {
-  if (callType === "video") {
-    return {
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-      video: {
-        width: { ideal: 1280, max: 1920 },
-        height: { ideal: 720, max: 1080 },
-        facingMode: "user",
-      },
-    };
-  }
-  return {
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-    },
-    video: false,
-  };
-};
-
-const requestMedia = async (callType: CallType): Promise<MediaStream> => {
-  const constraints = getMediaConstraints(callType);
-  if (callType !== "video") {
-    return navigator.mediaDevices.getUserMedia(constraints);
-  }
-  try {
-    return await navigator.mediaDevices.getUserMedia(constraints);
-  } catch (err) {
-    console.warn("Retrying getUserMedia with basic constraints:", err);
-    return navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-  }
-};
+export type { SwitchCameraResult };
 
 class WebRTCManager {
   private peerConnection: RTCPeerConnection | null = null;
@@ -72,7 +42,7 @@ class WebRTCManager {
       const hasVideoTrack = this.localStream.getVideoTracks().length > 0;
       if (callType === "video" && !hasVideoTrack) {
         // Upgrade from audio-only to audio + video
-        this.localStream.getTracks().forEach((track) => track.stop());
+        stopMediaTracks(this.localStream);
         this.localStream = null;
       } else {
         return this.localStream;
@@ -88,19 +58,15 @@ class WebRTCManager {
 
     this.pendingMediaPromise = (async () => {
       try {
-        const stream = await requestMedia(callType);
+        const stream = await requestUserMedia(callType);
         if (this.isCleanedUp) {
-          stream.getTracks().forEach((track) => track.stop());
+          stopMediaTracks(stream);
           throw new Error("Call ended before media access was granted");
         }
 
         // Apply persisted track enabled states (e.g., pre-connect camera-off or mute action)
-        stream.getVideoTracks().forEach((track) => {
-          track.enabled = this.isVideoEnabled;
-        });
-        stream.getAudioTracks().forEach((track) => {
-          track.enabled = this.isAudioEnabled;
-        });
+        setVideoTracksEnabled(stream, this.isVideoEnabled);
+        setAudioTracksEnabled(stream, this.isAudioEnabled);
 
         this.localStream = stream;
         this.onLocalStreamListener?.(stream);
@@ -186,9 +152,15 @@ class WebRTCManager {
           }
         });
       } else if (event.track) {
-        if (!this.remoteStream.getTracks().some((t) => t.id === event.track.id)) {
+        if (
+          !this.remoteStream.getTracks().some((t) => t.id === event.track.id)
+        ) {
           this.remoteStream.addTrack(event.track);
         }
+      }
+
+      if (this.remoteAudioElement) {
+        this.remoteAudioElement.play().catch(() => {});
       }
 
       this.onRemoteTrackListener?.(this.remoteStream);
@@ -305,11 +277,7 @@ class WebRTCManager {
    */
   setMute(isMuted: boolean): void {
     this.isAudioEnabled = !isMuted;
-    if (this.localStream) {
-      this.localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !isMuted;
-      });
-    }
+    setAudioTracksEnabled(this.localStream, !isMuted);
   }
 
   /**
@@ -317,69 +285,25 @@ class WebRTCManager {
    */
   setVideoEnabled(enabled: boolean): void {
     this.isVideoEnabled = enabled;
-    if (this.localStream) {
-      this.localStream.getVideoTracks().forEach((track) => {
-        track.enabled = enabled;
-      });
-    }
+    setVideoTracksEnabled(this.localStream, enabled);
   }
 
   /**
    * Switch between available cameras (e.g., front and back on mobile/tablet)
    */
   async switchCamera(): Promise<SwitchCameraResult> {
-    if (!this.localStream) return "no-alternate";
-    const currentVideoTrack = this.localStream.getVideoTracks()[0];
-    if (!currentVideoTrack) return "no-alternate";
+    const result = await switchCameraDevice({
+      localStream: this.localStream,
+      peerConnection: this.peerConnection,
+      isVideoEnabled: this.isVideoEnabled,
+      isAborted: () => this.isCleanedUp,
+    });
 
-    let newStream: MediaStream | null = null;
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoDevices = devices.filter((d) => d.kind === "videoinput");
-      if (videoDevices.length < 2) return "no-alternate";
-
-      const currentDeviceId = currentVideoTrack.getSettings().deviceId;
-      const nextDevice =
-        videoDevices.find((d) => d.deviceId !== currentDeviceId) ||
-        videoDevices[0];
-
-      newStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: nextDevice.deviceId } },
-      });
-
-      if (this.isCleanedUp) {
-        newStream.getTracks().forEach((track) => track.stop());
-        return "failed";
-      }
-
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      if (!newVideoTrack) {
-        newStream.getTracks().forEach((track) => track.stop());
-        return "failed";
-      }
-      newVideoTrack.enabled = this.isVideoEnabled;
-
-      if (this.peerConnection) {
-        const sender = this.peerConnection
-          .getSenders()
-          .find((s) => s.track?.kind === "video");
-        if (sender) {
-          await sender.replaceTrack(newVideoTrack);
-        }
-      }
-
-      this.localStream.removeTrack(currentVideoTrack);
-      currentVideoTrack.stop();
-      this.localStream.addTrack(newVideoTrack);
+    if (result === "success" && this.localStream) {
       this.onLocalStreamListener?.(this.localStream);
-      return "success";
-    } catch (err) {
-      if (newStream) {
-        newStream.getTracks().forEach((track) => track.stop());
-      }
-      console.error("Failed to switch camera:", err);
-      return "failed";
     }
+
+    return result;
   }
 
   /**
@@ -395,7 +319,7 @@ class WebRTCManager {
     }
     this.queuedIceCandidates = [];
     if (this.remoteStream) {
-      this.remoteStream.getTracks().forEach((t) => t.stop());
+      stopMediaTracks(this.remoteStream);
       this.remoteStream = null;
     }
     if (this.remoteAudioElement) {
@@ -416,7 +340,7 @@ class WebRTCManager {
     this.cleanupPeerConnection();
 
     if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
+      stopMediaTracks(this.localStream);
       this.localStream = null;
     }
   }
