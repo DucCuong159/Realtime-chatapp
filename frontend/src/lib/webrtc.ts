@@ -197,6 +197,7 @@ class WebRTCManager {
     });
 
     await this.peerConnection.setLocalDescription(offer);
+    await this.tuneSenderParameters();
     return offer;
   }
 
@@ -219,6 +220,7 @@ class WebRTCManager {
 
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
+    await this.tuneSenderParameters();
     return answer;
   }
 
@@ -233,6 +235,45 @@ class WebRTCManager {
         new RTCSessionDescription(answer),
       );
       await this.processQueuedIceCandidates();
+      await this.tuneSenderParameters();
+    }
+  }
+
+  /**
+   * Optimize WebRTC audio/video bitrate and encoding parameters for HD quality.
+   */
+  async tuneSenderParameters(): Promise<void> {
+    if (!this.peerConnection) return;
+    const senders = this.peerConnection.getSenders();
+
+    for (const sender of senders) {
+      if (!sender.track) continue;
+
+      try {
+        const parameters = sender.getParameters?.();
+        if (
+          !parameters ||
+          !parameters.encodings ||
+          parameters.encodings.length === 0
+        ) {
+          continue;
+        }
+
+        if (sender.track.kind === "video") {
+          for (const encoding of parameters.encodings) {
+            encoding.maxBitrate = 2_500_000; // 2.5 Mbps for FullHD/HD
+          }
+          parameters.degradationPreference = "maintain-framerate";
+        } else if (sender.track.kind === "audio") {
+          for (const encoding of parameters.encodings) {
+            encoding.maxBitrate = 64_000; // 64 kbps for Studio Opus Voice
+          }
+        }
+
+        await sender.setParameters?.(parameters);
+      } catch (err) {
+        console.warn("Could not tune sender parameters:", err);
+      }
     }
   }
 
