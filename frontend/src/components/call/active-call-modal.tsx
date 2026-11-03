@@ -201,7 +201,7 @@ const ActiveAudioCallView = ({ session }: { session: CallSession }) => {
             variant={isMuted ? "destructive" : "secondary"}
             className="size-12 rounded-full shadow-md transition-all"
             onClick={toggleMute}
-            disabled={status === "ENDED" || status === "CALLING"}
+            disabled={status === "ENDED"}
             aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
           >
             {isMuted ? (
@@ -298,7 +298,7 @@ const VideoControls = ({
         variant={isMuted ? "destructive" : "secondary"}
         className="size-12 rounded-full transition-all"
         onClick={onToggleMute}
-        disabled={status === "ENDED" || status === "CALLING"}
+        disabled={status === "ENDED"}
         aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
       >
         {isMuted ? <MicOff className="size-5" /> : <Mic className="size-5" />}

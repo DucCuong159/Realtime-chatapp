@@ -74,7 +74,7 @@ const FloatingCallPill = () => {
           variant={isMuted ? "destructive" : "ghost"}
           className="size-8 rounded-full"
           onClick={toggleMute}
-          disabled={status === "ENDED" || status === "CALLING"}
+          disabled={status === "ENDED"}
           aria-label={isMuted ? "Unmute" : "Mute"}
         >
           {isMuted ? <MicOff className="size-3.5" /> : <Mic className="size-3.5" />}
