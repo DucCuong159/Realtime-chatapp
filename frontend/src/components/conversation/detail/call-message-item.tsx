@@ -47,7 +47,7 @@ const CallMessageItem = ({ message, currentUserId }: CallMessageItemProps) => {
   const handleCallBack = () => {
     const targetUser = isCurrentUser ? null : message.sender;
     if (targetUser) {
-      useCall.getState().initiateCall(
+      void useCall.getState().initiateCall(
         {
           _id: targetUser._id,
           name: targetUser.name,

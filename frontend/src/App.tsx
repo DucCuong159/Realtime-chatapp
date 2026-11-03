@@ -11,7 +11,7 @@ function App() {
   const isAuth = isAuthRoute(pathname);
 
   useEffect(() => {
-    isAuthStatus();
+    void isAuthStatus();
   }, [isAuthStatus]);
 
   if (!isInitialized && !isAuth) return <AppLoader text="Please wait..." />;

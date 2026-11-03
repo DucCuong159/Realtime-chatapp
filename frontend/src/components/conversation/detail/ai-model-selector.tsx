@@ -47,7 +47,7 @@ const AiModelSelector = () => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    fetchAiModels();
+    void fetchAiModels();
   }, [fetchAiModels]);
 
   const activeModel =
@@ -71,7 +71,7 @@ const AiModelSelector = () => {
 
   const handleRefresh = (e: React.MouseEvent) => {
     e.stopPropagation();
-    fetchAiModels(true);
+    void fetchAiModels(true);
   };
 
   return (
