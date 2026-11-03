@@ -56,10 +56,17 @@ describe("DeviceManager", () => {
     it("should return video constraints when callType is video", () => {
       const constraints = getMediaConstraints("video");
       expect(constraints.video).toEqual(
-        expect.objectContaining({ facingMode: "user" }),
+        expect.objectContaining({
+          facingMode: "user",
+          frameRate: { ideal: 30, max: 60 },
+        }),
       );
       expect(constraints.audio).toEqual(
-        expect.objectContaining({ echoCancellation: true }),
+        expect.objectContaining({
+          echoCancellation: true,
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 },
+        }),
       );
     });
 
@@ -67,7 +74,11 @@ describe("DeviceManager", () => {
       const constraints = getMediaConstraints("audio");
       expect(constraints.video).toBe(false);
       expect(constraints.audio).toEqual(
-        expect.objectContaining({ echoCancellation: true }),
+        expect.objectContaining({
+          echoCancellation: true,
+          sampleRate: { ideal: 48000 },
+          channelCount: { ideal: 1 },
+        }),
       );
     });
   });
