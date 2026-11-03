@@ -272,6 +272,185 @@ describe("DeviceManager", () => {
 
       expect(result).toBe("failed");
     });
+
+    it("should switch camera using facingMode when currentVideoTrack has facingMode: 'user'", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const newVideoTrack = {
+        id: "video_rear",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("success");
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+        video: { facingMode: { ideal: "environment" } },
+      });
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+      expect(mockStream.removeTrack).toHaveBeenCalledWith(mockVideoTrack);
+      expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
+    });
+
+    it("should target 'user' facingMode when currentVideoTrack has facingMode: 'environment'", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "environment",
+        deviceId: "camera_rear",
+      });
+
+      const newVideoTrack = {
+        id: "video_front",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockResolvedValueOnce(
+        newStream as unknown as MediaStream,
+      );
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("success");
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+        video: { facingMode: { ideal: "user" } },
+      });
+    });
+
+    it("should retry camera acquisition when sensor is locked with NotReadableError or TrackStartError", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const newVideoTrack = {
+        id: "video_2",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      const lockError = new Error("Camera sensor locked");
+      lockError.name = "NotReadableError";
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(lockError)
+        .mockResolvedValueOnce(newStream as unknown as MediaStream);
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("success");
+      expect(mockVideoTrack.stop).toHaveBeenCalled();
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+      expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
+    });
+
+    it("should fallback to basic constraints when OverconstrainedError occurs", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        facingMode: "user",
+        deviceId: "camera_1",
+      });
+
+      const newVideoTrack = {
+        id: "video_fallback",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      const overconstrainedError = new Error("OverconstrainedError");
+      overconstrainedError.name = "OverconstrainedError";
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(overconstrainedError)
+        .mockResolvedValueOnce(newStream as unknown as MediaStream);
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("success");
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        video: { facingMode: "environment" },
+      });
+      expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
+    });
+
+    it("should fallback to { video: true } when switching without facingMode and OverconstrainedError occurs", async () => {
+      mockVideoTrack.getSettings.mockReturnValue({
+        deviceId: "camera_1",
+      });
+
+      const newVideoTrack = {
+        id: "video_fallback_generic",
+        kind: "video",
+        enabled: true,
+        stop: vi.fn(),
+      };
+      const newStream = {
+        getTracks: () => [newVideoTrack],
+        getVideoTracks: () => [newVideoTrack],
+      };
+
+      const overconstrainedError = new Error("OverconstrainedError");
+      overconstrainedError.name = "OverconstrainedError";
+
+      vi.mocked(navigator.mediaDevices.getUserMedia)
+        .mockRejectedValueOnce(overconstrainedError)
+        .mockResolvedValueOnce(newStream as unknown as MediaStream);
+
+      const result = await switchCameraDevice({
+        localStream: mockStream as unknown as MediaStream,
+        peerConnection: null,
+        isVideoEnabled: true,
+      });
+
+      expect(result).toBe("success");
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+      expect(navigator.mediaDevices.getUserMedia).toHaveBeenLastCalledWith({
+        video: true,
+      });
+      expect(mockStream.addTrack).toHaveBeenCalledWith(newVideoTrack);
+    });
   });
 });
-

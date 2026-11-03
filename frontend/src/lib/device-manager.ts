@@ -88,6 +88,110 @@ export interface SwitchCameraOptions {
   isAborted?: () => boolean;
 }
 
+interface CameraTargetConstraints {
+  primary: MediaStreamConstraints;
+  fallback: MediaStreamConstraints;
+  targetFacingMode?: "user" | "environment";
+}
+
+const isOverconstrainedError = (err: unknown): boolean => {
+  if (!err) return false;
+  if (typeof err === "string") return err.includes("OverconstrainedError");
+  if (typeof err === "object") {
+    const error = err as { name?: string; message?: string };
+    return (
+      error.name === "OverconstrainedError" ||
+      error.message?.includes("OverconstrainedError") === true
+    );
+  }
+  return false;
+};
+
+const isHardwareLockError = (err: unknown): boolean => {
+  if (!err) return false;
+  if (typeof err === "string") {
+    return err.includes("NotReadableError") || err.includes("TrackStartError");
+  }
+  if (typeof err === "object") {
+    const error = err as { name?: string; message?: string };
+    return (
+      error.name === "NotReadableError" ||
+      error.name === "TrackStartError" ||
+      error.message?.includes("NotReadableError") === true ||
+      error.message?.includes("TrackStartError") === true
+    );
+  }
+  return false;
+};
+
+const resolveCameraConstraints = async (
+  currentVideoTrack: MediaStreamTrack,
+): Promise<CameraTargetConstraints | "no-alternate"> => {
+  const settings = currentVideoTrack.getSettings();
+  const currentFacingMode = settings.facingMode;
+  const currentDeviceId = settings.deviceId;
+
+  if (currentFacingMode) {
+    const targetFacingMode =
+      currentFacingMode === "environment" ? "user" : "environment";
+    return {
+      primary: { video: { facingMode: { ideal: targetFacingMode } } },
+      fallback: { video: { facingMode: targetFacingMode } },
+      targetFacingMode,
+    };
+  }
+
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevices = devices.filter((d) => d.kind === "videoinput");
+  if (videoDevices.length < 2) return "no-alternate";
+
+  const nextDevice =
+    videoDevices.find(
+      (d) => Boolean(d.deviceId) && d.deviceId !== currentDeviceId,
+    ) ||
+    videoDevices.find((d) => d.deviceId !== currentDeviceId) ||
+    videoDevices[0];
+
+  return {
+    primary: nextDevice?.deviceId
+      ? { video: { deviceId: { exact: nextDevice.deviceId } } }
+      : { video: true },
+    fallback: { video: true },
+  };
+};
+
+const acquireCameraStream = async (
+  constraints: CameraTargetConstraints,
+): Promise<MediaStream> => {
+  try {
+    return await navigator.mediaDevices.getUserMedia(constraints.primary);
+  } catch (err) {
+    if (!isOverconstrainedError(err)) throw err;
+
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints.fallback);
+    } catch (fallbackErr) {
+      if (constraints.targetFacingMode && isOverconstrainedError(fallbackErr)) {
+        return await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      throw fallbackErr;
+    }
+  }
+};
+
+const replacePeerConnectionTrack = async (
+  peerConnection: RTCPeerConnection | null,
+  newVideoTrack: MediaStreamTrack,
+): Promise<void> => {
+  if (!peerConnection) return;
+  const sender = peerConnection
+    .getSenders()
+    .find((s) => s.track?.kind === "video");
+  if (sender) {
+    await sender.replaceTrack(newVideoTrack);
+  }
+};
+
 /**
  * Switches between front and rear cameras, replacing the track in both localStream and PeerConnection.
  */
@@ -102,19 +206,25 @@ export const switchCameraDevice = async ({
   if (!currentVideoTrack) return "no-alternate";
 
   let newStream: MediaStream | null = null;
+  let currentTrackStopped = false;
+
   try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const videoDevices = devices.filter((d) => d.kind === "videoinput");
-    if (videoDevices.length < 2) return "no-alternate";
+    const targetConstraints =
+      await resolveCameraConstraints(currentVideoTrack);
+    if (targetConstraints === "no-alternate") return "no-alternate";
 
-    const currentDeviceId = currentVideoTrack.getSettings().deviceId;
-    const nextDevice =
-      videoDevices.find((d) => d.deviceId !== currentDeviceId) ||
-      videoDevices[0];
-
-    newStream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: nextDevice.deviceId } },
-    });
+    try {
+      newStream = await acquireCameraStream(targetConstraints);
+    } catch (err) {
+      if (isHardwareLockError(err) && !currentTrackStopped) {
+        currentVideoTrack.stop();
+        currentTrackStopped = true;
+        if (isAborted?.()) return "failed";
+        newStream = await acquireCameraStream(targetConstraints);
+      } else {
+        throw err;
+      }
+    }
 
     if (isAborted?.()) {
       stopMediaTracks(newStream);
@@ -128,14 +238,7 @@ export const switchCameraDevice = async ({
     }
     newVideoTrack.enabled = isVideoEnabled;
 
-    if (peerConnection) {
-      const sender = peerConnection
-        .getSenders()
-        .find((s) => s.track?.kind === "video");
-      if (sender) {
-        await sender.replaceTrack(newVideoTrack);
-      }
-    }
+    await replacePeerConnectionTrack(peerConnection, newVideoTrack);
 
     if (isAborted?.()) {
       stopMediaTracks(newStream);
@@ -143,7 +246,9 @@ export const switchCameraDevice = async ({
     }
 
     localStream.removeTrack(currentVideoTrack);
-    currentVideoTrack.stop();
+    if (!currentTrackStopped) {
+      currentVideoTrack.stop();
+    }
     localStream.addTrack(newVideoTrack);
     return "success";
   } catch (err) {
