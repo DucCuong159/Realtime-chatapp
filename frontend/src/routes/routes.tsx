@@ -8,6 +8,7 @@ export const AUTH_ROUTES = {
 export const PROTECTED_ROUTES = {
   CONVERSATION: "/conversation",
   SINGLE_CONVERSATION: "/conversation/:conversationId",
+  PROFILE: "/profile",
 };
 
 export interface RouteConfig {
@@ -34,6 +35,10 @@ export const protectedRoutesPath: RouteConfig[] = [
   {
     path: PROTECTED_ROUTES.SINGLE_CONVERSATION,
     Component: lazy(() => import("@/pages/conversation/conversationId")),
+  },
+  {
+    path: PROTECTED_ROUTES.PROFILE,
+    Component: lazy(() => import("@/pages/profile")),
   },
 ];
 

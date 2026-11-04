@@ -1,3 +1,4 @@
+import cloudinary from "../config/cloudinary.config.js";
 import UserModel from "../models/User.js";
 import { NotFoundException } from "../utils/app-error.js";
 import { UpdateProfileSchemaType } from "../validators/user.validator.js";
@@ -10,9 +11,18 @@ export const updateProfileService = async (
   userId: string,
   data: UpdateProfileSchemaType,
 ) => {
+  const updateData = { ...data };
+
+  if (updateData.avatar && updateData.avatar.startsWith("data:image/")) {
+    const uploadRes = await cloudinary.uploader.upload(updateData.avatar, {
+      folder: "avatars",
+    });
+    updateData.avatar = uploadRes.secure_url;
+  }
+
   const user = await UserModel.findByIdAndUpdate(
     userId,
-    { $set: data },
+    { $set: updateData },
     { new: true, runValidators: true },
   ).select("-password");
 

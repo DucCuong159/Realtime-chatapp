@@ -1,5 +1,6 @@
 import { API } from "@/lib/axios-client";
 import type { LoginType, RegisterType, UserType } from "@/types/auth.type";
+import type { ProfileFormType } from "@/validators/user.validator";
 import { toast } from "sonner";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -10,12 +11,14 @@ interface AuthState {
   isLoggingIn: boolean;
   isSigningUp: boolean;
   isAuthStatusLoading: boolean;
+  isUpdatingProfile: boolean;
   isInitialized: boolean;
 
   register: (data: RegisterType) => Promise<void>;
   login: (data: LoginType) => Promise<void>;
   logout: () => Promise<void>;
   isAuthStatus: () => Promise<void>;
+  updateProfile: (data: ProfileFormType) => Promise<boolean>;
 }
 
 export const useAuth = create<AuthState>()(
@@ -25,6 +28,7 @@ export const useAuth = create<AuthState>()(
       isSigningUp: false,
       isLoggingIn: false,
       isAuthStatusLoading: false,
+      isUpdatingProfile: false,
       isInitialized: false,
 
       register: async (data: RegisterType) => {
@@ -72,6 +76,22 @@ export const useAuth = create<AuthState>()(
           useSocket.getState().disconnectSocket();
         } finally {
           set({ isAuthStatusLoading: false, isInitialized: true });
+        }
+      },
+      updateProfile: async (data: ProfileFormType): Promise<boolean> => {
+        set({ isUpdatingProfile: true });
+        try {
+          const response = await API.put("/user/profile", data);
+          if (response.status === 200 && response.data.user) {
+            set({ user: response.data.user });
+            toast.success("Profile updated successfully");
+            return true;
+          }
+          return false;
+        } catch {
+          return false;
+        } finally {
+          set({ isUpdatingProfile: false });
         }
       },
     }),
