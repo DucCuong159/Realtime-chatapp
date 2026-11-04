@@ -35,7 +35,8 @@
 - 🤖 **Gemini AI Streaming & Dynamic Selector**: Real-time token streaming, live quota latency check (`checkModelQuota`), auto-fallback on 429 quota limits, and markdown rendering with XSS hardening.
 - 📜 **Cursor-Based Pagination & Infinite Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) and `useLayoutEffect` Element-Anchor scroll restoration (Zero Viewport Drift).
 - 💬 **Rich Messaging**: 1-on-1 and group chats, message replies with context quotes, Cloudinary media sharing (up to 15MB), and user search.
-- 📞📹 **Real-Time WebRTC Voice & Video Calling (1-on-1)**: Peer-to-peer ultra-low latency audio & video calls (up to 1080p), camera flip/toggle, remote video visibility synchronization, local PiP preview, responsive full-screen active modal, floating minimized pill widget, Web Audio API sound synthesis, and automatic chat history call logging with duration.
+- 👍 **Real-Time Emoji Reactions & OCC**: Interactive message emoji reactions, mutual exclusivity per user, toggle-off removal, instant optimistic UI updates with rollback, and MongoDB Optimistic Concurrency Control (OCC) retry loop on `__v` to prevent lost updates under concurrent reactions.
+- 📞📹 **Real-Time WebRTC Voice & Video Calling (1-on-1)**: Peer-to-peer ultra-low latency audio & video calls with Full HD 1080p ideal (30-60fps), WebRTC sender tuning pinned at 2.5 Mbps (`maintain-framerate`) and studio 48kHz Opus audio at 64 kbps. Resilient mobile camera switching with main rear sensor enumeration, hardware sensor lock recovery, atomic rollback, and Howler.js audio engine with drift-compensated call duration timer.
 - 🔐 **Hardened Security**: Stateless JWT in `HttpOnly` `SameSite` cookies, Passport authentication, bcrypt hashing, rate limiting, and Zod validation.
 
 ---
@@ -44,10 +45,10 @@
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Base UI, Streamdown |
+| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Base UI, Streamdown, Howler.js |
 | **Backend** | Node.js 20+, Express 5, Socket.IO 4, Mongoose 9 (MongoDB), Passport.js, Zod 4 |
 | **AI & Media** | Vercel AI SDK (`ai` v7, `@ai-sdk/google` v4), Google Gemini Models, Cloudinary SDK |
-| **Dev & Infra** | Render.com (Monorepo Web Service), GitHub Actions, CodeRabbit |
+| **Dev & Infra** | Render.com (Monorepo Web Service), GitHub Actions, CodeRabbit, SonarCloud, Husky, Vitest |
 
 ---
 
@@ -102,9 +103,10 @@ realtime-chatapp/
 │   │   └── index.ts               # Server entry point & static SPA server
 ├── frontend/                      # React 19 SPA (Vite + Tailwind CSS v4)
 │   ├── src/
-│   │   ├── components/            # UI primitives, conversation detail, AI model selector
-│   │   ├── hooks/                 # Zustand stores (useAuth, useConversation, useSocket, useAiModels)
-│   │   ├── lib/                   # Axios client with x-socket-id interceptor
+│   │   ├── components/            # UI primitives, conversation detail, call modals, AI selector
+│   │   ├── hooks/                 # Custom React hooks (useAuth, useConversation, useSocket, etc.)
+│   │   ├── stores/                # Zustand sliced stores (call store & slices)
+│   │   ├── lib/                   # Axios client, WebRTC, device manager, sound effects, utils
 │   │   ├── pages/                 # Auth & Conversation views
 │   │   ├── types/                 # TypeScript data contracts
 │   │   └── App.tsx & main.tsx     # App root & entry point
@@ -178,6 +180,7 @@ yarn --cwd frontend dev   # Terminal 2: Port 5173
 | | `POST` | `/api/conversation/create` | Create 1-on-1 or group conversation | Yes |
 | | `GET` | `/api/conversation/:id` | Get messages with cursor pagination (`?cursor=&limit=30`) | Yes |
 | | `POST` | `/api/conversation/message/send` | Send message / prompt AI (`x-socket-id` header) | Yes |
+| | `POST` | `/api/conversation/message/:id/reaction` | Toggle emoji reaction with OCC concurrency | Yes |
 | **AI** | `GET` | `/api/ai/models` | Get active Gemini models & quota latency (`?refresh=true`) | Yes |
 
 ### Socket.IO Events
@@ -188,6 +191,8 @@ yarn --cwd frontend dev   # Terminal 2: Port 5173
 | `conversation:join` | Client ➔ Server | `conversationId, callback` | Join room `conversation:<id>` |
 | `conversation:leave`| Client ➔ Server | `conversationId` | Leave room `conversation:<id>` |
 | `message:new` | Server ➔ Room | `MessageType` | New message in room (excludes sender tab) |
+| `message:reaction` | Client ➔ Server | `{ messageId, emoji }, ack` | Toggle emoji reaction with callback response |
+| `message:reaction:update` | Server ➔ Room | `{ conversationId, messageId, reactions }` | Broadcast updated reaction list to room |
 | `conversation:updated` | Server ➔ User | `{ conversationId, lastMessage }` | Update sidebar preview and bump rank |
 | `conversation:new` | Server ➔ User | `ConversationType` | Notify user of new conversation |
 | `conversation:ai` | Server ➔ Room | `{ chunk, done, message, error }` | Stream AI tokens and completion |
@@ -201,6 +206,24 @@ yarn --cwd frontend dev   # Terminal 2: Port 5173
 | `call:end` / `call:ended` | Bidirectional | `{ callId, reason }` | End active call, teardown & log to DB |
 | `webrtc:offer` / `answer` | Client ➔ Client | `{ callId, sdp }` | Exchange SDP session descriptions |
 | `webrtc:ice-candidate` | Client ➔ Client | `{ callId, candidate }` | Exchange P2P network candidates |
+
+---
+
+## 🧪 Testing & Code Quality
+
+The project enforces strict code quality and stability with an automated 3-tier Level 3 AI Harness:
+- **TypeScript Strict Mode**: Fully typed codebase (`tsc -b`), zero unvetted `any` types.
+- **ESLint & SonarQube Compliance**: Zero warnings policy (`--max-warnings=0`), cognitive complexity < 20, unhandled floating promises guarded via `void` operator (SonarQube S9383).
+- **Fast Test Suite**: Fast component & state machine tests powered by Vitest (`@vitest/coverage-v8`).
+- **Git Enforcement**: Pre-commit verification via `lint-staged` and Conventional Commits enforcement via `commitlint`.
+
+```bash
+# Verify frontend pipeline (type-check -> lint -> test:fast)
+yarn --cwd frontend verify
+
+# Run test coverage
+yarn --cwd frontend test:coverage
+```
 
 ---
 
