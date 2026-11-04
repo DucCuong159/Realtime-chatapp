@@ -183,6 +183,46 @@ describe("WebRTCManager", () => {
     });
   });
 
+  describe("tuneSenderParameters", () => {
+    it("should configure video maxBitrate to 2.5Mbps and audio to 64kbps", async () => {
+      const mockVideoSender = {
+        track: { kind: "video" },
+        getParameters: vi.fn().mockReturnValue({
+          encodings: [{}],
+        }),
+        setParameters: vi.fn().mockResolvedValue(undefined),
+      };
+      const mockAudioSender = {
+        track: { kind: "audio" },
+        getParameters: vi.fn().mockReturnValue({
+          encodings: [{}],
+        }),
+        setParameters: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const mockPC = {
+        getSenders: () => [mockVideoSender, mockAudioSender],
+        close: vi.fn(),
+      } as unknown as RTCPeerConnection;
+
+      webrtcManager.setPeerConnection(mockPC);
+
+      await webrtcManager.tuneSenderParameters();
+
+      expect(mockVideoSender.setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({
+          encodings: [expect.objectContaining({ maxBitrate: 2_500_000 })],
+          degradationPreference: "maintain-framerate",
+        }),
+      );
+      expect(mockAudioSender.setParameters).toHaveBeenCalledWith(
+        expect.objectContaining({
+          encodings: [expect.objectContaining({ maxBitrate: 64_000 })],
+        }),
+      );
+    });
+  });
+
   it("should cleanup all tracks and listeners on cleanup", async () => {
     await webrtcManager.getLocalStream("video");
 
