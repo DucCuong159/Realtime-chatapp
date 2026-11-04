@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -20,15 +19,26 @@ import {
   type ProfileFormType,
 } from "@/validators/user.validator";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Camera, Check, Trash2 } from "lucide-react";
-import { type ChangeEvent, useRef, useState } from "react";
-import { type FieldErrors, type UseFormRegister, useForm } from "react-hook-form";
+import { ArrowLeft, Camera, Trash2 } from "lucide-react";
+import { type ChangeEvent, type JSX, useRef, useState } from "react";
+import {
+  type FieldErrors,
+  useForm,
+  type UseFormRegister,
+} from "react-hook-form";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+];
 
-const ProfileHeader = () => (
+const ProfileHeader = (): JSX.Element => (
   <div className="mx-auto flex w-full max-w-2xl items-center gap-3 pb-6">
     <Link
       to={PROTECTED_ROUTES.CONVERSATION}
@@ -54,6 +64,7 @@ const ProfileHeader = () => (
 interface ProfileAvatarCardProps {
   userName?: string;
   avatarPreview: string | null;
+  avatarError?: string;
   onImageChange: (e: ChangeEvent<HTMLInputElement>) => void;
   onRemoveAvatar: () => void;
 }
@@ -61,9 +72,10 @@ interface ProfileAvatarCardProps {
 const ProfileAvatarCard = ({
   userName,
   avatarPreview,
+  avatarError,
   onImageChange,
   onRemoveAvatar,
-}: ProfileAvatarCardProps) => {
+}: ProfileAvatarCardProps): JSX.Element => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const initials = (userName || "U")
@@ -85,46 +97,56 @@ const ProfileAvatarCard = ({
         <div className="flex flex-col items-center gap-5 sm:flex-row">
           <Avatar className="size-24 border-2 border-border shadow-sm">
             {avatarPreview && (
-              <AvatarImage src={avatarPreview} alt={userName || "User Avatar"} />
+              <AvatarImage
+                src={avatarPreview}
+                alt={userName || "User Avatar"}
+              />
             )}
             <AvatarFallback className="bg-primary/10 text-xl font-bold text-primary">
               {initials}
             </AvatarFallback>
           </Avatar>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={onImageChange}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-2 cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Camera className="size-4" />
-              <span>Upload New Photo</span>
-            </Button>
-
-            {avatarPreview && (
+          <div className="flex flex-col items-start gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={onImageChange}
+              />
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
-                onClick={() => {
-                  onRemoveAvatar();
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
+                className="gap-2 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
               >
-                <Trash2 className="size-4" />
-                <span>Remove</span>
+                <Camera className="size-4" />
+                <span>Upload New Photo</span>
               </Button>
+
+              {avatarPreview && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+                  onClick={() => {
+                    onRemoveAvatar();
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                >
+                  <Trash2 className="size-4" />
+                  <span>Remove</span>
+                </Button>
+              )}
+            </div>
+            {avatarError && (
+              <FieldError className="text-xs text-destructive">
+                {avatarError}
+              </FieldError>
             )}
           </div>
         </div>
@@ -151,26 +173,22 @@ const ProfileInfoCard = ({
   errors,
   aboutCount,
   onAboutChange,
-}: ProfileInfoCardProps) => {
+}: ProfileInfoCardProps): JSX.Element => {
   const { onChange: formAboutChange, ...aboutField } = register("about");
 
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-base font-semibold">Personal Information</CardTitle>
+        <CardTitle className="text-base font-semibold">
+          Personal Information
+        </CardTitle>
         <CardDescription className="text-xs">
           Update your display name and bio description.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <Field className="gap-1.5">
-          <div className="flex items-center justify-between">
-            <FieldLabel htmlFor="email">Email Address</FieldLabel>
-            <Badge variant="secondary" className="gap-1 text-[11px]">
-              <Check className="size-3 text-green-600 dark:text-green-400" />
-              <span>Verified</span>
-            </Badge>
-          </div>
+          <FieldLabel htmlFor="email">Email Address</FieldLabel>
           <Input
             id="email"
             type="email"
@@ -200,7 +218,9 @@ const ProfileInfoCard = ({
         <Field data-invalid={!!errors.about} className="gap-1.5">
           <div className="flex items-center justify-between">
             <FieldLabel htmlFor="about">About / Bio</FieldLabel>
-            <span className="text-xs text-muted-foreground">{aboutCount}/200</span>
+            <span className="text-xs text-muted-foreground">
+              {aboutCount}/200
+            </span>
           </div>
           <Textarea
             id="about"
@@ -221,7 +241,7 @@ const ProfileInfoCard = ({
   );
 };
 
-const ProfilePage = () => {
+const ProfilePage = (): JSX.Element => {
   const { user, updateProfile, isUpdatingProfile } = useAuth();
   const [avatarPreview, setAvatarPreview] = useState<string | null>(
     user?.avatar || null,
@@ -237,11 +257,11 @@ const ProfilePage = () => {
     },
   });
 
-  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>): void => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       toast.error("Please select a valid image file (PNG, JPG, WebP, GIF)");
       return;
     }
@@ -263,14 +283,25 @@ const ProfilePage = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveAvatar = () => {
+  const handleRemoveAvatar = (): void => {
     setAvatarPreview(null);
     form.setValue("avatar", null, { shouldDirty: true });
   };
 
-  const onSubmit = async (data: ProfileFormType) => {
+  const onSubmit = async (data: ProfileFormType): Promise<void> => {
     if (isUpdatingProfile) return;
-    await updateProfile(data);
+    const isSuccess = await updateProfile(data);
+    if (isSuccess) {
+      const updatedUser = useAuth.getState().user;
+      if (updatedUser) {
+        setAvatarPreview(updatedUser.avatar || null);
+        form.reset({
+          name: updatedUser.name || "",
+          about: updatedUser.about || "",
+          avatar: updatedUser.avatar || null,
+        });
+      }
+    }
   };
 
   return (
@@ -282,6 +313,7 @@ const ProfilePage = () => {
           <ProfileAvatarCard
             userName={user?.name}
             avatarPreview={avatarPreview}
+            avatarError={form.formState.errors.avatar?.message}
             onImageChange={handleImageChange}
             onRemoveAvatar={handleRemoveAvatar}
           />

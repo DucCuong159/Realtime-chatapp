@@ -23,6 +23,15 @@ describe("profileFormSchema (TDD)", () => {
     expect(parsed.avatar).toContain("data:image/png;base64,");
   });
 
+  it("accepts avatar as an existing valid image URL", () => {
+    const input = {
+      name: "Alice",
+      avatar: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    };
+    const parsed = profileFormSchema.parse(input);
+    expect(parsed.avatar).toBe("https://res.cloudinary.com/demo/image/upload/sample.jpg");
+  });
+
   it("fails when name is empty", () => {
     const input = {
       name: "   ",
@@ -45,12 +54,11 @@ describe("profileFormSchema (TDD)", () => {
     expect(() => profileFormSchema.parse(input)).toThrow();
   });
 
-  it("rejects arbitrary text or link as avatar (only base64 data URI or null allowed)", () => {
+  it("rejects arbitrary invalid text as avatar", () => {
     const input = {
       name: "Alice",
-      avatar: "https://example.com/not-allowed.jpg",
+      avatar: "not-a-valid-data-uri-or-url",
     };
     expect(() => profileFormSchema.parse(input)).toThrow();
   });
 });
-

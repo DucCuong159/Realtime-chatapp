@@ -11,13 +11,19 @@ export const updateProfileService = async (
   userId: string,
   data: UpdateProfileSchemaType,
 ) => {
-  const updateData = { ...data };
+  const updateData: Record<string, unknown> = {};
 
-  if (updateData.avatar && updateData.avatar.startsWith("data:image/")) {
-    const uploadRes = await cloudinary.uploader.upload(updateData.avatar, {
-      folder: "avatars",
-    });
-    updateData.avatar = uploadRes.secure_url;
+  if (data.name !== undefined) updateData.name = data.name;
+  if (data.about !== undefined) updateData.about = data.about;
+  if (data.avatar !== undefined) {
+    if (data.avatar && data.avatar.toLowerCase().startsWith("data:image/")) {
+      const uploadRes = await cloudinary.uploader.upload(data.avatar, {
+        folder: "avatars",
+      });
+      updateData.avatar = uploadRes.secure_url;
+    } else {
+      updateData.avatar = data.avatar;
+    }
   }
 
   const user = await UserModel.findByIdAndUpdate(

@@ -2,7 +2,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useIsUserOnline } from "@/hooks/use-is-user-online";
 import { PROTECTED_ROUTES } from "@/routes/routes";
 import { LogOut, Moon, Sun, User } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import AvatarWithBadge from "./avatar-with-badge";
 import Logo from "./logo";
 import { useTheme } from "./theme-provider";
@@ -24,7 +24,6 @@ interface AsideBarProps {
 const AsideBar = ({ defaultMenuOpen }: AsideBarProps = {}) => {
   const { user, logout } = useAuth();
   const { toggleTheme } = useTheme();
-  const navigate = useNavigate();
 
   const isOnline = useIsUserOnline(user?._id);
 
@@ -80,16 +79,11 @@ const AsideBar = ({ defaultMenuOpen }: AsideBarProps = {}) => {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => navigate(PROTECTED_ROUTES.PROFILE)}
+                render={<Link to={PROTECTED_ROUTES.PROFILE} />}
                 className="cursor-pointer gap-2 py-2"
               >
-                <Link
-                  to={PROTECTED_ROUTES.PROFILE}
-                  className="flex items-center gap-2 w-full"
-                >
-                  <User className="size-4" />
-                  <span>Profile</span>
-                </Link>
+                <User className="size-4" />
+                <span>Profile</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => logout()}

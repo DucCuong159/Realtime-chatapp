@@ -36,16 +36,23 @@ app.use(
     crossOriginEmbedderPolicy: false,
   }),
 );
+
 // TODO: We will use multer later to handle large file uploads and limit sizes.
-// For now, bypass the global JSON body limit for the message send route.
+// Retain a strict 100kb global limit for all general routes (protecting unauthenticated & nonexistent paths from memory exhaustion).
+// Only authenticated media upload routes bypass this global limit and parse up to 16mb at route level AFTER JWT authentication.
+const MEDIA_UPLOAD_ROUTES = new Set([
+  "POST:/api/conversation/message/send",
+  "PUT:/api/user/profile",
+]);
+
 app.use((req, res, next) => {
-  if (req.method === "POST" && req.path === "/api/conversation/message/send") {
+  if (MEDIA_UPLOAD_ROUTES.has(`${req.method}:${req.path}`)) {
     return next();
   }
   express.json({ limit: "100kb" })(req, res, next);
 });
+app.use(express.urlencoded({ extended: true, limit: "100kb" }));
 app.use(cookieParser());
-app.use(express.urlencoded({ extended: true }));
 app.use(
   cors({
     origin: Env.FRONTEND_ORIGIN,

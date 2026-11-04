@@ -21,6 +21,14 @@ describe("updateProfileSchema validation (TDD)", () => {
     assert.ok(parsed.avatar?.startsWith("data:image/png;base64,"));
   });
 
+  it("accepts avatar as an existing valid image URL (without re-uploading)", () => {
+    const input = {
+      avatar: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    };
+    const parsed = updateProfileSchema.parse(input);
+    assert.equal(parsed.avatar, "https://res.cloudinary.com/demo/image/upload/sample.jpg");
+  });
+
   it("accepts avatar as null (to remove avatar)", () => {
     const input = {
       avatar: null,
@@ -50,11 +58,10 @@ describe("updateProfileSchema validation (TDD)", () => {
     assert.throws(() => updateProfileSchema.parse(input));
   });
 
-  it("rejects arbitrary text or link as avatar (only base64 data URI or null allowed)", () => {
+  it("rejects arbitrary invalid text as avatar", () => {
     const input = {
-      avatar: "https://example.com/not-allowed-direct-link.jpg",
+      avatar: "not-a-valid-data-uri-or-url",
     };
     assert.throws(() => updateProfileSchema.parse(input));
   });
 });
-
