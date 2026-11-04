@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.6.0...realtime-chatapp-v1.7.0) (2026-11-04)
+
+
+### Features
+
+* **call:** optimize HD media quality, harden mobile camera switching, and select main rear sensor ([#99](https://github.com/DucCuong159/Realtime-chatapp/issues/99)) ([349feda](https://github.com/DucCuong159/Realtime-chatapp/commit/349feda08d8b63c49b7bdf7b49eab6eb0bca3d45))
+
+
+### Bug Fixes
+
+* **chat:** resolve SonarQube floating promise violations ([#102](https://github.com/DucCuong159/Realtime-chatapp/issues/102)) ([c7d6b3f](https://github.com/DucCuong159/Realtime-chatapp/commit/c7d6b3f700725176f9cc0af8a8c26252e934e121))
+
 ## [1.6.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.5.0...realtime-chatapp-v1.6.0) (2026-10-05)
 
 
