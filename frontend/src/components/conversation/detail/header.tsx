@@ -24,7 +24,7 @@ const useConversationCalls = (
   const startCall = useCallback(
     (callType: "audio" | "video") => {
       if (isDisabled || !participant) return;
-      useCall.getState().initiateCall(
+      void useCall.getState().initiateCall(
         {
           _id: participant._id,
           name: participant.name,

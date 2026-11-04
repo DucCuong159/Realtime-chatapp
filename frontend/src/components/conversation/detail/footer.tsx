@@ -109,19 +109,19 @@ const ConversationFooter = ({
       aiModelId: isAiConversation ? getEffectiveModelId() : undefined,
     };
     // Send payload in background (non-blocking)
-    sendMessage(payload, isAiConversation);
+    void sendMessage(payload, isAiConversation);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      form.handleSubmit(onSubmit)();
+      void form.handleSubmit(onSubmit)();
     }
   };
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    handleRegisterChange(e);
+    void handleRegisterChange(e);
     const textarea = e.target;
     textarea.style.height = "36px";
     const newHeight = Math.max(36, Math.min(textarea.scrollHeight, 144));

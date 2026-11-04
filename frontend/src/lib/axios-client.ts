@@ -97,7 +97,7 @@ API.interceptors.response.use(
           toast.error(getApiErrorMessage(error));
           break;
         }
-        useAuth.getState().logout();
+        void useAuth.getState().logout();
         break;
       }
       case HTTPSTATUS.FORBIDDEN:

@@ -33,7 +33,7 @@ const NewConversationPopover = () => {
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchAllUsers();
+    void fetchAllUsers();
   }, [fetchAllUsers]);
 
   const toggleUserSelection = (id: string) => {
@@ -74,7 +74,7 @@ const NewConversationPopover = () => {
     });
     setIsOpen(false);
     resetState();
-    navigate(`/conversation/${response?._id}`);
+    void navigate(`/conversation/${response?._id}`);
   };
 
   const handleCreateConversation = async (userId: string) => {
@@ -86,7 +86,7 @@ const NewConversationPopover = () => {
       });
       setIsOpen(false);
       resetState();
-      navigate(`/conversation/${response?._id}`);
+      void navigate(`/conversation/${response?._id}`);
     } finally {
       setLoadingUserId(null);
       setIsOpen(false);
