@@ -767,6 +767,18 @@
     "@tailwindcss/oxide" "4.3.3"
     tailwindcss "4.3.3"
 
+"@tanstack/query-core@5.106.1":
+  version "5.106.1"
+  resolved "https://registry.yarnpkg.com/@tanstack/query-core/-/query-core-5.106.1.tgz#3e5741dcdb4dc6efd6c1d9ccd9d25ae581370317"
+  integrity sha512-erYv/UACddcdgjOL2ixmFdK6tO/AVBeUcTCOtX2N51yZpDQ2U7KJ+xgB/bCNfsF3uoCDTqGHEEbDiFsIO9YUmQ==
+
+"@tanstack/react-query@^5.106.1":
+  version "5.106.1"
+  resolved "https://registry.yarnpkg.com/@tanstack/react-query/-/react-query-5.106.1.tgz#d3381ab946125c918d1627faa2ebcd07b0920000"
+  integrity sha512-ORDvJG/DSfmlFL9lQ8GDkE0VjtQbLeRDY7BL8xjKkQFGLfjFGfNWNuteWgPqA2gPJgLLuWfQ7IX0FlsHCJriyg==
+  dependencies:
+    "@tanstack/query-core" "5.106.1"
+
 "@ts-morph/common@~0.27.0":
   version "0.27.0"
   resolved "https://registry.yarnpkg.com/@ts-morph/common/-/common-0.27.0.tgz#e83a1bd7cbac054045c6246a7c4c99eab7692d46"
