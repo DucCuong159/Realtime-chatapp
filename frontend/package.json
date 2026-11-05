@@ -11,7 +11,7 @@
     "lint": "eslint . --cache --max-warnings=0",
     "test:fast": "vitest run --changed",
     "test:coverage": "vitest run --coverage",
-    "verify": "yarn run type-check && yarn run lint && yarn run test:fast"
+    "verify": "yarn run type-check && yarn run lint && yarn run test:coverage"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

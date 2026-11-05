@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "prepare": "husky",
-    "install:all": "yarn install && yarn --cwd frontend install && yarn --cwd backend install"
+    "install:all": "yarn install && yarn --cwd frontend install && yarn --cwd backend install",
+    "verify:frontend": "yarn --cwd frontend run verify",
+    "verify:backend": "yarn --cwd backend test && yarn --cwd backend run build",
+    "verify": "yarn verify:frontend && yarn verify:backend"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
