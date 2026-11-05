@@ -63,6 +63,13 @@ const ConversationBody = ({
     [messages],
   );
 
+  const isOutgoingMessage = useCallback(
+    (msg: MessageType) =>
+      Boolean(currentUserId && msg.sender?._id === currentUserId) ||
+      msg.status === "sending...",
+    [currentUserId],
+  );
+
   const {
     virtuosoRef,
     scrollerRef,
@@ -80,6 +87,7 @@ const ConversationBody = ({
     isLoadingMore: isFetchingMoreMessages,
     onLoadMore: () => fetchMoreMessages(conversationId),
     isStreaming: isAnyMessageStreaming,
+    isOutgoingItem: isOutgoingMessage,
   });
 
   // Handle Socket AI streaming
@@ -148,21 +156,6 @@ const ConversationBody = ({
     [hasMore, messages.length, isFetchingMoreMessages],
   );
 
-  const handleFollowOutput = useCallback(
-    (isAtBottom: boolean) => {
-      const lastMessage = messages[messages.length - 1];
-      const isLastFromCurrentUser =
-        Boolean(currentUserId && lastMessage?.sender?._id === currentUserId) ||
-        lastMessage?.status === "sending...";
-
-      if (isLastFromCurrentUser) {
-        return "smooth";
-      }
-      return isAtBottom ? "auto" : false;
-    },
-    [messages, currentUserId],
-  );
-
   return (
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
       <Virtuoso<MessageType, VirtuosoHeaderContext>
@@ -178,7 +171,7 @@ const ConversationBody = ({
         }
         startReached={handleStartReached}
         alignToBottom
-        followOutput={handleFollowOutput}
+        followOutput={false}
         atBottomThreshold={80}
         atBottomStateChange={handleAtBottomStateChange}
         components={VIRTUOSO_COMPONENTS}
@@ -215,7 +208,7 @@ const ConversationBody = ({
         <Button
           variant="secondary"
           size="icon"
-          onClick={scrollToBottom}
+          onClick={() => scrollToBottom()}
           className="absolute bottom-4 right-5 z-20 size-9 rounded-full shadow-md border border-border/60 bg-background/90 hover:bg-background backdrop-blur-md transition-all hover:scale-105 active:scale-95 animate-in fade-in zoom-in-75 duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
           aria-label="Scroll to bottom"
         >

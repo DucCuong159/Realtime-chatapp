@@ -4,7 +4,9 @@ import {
   calculateInitialFirstItemIndex,
   calculatePrependedFirstItemIndex,
   findMessageIndexById,
+  getScrollBehaviorOnAppend,
   isPrependedUpdate,
+  shouldAutoScrollOnAppend,
   toVirtuosoItemIndex,
 } from "./virtual-scroll.utils";
 
@@ -107,6 +109,43 @@ describe("virtual-scroll.utils", () => {
 
     it("returns -1 if array index is negative", () => {
       expect(toVirtuosoItemIndex(9970, -1)).toBe(-1);
+    });
+  });
+
+  describe("shouldAutoScrollOnAppend", () => {
+    it("returns true for outgoing message when user is scrolled up", () => {
+      expect(shouldAutoScrollOnAppend(true, false)).toBe(true);
+    });
+
+    it("returns true for outgoing message when user is at bottom", () => {
+      expect(shouldAutoScrollOnAppend(true, true)).toBe(true);
+    });
+
+    it("returns true for incoming message when user is already at bottom", () => {
+      expect(shouldAutoScrollOnAppend(false, true)).toBe(true);
+    });
+
+    it("returns false for incoming message when user is scrolled up reading history", () => {
+      expect(shouldAutoScrollOnAppend(false, false)).toBe(false);
+    });
+  });
+
+  describe("getScrollBehaviorOnAppend", () => {
+    it("returns auto for outgoing message when user was scrolled up", () => {
+      expect(getScrollBehaviorOnAppend(true, false)).toBe("auto");
+    });
+
+    it("returns smooth for outgoing message when user was already at bottom", () => {
+      expect(getScrollBehaviorOnAppend(true, true)).toBe("smooth");
+    });
+
+    it("returns smooth for incoming message when user is at bottom", () => {
+      expect(getScrollBehaviorOnAppend(false, true)).toBe("smooth");
+    });
+
+    it("returns auto when isStreaming is true", () => {
+      expect(getScrollBehaviorOnAppend(true, true, true)).toBe("auto");
+      expect(getScrollBehaviorOnAppend(false, true, true)).toBe("auto");
     });
   });
 });

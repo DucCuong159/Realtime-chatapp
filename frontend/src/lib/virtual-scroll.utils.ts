@@ -58,3 +58,35 @@ export function toVirtuosoItemIndex(
   if (arrayIndex < 0) return -1;
   return firstItemIndex + arrayIndex;
 }
+
+/**
+ * Determines whether the virtual chat should auto-scroll to the bottom
+ * upon a new message being appended at the end of the list.
+ *
+ * Rules:
+ * - Outgoing messages (sent by the user) ALWAYS auto-scroll to bottom,
+ *   even when the user was scrolled up reading history.
+ * - Incoming messages (from others) only auto-scroll if the user is already at/near the bottom.
+ */
+export function shouldAutoScrollOnAppend(
+  isOutgoing: boolean,
+  isAtBottom: boolean,
+): boolean {
+  return isOutgoing || isAtBottom;
+}
+
+/**
+ * Determines the scroll behavior ('auto' vs 'smooth') when auto-scrolling on append.
+ * If user was scrolled far up, instant jump ('auto') prevents animation stalls
+ * across unrendered virtual items. If already near bottom, 'smooth' provides fluid UX.
+ */
+export function getScrollBehaviorOnAppend(
+  isOutgoing: boolean,
+  isAtBottom: boolean,
+  isStreaming: boolean = false,
+): "auto" | "smooth" {
+  if (isStreaming) return "auto";
+  if (isOutgoing && !isAtBottom) return "auto";
+  return "smooth";
+}
+
