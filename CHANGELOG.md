@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.8.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.7.0...realtime-chatapp-v1.8.0) (2026-11-05)
+
+
+### Features
+
+* **auth:** add user profile view and edit functionality with avatar upload ([#105](https://github.com/DucCuong159/Realtime-chatapp/issues/105)) ([5c35e73](https://github.com/DucCuong159/Realtime-chatapp/commit/5c35e7341943497818d4557c0aead8a9eb8b84c3))
+* **chat:** apply react-virtuoso virtual scroll to conversation body ([#115](https://github.com/DucCuong159/Realtime-chatapp/issues/115)) ([dd7b9e6](https://github.com/DucCuong159/Realtime-chatapp/commit/dd7b9e6ed1224d538d73e7be97c79ee8b79b62eb))
+
 ## [1.7.0](https://github.com/DucCuong159/Realtime-chatapp/compare/realtime-chatapp-v1.6.0...realtime-chatapp-v1.7.0) (2026-11-04)
 
 
