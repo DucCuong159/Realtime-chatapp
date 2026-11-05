@@ -82,7 +82,6 @@ export function useVirtualChatScroll<T extends { _id: string }>({
     );
   const isChanged =
     isSwitch ||
-    isPrepend ||
     items.length !== snapshot.length ||
     currentFirstId !== snapshot.firstId;
 

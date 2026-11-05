@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useConversation } from "@/hooks/use-conversation";
 import { useSocket } from "@/hooks/use-socket";
@@ -11,13 +12,49 @@ import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import MessageItem from "./message-item";
-import {
-  VirtuosoHeader,
-  type VirtuosoHeaderContext,
-} from "./virtuoso-components";
+
+interface VirtuosoHeaderContext {
+  hasMore: boolean;
+  messagesLength: number;
+  isFetchingMoreMessages: boolean;
+}
+
+const VirtuosoHeader = ({
+  context,
+}: {
+  context?: VirtuosoHeaderContext;
+}) => {
+  if (!context) return null;
+  const { hasMore, messagesLength, isFetchingMoreMessages } = context;
+
+  return (
+    <div className="w-full px-3 select-none">
+      {!hasMore && messagesLength > 0 && (
+        <div className="flex items-center justify-center py-4">
+          <div className="text-[11px] text-muted-foreground/70 flex items-center gap-2 font-medium">
+            <span className="h-px w-8 bg-border/60" />
+            <span>Beginning of conversation history</span>
+            <span className="h-px w-8 bg-border/60" />
+          </div>
+        </div>
+      )}
+
+      {isFetchingMoreMessages && (
+        <div className="flex items-center justify-center pb-3">
+          <Spinner className="size-6 text-primary!" />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const VIRTUOSO_COMPONENTS = {
   Header: VirtuosoHeader,
+};
+
+const INITIAL_TOP_MOST_ITEM = {
+  index: "LAST" as const,
+  align: "end" as const,
 };
 
 interface ConversationBodyProps {
@@ -155,11 +192,7 @@ const ConversationBody = ({
         ref={virtuosoRef}
         data={messages}
         firstItemIndex={firstItemIndex}
-        initialTopMostItemIndex={
-          messages.length > 0
-            ? { index: messages.length - 1, align: "end" }
-            : 0
-        }
+        initialTopMostItemIndex={INITIAL_TOP_MOST_ITEM}
         startReached={handleStartReached}
         alignToBottom
         followOutput="auto"
