@@ -5,11 +5,30 @@ export const emailSchema = z
   .trim()
   .email("Invalid email address")
   .min(1);
+
 export const passwordSchema = z
   .string()
   .min(12, "Password must be at least 12 characters long");
-export const nameSchema = z.string().trim().min(1, "Name must not be empty");
-export const avatarSchema = z.string().url("Avatar must be a valid URL");
+
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(1, "Name must not be empty")
+  .max(50, "Name must be at most 50 characters");
+
+export const avatarSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) =>
+      val.startsWith("http://") ||
+      val.startsWith("https://") ||
+      (/^data:image\/(png|jpeg|jpg|webp|gif);base64,/.test(val) &&
+        val.length <= 15 * 1024 * 1024),
+    "Avatar must be a valid image URL or Data URI",
+  )
+  .nullable();
+
 export const aboutSchema = z
   .string()
   .trim()

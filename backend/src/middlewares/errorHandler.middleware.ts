@@ -6,6 +6,13 @@ import { AppError, ErrorCodes } from "../utils/app-error.js";
 export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
   console.log(`Error occured: ${req.path}`, err);
 
+  if (err && typeof err === "object" && "type" in err && err.type === "entity.too.large") {
+    return res.status(HTTPSTATUS.BAD_REQUEST).json({
+      message: "Payload too large",
+      errorCode: ErrorCodes.ERR_BAD_REQUEST,
+    });
+  }
+
   if (err instanceof z.ZodError) {
     return res.status(HTTPSTATUS.BAD_REQUEST).json({
       message: "Validation Error",
