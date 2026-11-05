@@ -67,7 +67,8 @@ const MessageAttachment = ({
     <img
       src={image}
       alt="Attachment"
-      className={cn("max-h-80 object-cover", imageClassName)}
+      loading="lazy"
+      className={cn("max-h-80 object-cover min-h-32 bg-muted/20", imageClassName)}
     />
   );
 };
@@ -112,6 +113,7 @@ interface MessageBubbleProps {
   message: MessageType;
   isCurrentUser: boolean;
   currentUserId: string | null;
+  isHighlighted?: boolean;
   onScrollToMessage: (targetId: string) => void;
   onToggleReaction: (emoji: string) => void;
   onTouchStart: () => void;
@@ -124,6 +126,7 @@ const MessageBubble = memo(
     message,
     isCurrentUser,
     currentUserId,
+    isHighlighted,
     onScrollToMessage,
     onToggleReaction,
     onTouchStart,
@@ -151,8 +154,9 @@ const MessageBubble = memo(
           onTouchEnd={onTouchEnd}
           onTouchMove={onTouchMove}
           className={cn(
-            "relative flex flex-col text-sm wrap-break-word wrap-anywhere",
+            "relative flex flex-col text-sm wrap-break-word wrap-anywhere transition-all duration-300",
             bubbleClassName,
+            isHighlighted && "border-2 border-black dark:border-white",
           )}
         >
           {message.replyTo && (
