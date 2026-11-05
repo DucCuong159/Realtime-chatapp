@@ -31,6 +31,12 @@ export interface UseVirtualChatScrollReturn {
   scrollToItemById: (targetId: string) => boolean;
 }
 
+interface VirtualItemsSnapshot {
+  conversationId: string;
+  firstId: string | undefined;
+  length: number;
+}
+
 /**
  * Lightweight, idiomatic Virtual Chat Scroll Engine.
  * Manages reverse-scroll indexing, seamless pagination prepend during render,
@@ -48,40 +54,66 @@ export function useVirtualChatScroll<T extends { _id: string }>({
 }: UseVirtualChatScrollOptions<T>): UseVirtualChatScrollReturn {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const isAtBottomRef = useRef(true);
-  const prevEffectConvIdRef = useRef(conversationId);
-  const prevEffectFirstIdRef = useRef<string | undefined>(items[0]?._id);
-  const prevEffectLengthRef = useRef(items.length);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [firstItemIndex, setFirstItemIndex] = useState(() =>
     calculateInitialFirstItemIndex(items.length),
   );
-  const [prevConversationId, setPrevConversationId] = useState(conversationId);
-  const [prevFirstId, setPrevFirstId] = useState(() => items[0]?._id);
-  const [prevLength, setPrevLength] = useState(items.length);
+  const [itemsSnapshot, setItemsSnapshot] = useState<VirtualItemsSnapshot>(
+    () => ({
+      conversationId,
+      firstId: items[0]?._id,
+      length: items.length,
+    }),
+  );
+  const prevEffectSnapshotRef = useRef<VirtualItemsSnapshot>({
+    conversationId,
+    firstId: items[0]?._id,
+    length: items.length,
+  });
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
+  const currentFirstId = items[0]?._id;
+  const isConversationSwitch = itemsSnapshot.conversationId !== conversationId;
+  const isPrepend =
+    !isConversationSwitch &&
+    isPrependedUpdate(
+      currentFirstId,
+      itemsSnapshot.firstId,
+      items.length,
+      itemsSnapshot.length,
+    );
+
   // Detect conversation switches or prepended messages during render
   // and adjust firstItemIndex before Virtuoso receives the updated items.
-  if (conversationId !== prevConversationId) {
-    setPrevConversationId(conversationId);
-    setPrevFirstId(items[0]?._id);
-    setPrevLength(items.length);
+  if (isConversationSwitch) {
+    setItemsSnapshot({
+      conversationId,
+      firstId: currentFirstId,
+      length: items.length,
+    });
     setFirstItemIndex(calculateInitialFirstItemIndex(items.length));
-  } else if (
-    isPrependedUpdate(items[0]?._id, prevFirstId, items.length, prevLength)
-  ) {
-    const prependedCount = items.length - prevLength;
-    setPrevFirstId(items[0]?._id);
-    setPrevLength(items.length);
+  } else if (isPrepend) {
+    const prependedCount = items.length - itemsSnapshot.length;
+    setItemsSnapshot({
+      conversationId,
+      firstId: currentFirstId,
+      length: items.length,
+    });
     setFirstItemIndex((prev) =>
       calculatePrependedFirstItemIndex(prev, prependedCount),
     );
-  } else if (items.length !== prevLength || items[0]?._id !== prevFirstId) {
-    setPrevFirstId(items[0]?._id);
-    setPrevLength(items.length);
+  } else if (
+    items.length !== itemsSnapshot.length ||
+    currentFirstId !== itemsSnapshot.firstId
+  ) {
+    setItemsSnapshot({
+      conversationId,
+      firstId: currentFirstId,
+      length: items.length,
+    });
   }
 
   // Clean up highlight timer on unmount
@@ -137,11 +169,17 @@ export function useVirtualChatScroll<T extends { _id: string }>({
 
   // Unified effect handling scroll side effects (conversation switch and appends)
   useEffect(() => {
+    const prev = prevEffectSnapshotRef.current;
+    const currentFirst = items[0]?._id;
+    const currentLength = items.length;
+
     // 1. Conversation switch: scroll to bottom and reset UI state
-    if (prevEffectConvIdRef.current !== conversationId) {
-      prevEffectConvIdRef.current = conversationId;
-      prevEffectFirstIdRef.current = items[0]?._id;
-      prevEffectLengthRef.current = items.length;
+    if (prev.conversationId !== conversationId) {
+      prevEffectSnapshotRef.current = {
+        conversationId,
+        firstId: currentFirst,
+        length: currentLength,
+      };
       isAtBottomRef.current = true;
       setShowScrollToBottom(false);
       setHighlightedId(null);
@@ -149,20 +187,15 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       return;
     }
 
-    const currentFirstId = items[0]?._id;
-    const prevFirstId = prevEffectFirstIdRef.current;
-    const currentLength = items.length;
-    const prevLength = prevEffectLengthRef.current;
-
-    const isPrepend = isPrependedUpdate(
-      currentFirstId,
-      prevFirstId,
+    const isPrependEffect = isPrependedUpdate(
+      currentFirst,
+      prev.firstId,
       currentLength,
-      prevLength,
+      prev.length,
     );
 
     // 2. New message appended: auto-scroll side-effect
-    if (!isPrepend && currentLength > prevLength) {
+    if (!isPrependEffect && currentLength > prev.length) {
       const lastItem = items[currentLength - 1];
       const isOutgoing = Boolean(lastItem && isOutgoingItem?.(lastItem));
 
@@ -176,8 +209,11 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       }
     }
 
-    prevEffectFirstIdRef.current = currentFirstId;
-    prevEffectLengthRef.current = currentLength;
+    prevEffectSnapshotRef.current = {
+      conversationId,
+      firstId: currentFirst,
+      length: currentLength,
+    };
   }, [items, conversationId, isOutgoingItem, isStreaming, scrollToBottom]);
 
   return {
