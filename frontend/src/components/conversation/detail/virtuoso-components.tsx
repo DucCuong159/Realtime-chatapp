@@ -34,5 +34,3 @@ export const VirtuosoHeader = ({
     </div>
   );
 };
-
-export const VirtuosoFooter = () => <div className="h-2 w-full shrink-0" />;

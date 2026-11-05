@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useConversation } from "@/hooks/use-conversation";
 import { useSocket } from "@/hooks/use-socket";
 import { useVirtualChatScroll } from "@/hooks/use-virtual-chat-scroll";
+import { cn } from "@/lib/utils";
 import type { AIStreamPayload, MessageType } from "@/types/conversation.type";
 import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useMemo } from "react";
@@ -11,14 +12,12 @@ import { toast } from "sonner";
 import { useShallow } from "zustand/react/shallow";
 import MessageItem from "./message-item";
 import {
-  VirtuosoFooter,
   VirtuosoHeader,
   type VirtuosoHeaderContext,
 } from "./virtuoso-components";
 
 const VIRTUOSO_COMPONENTS = {
   Header: VirtuosoHeader,
-  Footer: VirtuosoFooter,
 };
 
 interface ConversationBodyProps {
@@ -72,7 +71,6 @@ const ConversationBody = ({
 
   const {
     virtuosoRef,
-    scrollerRef,
     firstItemIndex,
     showScrollToBottom,
     highlightedId,
@@ -161,7 +159,6 @@ const ConversationBody = ({
       <Virtuoso<MessageType, VirtuosoHeaderContext>
         key={conversationId}
         ref={virtuosoRef}
-        scrollerRef={scrollerRef}
         data={messages}
         firstItemIndex={firstItemIndex}
         initialTopMostItemIndex={
@@ -171,7 +168,7 @@ const ConversationBody = ({
         }
         startReached={handleStartReached}
         alignToBottom
-        followOutput={false}
+        followOutput="auto"
         atBottomThreshold={80}
         atBottomStateChange={handleAtBottomStateChange}
         components={VIRTUOSO_COMPONENTS}
@@ -182,11 +179,11 @@ const ConversationBody = ({
         itemContent={(index, message) => {
           const arrayIndex = index - firstItemIndex;
           const isCurrentUser = message.sender?._id === currentUserId;
-          const isLastFromUser =
-            arrayIndex === messages.length - 1 && isCurrentUser;
+          const isLast = arrayIndex === messages.length - 1;
+          const isLastFromUser = isLast && isCurrentUser;
 
           return (
-            <div className="pb-1 w-full px-3">
+            <div className={cn("w-full px-3", isLast ? "pb-2.5" : "pb-1")}>
               <MessageItem
                 message={message}
                 currentUserId={currentUserId}
