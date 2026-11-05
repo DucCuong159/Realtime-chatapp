@@ -112,12 +112,19 @@ frontend/src/
 ## 5. Harness Scripts (Verify Pipeline)
 
 ```bash
-# Frontend — chạy từ /frontend
-yarn run verify    # = type-check → lint → test:fast
+# Root Monorepo — Chạy từ root dự án (Fail-Fast, bảo toàn mã lỗi)
+yarn verify              # = yarn verify:frontend && yarn verify:backend (Fail-Fast)
+yarn verify:frontend     # = yarn --cwd frontend run verify
+yarn verify:backend      # = yarn --cwd backend test && yarn --cwd backend run build
 
-# Các lệnh con:
+# Frontend — chạy từ /frontend (hoặc yarn --cwd frontend ...)
+yarn run verify          # = type-check → lint → test:fast
 yarn run type-check      # tsc -b (project build mode traversing tsconfig references)
 yarn run lint            # eslint . --cache --max-warnings=0
 yarn run test:fast       # vitest run --changed
 yarn run test:coverage   # vitest run --coverage
+
+# Backend — chạy từ /backend (hoặc yarn --cwd backend ...)
+yarn test                # node --import tsx --test
+yarn run build           # tsc (compile & type-check)
 ```

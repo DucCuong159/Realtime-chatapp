@@ -11,20 +11,17 @@
 
 ---
 
-
 ## 2. QUY TRÌNH 9 BƯỚC BẮT BUỘC (9-STEP SPECIFICATION-DRIVEN EXECUTION HARNESS)
 
 > Quy trình 9 bước tiêu chuẩn khi giao task cho AI (đặc biệt trong các framework kỹ nghệ agent như ECC, Cursor rules, hay quy trình Specification-Driven Development) được chia làm 3 giai đoạn lớn:
 > **Chuẩn bị (Specification & Context) $\rightarrow$ Thực thi (Execution & Planning) $\rightarrow$ Kiểm định & Đóng gói (Verification & Delivery)**.
 
 ### Tóm tắt chu trình:
-
 $$\text{Specify} \rightarrow \text{Clarify} \rightarrow \text{Explore} \rightarrow \text{Plan} \rightarrow \text{Test} \rightarrow \text{Implement} \rightarrow \text{Verify} \rightarrow \text{Review} \rightarrow \text{Commit}$$
 
 Mọi tác vụ code/tính năng (trừ câu hỏi lý thuyết thuần túy) BẮT BUỘC phải thực hiện tuần tự qua 3 giai đoạn và hiển thị rõ block tiến trình tương ứng:
 
 ---
-
 
 ### Giai đoạn 1: Định hình bài toán (Specification & Context)
 
@@ -36,7 +33,6 @@ Mọi tác vụ code/tính năng (trừ câu hỏi lý thuyết thuần túy) B�
 - **Bước 2 [Clarify - Làm rõ & Hỏi ngược]**:
   - Yêu cầu AI chủ động đặt câu hỏi làm rõ các điểm mơ hồ, edge cases, hoặc giả định ngầm trước khi bắt tay vào làm (chặn đứng nguy cơ hiểu sai đề bài).
   - Nếu yêu cầu đã rõ ràng 100%, BẮT BUỘC liệt kê ngắn gọn các giả định kỹ thuật (technical assumptions) trước khi chuyển bước.
-
 
 - **Bước 3 [Explore / Research - Khảo sát hiện trạng]**:
   - Quét codebase và đọc tài liệu: Nạp `.agent/memory.md` và mở file `SKILL.md` liên quan từ Mục 3 (Bản đồ định tuyến kỹ năng).
@@ -67,9 +63,10 @@ Mọi tác vụ code/tính năng (trừ câu hỏi lý thuyết thuần túy) B�
 ### Giai đoạn 3: Kiểm định & Bàn giao (Verification & Delivery)
 
 - **Bước 7 [Verify / Self-Correction - Tự động xác thực & Sửa lỗi]**:
-  - Kích hoạt Harness xác thực dự án:
-    - Frontend: Chạy `yarn run verify` (tuần tự `type-check` via `tsc -b`, `lint` via ESLint, và `test:fast` via Vitest).
-    - Backend: Chạy `yarn test` và `yarn build` (type-check / compile).
+  - Kích hoạt Harness xác thực dự án (BẮT BUỘC tuân thủ nguyên tắc **Bảo toàn lỗi - Preserve Failures**, không để lệnh kiểm tra sau che giấu/mask mã lỗi của lệnh trước):
+    - **Cross-Stack (cả Frontend & Backend)**: Chạy `yarn verify` từ root monorepo (Fail-Fast: dừng ngay lập tức nếu Frontend fail), hoặc chạy Status Aggregator gom mã lỗi nếu cần audit đầy đủ cả hai stack.
+    - **Scoped Frontend**: Chạy `yarn verify:frontend` (hoặc `yarn --cwd frontend run verify` gồm `type-check`, `lint`, `test:fast`).
+    - **Scoped Backend**: Chạy `yarn verify:backend` (hoặc `yarn --cwd backend test && yarn --cwd backend run build`).
   - Nếu có lỗi phát sinh, AI tự động đọc log/stack trace, phân tích nguyên nhân gốc rễ (Root Cause Analysis - RCA) và tự sửa code cho đến khi exit code = 0 (tối đa 3 vòng lặp tự sửa).
   - Tuân thủ nghiêm ngặt **Quy tắc chống gian lận (Anti-Tampering ở Mục 6.3)**: Tuyệt đối KHÔNG sửa file test hoặc chèn comment tắt cảnh báo type/lint để pass giả tạo.
 
@@ -199,16 +196,51 @@ Trước khi kết thúc bất kỳ tác vụ nào, tự động xác nhận cá
 > Quy chuẩn vận hành bắt buộc để Agent hoạt động ở Level 3 (Autonomous).
 > Type, Lint và Commit Message sẽ được Husky Git hooks cưỡng chế cơ học trên máy local.
 
-### 6.1 Vòng lặp tự kiểm tra (Automated Self-Correction Loop)
+### 6.1 Vòng lặp tự kiểm tra & Bảo toàn lỗi (Automated Self-Correction & Preserve Failures)
 
-Sau khi hoàn thành Bước 6 (Implement), **BẮT BUỘC** gọi terminal tool chạy:
+Sau khi hoàn thành Bước 6 (Implement), **BẮT BUỘC** gọi terminal tool chạy pipeline kiểm định.
+
+> ⚠️ **NGUYÊN TẮC BẢO TOÀN LỖI (PRESERVE FAILURES / ANTI-MASKING)**:
+> Khi kiểm tra các thay đổi liên quan đến cả hai stack (cross-stack change), tuyệt đối không chạy các lệnh kiểm tra tuần tự rời rạc mà không kiểm tra exit code. Nếu kiểm tra Frontend thất bại nhưng Backend thành công, shell script sẽ kết thúc bằng mã exit code 0 của Backend $\rightarrow$ lỗi của Frontend sẽ bị **che giấu (masked)** hoàn toàn!
+> Bắt buộc áp dụng một trong hai cơ chế sau:
+
+#### Phương án 1: Fail-Fast (Khuyến nghị cho Automation / Monorepo CI)
+Dừng thực thi ngay lập tức tại bước bị lỗi đầu tiên và bảo toàn nguyên vẹn mã exit code:
 
 ```bash
-# Frontend verify harness
-cd frontend && yarn run verify
+# Lựa chọn 1.1: Sử dụng root script chuẩn của Monorepo (đã tích hợp Fail-Fast qua &&)
+yarn verify
 
-# Backend test & build harness (khi sửa code backend)
-cd backend && yarn test && yarn run build
+# Lựa chọn 1.2: Chạy trực tiếp từ root với cờ --cwd và toán tử && (Fail-Fast)
+yarn --cwd frontend run verify && \
+yarn --cwd backend test && \
+yarn --cwd backend run build
+```
+
+#### Phương án 2: Status Aggregator (Kiểm tra toàn diện 2 stack mà KHÔNG nuốt mã lỗi)
+Sử dụng khi bạn muốn chạy cả Frontend và Backend để thu thập đầy đủ toàn bộ log lỗi trước khi bắt tay vào sửa, nhưng vẫn đảm bảo block script trả về mã lỗi (exit code ≠ 0) nếu có bất kỳ stack nào thất bại:
+
+```bash
+# Chạy kiểm tra cả 2 stack và tổng hợp exit code
+FE_EXIT=0
+BE_EXIT=0
+
+yarn --cwd frontend run verify || FE_EXIT=$?
+(yarn --cwd backend test && yarn --cwd backend run build) || BE_EXIT=$?
+
+if [ $FE_EXIT -ne 0 ] || [ $BE_EXIT -ne 0 ]; then
+  echo "❌ Verification FAILED: Frontend exit code = $FE_EXIT, Backend exit code = $BE_EXIT"
+  exit 1
+fi
+```
+
+#### Đối với tác vụ đơn lẻ (Single-Stack Scoped Task)
+```bash
+# Chỉ Frontend
+yarn verify:frontend   # hoặc: yarn --cwd frontend run verify
+
+# Chỉ Backend
+yarn verify:backend    # hoặc: yarn --cwd backend test && yarn --cwd backend run build
 ```
 
 Nếu lệnh trả về exit code ≠ 0:
@@ -241,7 +273,7 @@ Nếu lệnh trả về exit code ≠ 0:
 
 ### 6.4 Git Delivery (Conventional Commits)
 
-Khi `yarn run verify` thành công, tạo commit theo chuẩn:
+Khi toàn bộ pipeline kiểm định (verify) thành công (exit code = 0), tạo commit theo chuẩn:
 
 ```text
 <type>(<scope>): <mô tả ngắn>
