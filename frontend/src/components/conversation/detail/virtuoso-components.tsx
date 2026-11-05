@@ -15,7 +15,7 @@ export const VirtuosoHeader = ({
   const { hasMore, messagesLength, isFetchingMoreMessages } = context;
 
   return (
-    <div className="w-full select-none">
+    <div className="w-full px-3 select-none">
       {!hasMore && messagesLength > 0 && (
         <div className="flex items-center justify-center py-4">
           <div className="text-[11px] text-muted-foreground/70 flex items-center gap-2 font-medium">

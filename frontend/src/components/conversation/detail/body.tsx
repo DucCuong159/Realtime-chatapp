@@ -184,7 +184,7 @@ const ConversationBody = ({
         components={VIRTUOSO_COMPONENTS}
         context={headerContext}
         style={{ height: "100%", width: "100%", overflowX: "hidden" }}
-        className="overflow-x-hidden px-3"
+        className="overflow-x-hidden"
         computeItemKey={(_index, message) => message._id}
         itemContent={(index, message) => {
           const arrayIndex = index - firstItemIndex;
@@ -193,7 +193,7 @@ const ConversationBody = ({
             arrayIndex === messages.length - 1 && isCurrentUser;
 
           return (
-            <div className="pb-1 w-full overflow-hidden">
+            <div className="pb-1 w-full px-3">
               <MessageItem
                 message={message}
                 currentUserId={currentUserId}
