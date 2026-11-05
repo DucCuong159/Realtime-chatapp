@@ -57,11 +57,6 @@ const ConversationBody = ({
     })),
   );
 
-  const isAnyMessageStreaming = useMemo(
-    () => messages.some((m) => Boolean(m.streaming)),
-    [messages],
-  );
-
   const isOutgoingMessage = useCallback(
     (msg: MessageType) =>
       Boolean(currentUserId && msg.sender?._id === currentUserId) ||
@@ -84,7 +79,6 @@ const ConversationBody = ({
     hasMore,
     isLoadingMore: isFetchingMoreMessages,
     onLoadMore: () => fetchMoreMessages(conversationId),
-    isStreaming: isAnyMessageStreaming,
     isOutgoingItem: isOutgoingMessage,
   });
 
@@ -205,7 +199,7 @@ const ConversationBody = ({
         <Button
           variant="secondary"
           size="icon"
-          onClick={() => scrollToBottom()}
+          onClick={scrollToBottom}
           className="absolute bottom-4 right-5 z-20 size-9 rounded-full shadow-md border border-border/60 bg-background/90 hover:bg-background backdrop-blur-md transition-all hover:scale-105 active:scale-95 animate-in fade-in zoom-in-75 duration-200 cursor-pointer text-muted-foreground hover:text-foreground"
           aria-label="Scroll to bottom"
         >

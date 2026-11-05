@@ -2,7 +2,6 @@ import {
   calculateInitialFirstItemIndex,
   calculatePrependedFirstItemIndex,
   findMessageIndexById,
-  getScrollBehaviorOnAppend,
   isPrependedUpdate,
   shouldAutoScrollOnAppend,
 } from "@/lib/virtual-scroll.utils";
@@ -16,7 +15,6 @@ export interface UseVirtualChatScrollOptions<T extends { _id: string }> {
   isLoadingMore?: boolean;
   onLoadMore?: () => void | Promise<unknown>;
   highlightDurationMs?: number;
-  isStreaming?: boolean;
   isOutgoingItem?: (item: T) => boolean;
 }
 
@@ -27,7 +25,7 @@ export interface UseVirtualChatScrollReturn {
   highlightedId: string | null;
   handleStartReached: () => void;
   handleAtBottomStateChange: (atBottom: boolean) => void;
-  scrollToBottom: (behavior?: "auto" | "smooth") => void;
+  scrollToBottom: () => void;
   scrollToItemById: (targetId: string) => boolean;
 }
 
@@ -39,7 +37,7 @@ interface ItemSnapshot {
 
 /**
  * Lightweight Virtual Chat Scroll Engine.
- * Manages reverse-scroll indexing during render, reply jump, and auto-follow.
+ * Automatically aligns and scrolls to bottom with zero jank during prepend.
  */
 export function useVirtualChatScroll<T extends { _id: string }>({
   items,
@@ -48,7 +46,6 @@ export function useVirtualChatScroll<T extends { _id: string }>({
   isLoadingMore,
   onLoadMore,
   highlightDurationMs = 2000,
-  isStreaming = false,
   isOutgoingItem,
 }: UseVirtualChatScrollOptions<T>): UseVirtualChatScrollReturn {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -99,10 +96,7 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       setFirstItemIndex(calculateInitialFirstItemIndex(items.length));
     } else if (isPrepend) {
       setFirstItemIndex((prev) =>
-        calculatePrependedFirstItemIndex(
-          prev,
-          items.length - snapshot.length,
-        ),
+        calculatePrependedFirstItemIndex(prev, items.length - snapshot.length),
       );
     }
   }
@@ -113,17 +107,14 @@ export function useVirtualChatScroll<T extends { _id: string }>({
     };
   }, []);
 
-  const scrollToBottom = useCallback(
-    (behavior: "auto" | "smooth" = "smooth") => {
-      virtuosoRef.current?.scrollToIndex({
-        index: "LAST",
-        align: "end",
-        behavior: isStreaming ? "auto" : behavior,
-      });
-      setShowScrollToBottom(false);
-    },
-    [isStreaming],
-  );
+  const scrollToBottom = useCallback(() => {
+    virtuosoRef.current?.scrollToIndex({
+      index: "LAST",
+      align: "end",
+      behavior: "auto",
+    });
+    setShowScrollToBottom(false);
+  }, []);
 
   const handleStartReached = useCallback(() => {
     if (hasMore && !isLoadingMore && onLoadMore) void onLoadMore();
@@ -165,27 +156,16 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       isAtBottomRef.current = true;
       setShowScrollToBottom(false);
       setHighlightedId(null);
-      scrollToBottom("auto");
+      scrollToBottom();
     } else if (
-      !isPrependedUpdate(
-        currentFirst,
-        prev.firstId,
-        currentLen,
-        prev.length,
-      ) &&
+      !isPrependedUpdate(currentFirst, prev.firstId, currentLen, prev.length) &&
       currentLen > prev.length
     ) {
       const isOutgoing = Boolean(
         items[currentLen - 1] && isOutgoingItem?.(items[currentLen - 1]),
       );
       if (shouldAutoScrollOnAppend(isOutgoing, isAtBottomRef.current)) {
-        scrollToBottom(
-          getScrollBehaviorOnAppend(
-            isOutgoing,
-            isAtBottomRef.current,
-            isStreaming,
-          ),
-        );
+        scrollToBottom();
       }
     }
 
@@ -194,7 +174,7 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       firstId: currentFirst,
       length: currentLen,
     };
-  }, [items, conversationId, isOutgoingItem, isStreaming, scrollToBottom]);
+  }, [items, conversationId, isOutgoingItem, scrollToBottom]);
 
   return {
     virtuosoRef,
