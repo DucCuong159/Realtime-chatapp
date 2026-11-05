@@ -22,6 +22,20 @@ describe("virtual-scroll.utils", () => {
     it("supports custom START_INDEX", () => {
       expect(calculateInitialFirstItemIndex(20, 5000)).toBe(4980);
     });
+
+    it("keeps index positive and non-underflowing for 10,000+ messages", () => {
+      const indexFor10k = calculateInitialFirstItemIndex(10000);
+      expect(indexFor10k).toBeGreaterThan(0);
+      expect(indexFor10k).toBe(START_INDEX - 10000);
+
+      const indexFor50k = calculateInitialFirstItemIndex(50000);
+      expect(indexFor50k).toBeGreaterThan(0);
+      expect(indexFor50k).toBe(START_INDEX - 50000);
+    });
+
+    it("guards against negative underflow if length exceeds startIndex", () => {
+      expect(calculateInitialFirstItemIndex(6000, 5000)).toBe(0);
+    });
   });
 
   describe("calculatePrependedFirstItemIndex", () => {
@@ -33,6 +47,10 @@ describe("virtual-scroll.utils", () => {
 
     it("handles zero prepended messages gracefully", () => {
       expect(calculatePrependedFirstItemIndex(9970, 0)).toBe(9970);
+    });
+
+    it("guards against negative underflow if prepended exceeds current index", () => {
+      expect(calculatePrependedFirstItemIndex(20, 50)).toBe(0);
     });
   });
 
@@ -92,4 +110,3 @@ describe("virtual-scroll.utils", () => {
     });
   });
 });
-

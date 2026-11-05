@@ -148,6 +148,21 @@ const ConversationBody = ({
     [hasMore, messages.length, isFetchingMoreMessages],
   );
 
+  const handleFollowOutput = useCallback(
+    (isAtBottom: boolean) => {
+      const lastMessage = messages[messages.length - 1];
+      const isLastFromCurrentUser =
+        Boolean(currentUserId && lastMessage?.sender?._id === currentUserId) ||
+        lastMessage?.status === "sending...";
+
+      if (isLastFromCurrentUser) {
+        return "smooth";
+      }
+      return isAtBottom ? "auto" : false;
+    },
+    [messages, currentUserId],
+  );
+
   return (
     <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
       <Virtuoso<MessageType, VirtuosoHeaderContext>
@@ -163,7 +178,7 @@ const ConversationBody = ({
         }
         startReached={handleStartReached}
         alignToBottom
-        followOutput="auto"
+        followOutput={handleFollowOutput}
         atBottomThreshold={80}
         atBottomStateChange={handleAtBottomStateChange}
         components={VIRTUOSO_COMPONENTS}

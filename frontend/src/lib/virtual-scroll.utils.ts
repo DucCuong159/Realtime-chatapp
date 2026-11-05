@@ -1,25 +1,27 @@
-export const START_INDEX = 10000;
+export const START_INDEX = 1_000_000_000;
 
 /**
  * Calculates the initial firstItemIndex for Virtuoso.
  * Pre-shifts the index by the count of existing messages so older prepended
  * messages can decrement without reaching negative indices.
+ * Guaranteed to stay non-negative.
  */
 export function calculateInitialFirstItemIndex(
   messagesLength: number,
   startIndex: number = START_INDEX,
 ): number {
-  return startIndex - messagesLength;
+  return Math.max(0, startIndex - messagesLength);
 }
 
 /**
  * Calculates new firstItemIndex when older messages are prepended to the top.
+ * Guaranteed to stay non-negative to satisfy Virtuoso API requirements.
  */
 export function calculatePrependedFirstItemIndex(
   currentFirstItemIndex: number,
   prependedCount: number,
 ): number {
-  return currentFirstItemIndex - prependedCount;
+  return Math.max(0, currentFirstItemIndex - prependedCount);
 }
 
 /**
@@ -56,4 +58,3 @@ export function toVirtuosoItemIndex(
   if (arrayIndex < 0) return -1;
   return firstItemIndex + arrayIndex;
 }
-
