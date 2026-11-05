@@ -6,6 +6,7 @@
 ## 1. Stack cố định (KHÔNG được tự ý thay đổi)
 
 ### Frontend (`/frontend`)
+
 - **Framework**: React 19 + TypeScript 6 (Strict mode via `tsc -b`)
 - **Styling**: Tailwind CSS 4 + shadcn/ui (Base UI)
 - **State Management**: Zustand (client state only)
@@ -18,6 +19,7 @@
 - **Linting**: ESLint 10 (flat config) + typescript-eslint
 
 ### Backend (`/backend`)
+
 - **Runtime**: Node.js + TypeScript 7
 - **Framework**: Express 5
 - **Realtime**: Socket.IO
@@ -67,29 +69,35 @@ frontend/src/
 ## 3. Quy tắc kiến trúc bất biến (Invariant Rules)
 
 ### State Management
+
 - **KHÔNG** lưu server state (API response cache) trong Zustand.
 - Zustand chỉ cho client state: UI flags, theme, current user session.
 - Data fetching dùng custom hooks (`src/hooks/use-*.ts`).
 
 ### Realtime (Socket.IO)
+
 - Mọi socket event listener PHẢI có cleanup function khi component unmount.
 - Socket connection được quản lý tập trung, KHÔNG tạo connection mới trong component.
 
 ### Validation
+
 - 100% request body / socket payload PHẢI parse qua Zod schema trước khi vào Controller/Service.
 - Frontend form validation dùng `@hookform/resolvers` + Zod.
 
 ### TypeScript
+
 - KHÔNG dùng `any`.
 - KHÔNG dùng `as unknown as T` trừ khi tương tác với thư viện third-party không có type.
 - Mọi function parameter và return type phải được khai báo tường minh.
 
 ### Database (MongoDB/Mongoose)
+
 - ID dùng ObjectId mặc định của MongoDB.
 - Index cho foreign key fields và các trường hay query/filter.
 - Phân trang dùng cursor-based (sort by `_id` hoặc `createdAt`), KHÔNG dùng `skip()` với offset lớn.
 
 ### Security
+
 - KHÔNG render HTML/Markdown thô từ user input mà không sanitize.
 - KHÔNG ghép chuỗi vào query — luôn dùng Mongoose query builder.
 - Rate limiting đã cấu hình via `express-rate-limit`.
@@ -112,12 +120,19 @@ frontend/src/
 ## 5. Harness Scripts (Verify Pipeline)
 
 ```bash
-# Frontend — chạy từ /frontend
-yarn run verify    # = type-check → lint → test:fast
+# Root Monorepo — Chạy từ root dự án (Fail-Fast, bảo toàn mã lỗi)
+yarn verify              # = yarn verify:frontend && yarn verify:backend (Fail-Fast)
+yarn verify:frontend     # = yarn --cwd frontend run verify
+yarn verify:backend      # = yarn --cwd backend test && yarn --cwd backend run build
 
-# Các lệnh con:
+# Frontend — chạy từ /frontend (hoặc yarn --cwd frontend ...)
+yarn run verify          # = type-check → lint → test:coverage (full test suite)
 yarn run type-check      # tsc -b (project build mode traversing tsconfig references)
 yarn run lint            # eslint . --cache --max-warnings=0
 yarn run test:fast       # vitest run --changed
 yarn run test:coverage   # vitest run --coverage
+
+# Backend — chạy từ /backend (hoặc yarn --cwd backend ...)
+yarn test                # node --import tsx --test
+yarn run build           # tsc (compile & type-check)
 ```
