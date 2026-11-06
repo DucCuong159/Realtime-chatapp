@@ -29,11 +29,12 @@
 ## ✨ Key Features
 
 - ⚡ **Hybrid Real-Time Pipeline**: HTTP POST for data validation & media uploads; Socket.IO for real-time room broadcasting.
+- 🗄️ **Decoupled Server State & Instant Sync**: Powered by **TanStack Query v5** (`useConversations`, `useConversationMessages`, `useConversationActions`, `useUsers`). Zero API cache in Zustand. Real-time Socket.IO events directly update query caches without redundant refetches.
+- 📜 **Virtualized Infinite Chat & Zero-Jank Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) combined with **react-virtuoso** reverse-scroll virtualization and prepended index offset calculation.
 - 🔄 **Multi-Tab Sync & Echo Prevention**: Request header `x-socket-id` and `.except(socketId)` prevent duplicate messages on the sender's active tab while syncing all other tabs.
 - 🟢 **Accurate Online Presence**: Multi-tab tracking via `Map<userId, Set<socketId>>` — users only show offline when all sessions disconnect.
-- 🎯 **Optimistic UI & Auto-Rollback**: Instant UI feedback with local UUIDs, server ID reconciliation, and fail-safe sidebar rollback on error.
+- 🎯 **Optimistic UI & Verbatim Rollback**: Instant UI feedback with local UUIDs, optimistic reactions and message append, with automated cache rollback on mutation failure.
 - 🤖 **Gemini AI Streaming & Dynamic Selector**: Real-time token streaming, live quota latency check (`checkModelQuota`), auto-fallback on 429 quota limits, and markdown rendering with XSS hardening.
-- 📜 **Cursor-Based Pagination & Infinite Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) and `useLayoutEffect` Element-Anchor scroll restoration (Zero Viewport Drift).
 - 💬 **Rich Messaging**: 1-on-1 and group chats, message replies with context quotes, Cloudinary media sharing (up to 15MB), and user search.
 - 👍 **Real-Time Emoji Reactions & OCC**: Interactive message emoji reactions, mutual exclusivity per user, toggle-off removal, instant optimistic UI updates with rollback, and MongoDB Optimistic Concurrency Control (OCC) retry loop on `__v` to prevent lost updates under concurrent reactions.
 - 📞📹 **Real-Time WebRTC Voice & Video Calling (1-on-1)**: Peer-to-peer ultra-low latency audio & video calls with Full HD 1080p ideal (30-60fps), WebRTC sender tuning pinned at 2.5 Mbps (`maintain-framerate`) and studio 48kHz Opus audio at 64 kbps. Resilient mobile camera switching with main rear sensor enumeration, hardware sensor lock recovery, atomic rollback, and Howler.js audio engine with drift-compensated call duration timer.
@@ -45,7 +46,7 @@
 
 | Layer | Technologies |
 | :--- | :--- |
-| **Frontend** | React 19, TypeScript, Vite 8, Zustand 5, Tailwind CSS v4, Base UI, Streamdown, Howler.js |
+| **Frontend** | React 19, TypeScript, Vite 8, TanStack Query v5, Zustand 5, React Virtuoso 4, Tailwind CSS v4, Base UI, Streamdown, Howler.js |
 | **Backend** | Node.js 20+, Express 5, Socket.IO 4, Mongoose 9 (MongoDB), Passport.js, Zod 4 |
 | **AI & Media** | Vercel AI SDK (`ai` v7, `@ai-sdk/google` v4), Google Gemini Models, Cloudinary SDK |
 | **Dev & Infra** | Render.com (Monorepo Web Service), GitHub Actions, CodeRabbit, SonarCloud, Husky, Vitest |
