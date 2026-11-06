@@ -1,16 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
-import { useConversation } from "@/hooks/use-conversation";
-import { useSocket } from "@/hooks/use-socket";
+import { useToggleReaction } from "@/hooks/use-conversation-actions";
+import { useConversationMessages } from "@/hooks/use-conversation-messages";
 import { useVirtualChatScroll } from "@/hooks/use-virtual-chat-scroll";
 import { cn } from "@/lib/utils";
-import type { AIStreamPayload, MessageType } from "@/types/conversation.type";
+import type { MessageType } from "@/types/conversation.type";
 import { ChevronDown } from "lucide-react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { toast } from "sonner";
-import { useShallow } from "zustand/react/shallow";
 import MessageItem from "./message-item";
 
 interface VirtuosoHeaderContext {
@@ -19,11 +18,7 @@ interface VirtuosoHeaderContext {
   isFetchingMoreMessages: boolean;
 }
 
-const VirtuosoHeader = ({
-  context,
-}: {
-  context?: VirtuosoHeaderContext;
-}) => {
+const VirtuosoHeader = ({ context }: { context?: VirtuosoHeaderContext }) => {
   if (!context) return null;
   const { hasMore, messagesLength, isFetchingMoreMessages } = context;
 
@@ -61,38 +56,21 @@ interface ConversationBodyProps {
   conversationId: string;
   messages: MessageType[];
   onReply: (message: MessageType) => void;
+  isSendingMsg?: boolean;
 }
 
 const ConversationBody = ({
   conversationId,
   messages,
   onReply,
+  isSendingMsg = false,
 }: ConversationBodyProps) => {
   const { user } = useAuth();
   const currentUserId = user?._id || null;
-  const { socket } = useSocket();
 
-  const {
-    addOrUpdateMessage,
-    updateStreamingAIMessage,
-    clearStreamingAIMessage,
-    fetchMoreMessages,
-    isFetchingMoreMessages,
-    hasMore,
-    isSendingMsg,
-    toggleReaction,
-  } = useConversation(
-    useShallow((state) => ({
-      addOrUpdateMessage: state.addOrUpdateMessage,
-      updateStreamingAIMessage: state.updateStreamingAIMessage,
-      clearStreamingAIMessage: state.clearStreamingAIMessage,
-      fetchMoreMessages: state.fetchMoreMessages,
-      isFetchingMoreMessages: state.isFetchingMoreMessages,
-      hasMore: Boolean(state.singleConversation?.pagination?.hasMore),
-      isSendingMsg: state.isSendingMsg,
-      toggleReaction: state.toggleReaction,
-    })),
-  );
+  const { hasMore, isFetchingMore, fetchMoreMessages } =
+    useConversationMessages(conversationId);
+  const { mutate: toggleReaction } = useToggleReaction();
 
   const isOutgoingMessage = useCallback(
     (msg: MessageType) =>
@@ -114,54 +92,16 @@ const ConversationBody = ({
     items: messages,
     conversationId,
     hasMore,
-    isLoadingMore: isFetchingMoreMessages,
-    onLoadMore: () => fetchMoreMessages(conversationId),
+    isLoadingMore: isFetchingMore,
+    onLoadMore: () => {
+      void fetchMoreMessages();
+    },
     isOutgoingItem: isOutgoingMessage,
   });
 
-  // Handle Socket AI streaming
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleAIStream = ({
-      conversationId: streamConversationId,
-      chunk,
-      done,
-      message,
-      sender,
-      error,
-    }: AIStreamPayload) => {
-      if (streamConversationId !== conversationId) return;
-
-      if (chunk && !done) {
-        updateStreamingAIMessage(conversationId, chunk, sender);
-      }
-      if (done && message) {
-        addOrUpdateMessage(conversationId, message);
-      } else if (done && !message) {
-        clearStreamingAIMessage(conversationId);
-        if (error) {
-          toast.error(error);
-        }
-      }
-    };
-
-    socket.on("conversation:ai", handleAIStream);
-
-    return () => {
-      socket.off("conversation:ai", handleAIStream);
-    };
-  }, [
-    socket,
-    conversationId,
-    updateStreamingAIMessage,
-    addOrUpdateMessage,
-    clearStreamingAIMessage,
-  ]);
-
   const handleToggleReaction = useCallback(
     (messageId: string, emoji: string) => {
-      void toggleReaction(conversationId, messageId, emoji);
+      toggleReaction({ conversationId, messageId, emoji });
     },
     [conversationId, toggleReaction],
   );
@@ -180,9 +120,9 @@ const ConversationBody = ({
     () => ({
       hasMore,
       messagesLength: messages.length,
-      isFetchingMoreMessages,
+      isFetchingMoreMessages: isFetchingMore,
     }),
-    [hasMore, messages.length, isFetchingMoreMessages],
+    [hasMore, messages.length, isFetchingMore],
   );
 
   return (

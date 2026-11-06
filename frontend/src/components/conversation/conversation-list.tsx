@@ -1,8 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useConversation } from "@/hooks/use-conversation";
-import { useSocket } from "@/hooks/use-socket";
-import type { ConversationType, MessageType } from "@/types/conversation.type";
-import { useEffect, useState } from "react";
+import { useConversations } from "@/hooks/use-conversations";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Spinner } from "../ui/spinner";
 import ConversationListHeader from "./conversation-list-header";
@@ -10,14 +8,8 @@ import ConversationListItem from "./conversation-list-item";
 
 const ConversationList = () => {
   const navigate = useNavigate();
-  const { socket } = useSocket();
-  const {
-    fetchConversations,
-    conversations,
-    isConversationsLoading,
-    addNewConversation,
-    updateConversationLastMessage,
-  } = useConversation();
+  const { conversations, isLoading: isConversationsLoading } =
+    useConversations();
   const { user } = useAuth();
   const currentUserId = user?._id || null;
 
@@ -35,41 +27,6 @@ const ConversationList = () => {
             p.name?.toLowerCase().includes(searchQuery.toLowerCase()),
         ),
     ) || [];
-
-  useEffect(() => {
-    void fetchConversations();
-  }, [fetchConversations]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleNewConversation = (newConversation: ConversationType) => {
-      addNewConversation(newConversation);
-    };
-
-    socket.on("conversation:new", handleNewConversation);
-
-    return () => {
-      socket.off("conversation:new", handleNewConversation);
-    };
-  }, [addNewConversation, socket]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleConversationUpdate = (data: {
-      conversationId: string;
-      lastMessage: MessageType;
-    }) => {
-      updateConversationLastMessage(data.conversationId, data.lastMessage);
-    };
-
-    socket.on("conversation:updated", handleConversationUpdate);
-
-    return () => {
-      socket.off("conversation:updated", handleConversationUpdate);
-    };
-  }, [socket, updateConversationLastMessage]);
 
   const onRoute = (id: string) => {
     void navigate(`/conversation/${id}`);
