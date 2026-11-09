@@ -27,6 +27,7 @@ interface SendMessageContext {
   previousMessages?: InfiniteData<MessagesPage>;
   previousConversations?: ConversationType[];
   conversationId: string;
+  tempId: string;
 }
 
 interface ToggleReactionContext {
@@ -77,8 +78,9 @@ export function useSendMessage() {
         ConversationType[]
       >(conversationKeys.lists());
 
+      const tempId = generateUUID();
       const optimisticMsg: MessageType = {
-        _id: generateUUID(),
+        _id: tempId,
         conversationId: convId,
         content: payload.content ?? null,
         image: payload.image ?? null,
@@ -125,7 +127,50 @@ export function useSendMessage() {
         previousMessages,
         previousConversations,
         conversationId: convId,
+        tempId,
       };
+    },
+
+    onSuccess: (data, _payload, ctx) => {
+      if (!ctx || !data?.userMessage) return;
+      const { userMessage } = data;
+      const convId = ctx.conversationId;
+      const tempId = ctx.tempId;
+
+      // Replace optimistic message in-place without refetching or discarding older pages
+      queryClient.setQueryData<InfiniteData<MessagesPage>>(
+        conversationKeys.messages(convId),
+        (old) => {
+          if (!old) return old;
+          const alreadyExists = old.pages.some((page) =>
+            page.messages.some((m) => m._id === userMessage._id),
+          );
+          return {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              messages: page.messages
+                .map((m) => (m._id === tempId ? userMessage : m))
+                .filter((m) => !(alreadyExists && m._id === tempId)),
+            })),
+          };
+        },
+      );
+
+      // Update conversation list lastMessage
+      queryClient.setQueryData<ConversationType[]>(
+        conversationKeys.lists(),
+        (old = []) =>
+          old.map((c) =>
+            c._id === convId
+              ? {
+                  ...c,
+                  lastMessage: userMessage,
+                  updatedAt: userMessage.createdAt || new Date().toISOString(),
+                }
+              : c,
+          ),
+      );
     },
 
     onError: (_err, _payload, ctx) => {
@@ -148,9 +193,8 @@ export function useSendMessage() {
 
     onSettled: (_data, _err, payload) => {
       if (payload.conversationId) {
-        void queryClient.invalidateQueries({
-          queryKey: conversationKeys.messages(payload.conversationId),
-        });
+        // Only invalidate conversation list to update ordering/unread status
+        // NEVER invalidate messages infinite query: avoids resetting prepended older history
         void queryClient.invalidateQueries({
           queryKey: conversationKeys.lists(),
         });

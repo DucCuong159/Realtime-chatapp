@@ -22,7 +22,7 @@ interface MessagesPage {
   pagination: PaginationType;
 }
 
-function appendNewMessageToCache(
+export function appendNewMessageToCache(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
   msg: MessageType,
@@ -31,15 +31,39 @@ function appendNewMessageToCache(
     conversationKeys.messages(conversationId),
     (old) => {
       if (!old || old.pages.length === 0) return old;
+
+      // 1. If message already exists by _id, ignore to avoid duplicates
+      const exists = old.pages.some((page) =>
+        page.messages.some((m) => m._id === msg._id),
+      );
+      if (exists) return old;
+
       const lastPageIndex = old.pages.length - 1;
       const lastPage = old.pages[lastPageIndex];
-      if (lastPage.messages.some((m) => m._id === msg._id)) return old;
+
+      // 2. Check if this replaces an optimistic message from the sender
+      const optimisticIdx = lastPage.messages.findIndex(
+        (m) =>
+          m.status === "sending..." &&
+          m.sender?._id === msg.sender?._id &&
+          m.content === msg.content,
+      );
 
       const updatedPages = [...old.pages];
-      updatedPages[lastPageIndex] = {
-        ...lastPage,
-        messages: [...lastPage.messages, msg],
-      };
+      if (optimisticIdx >= 0) {
+        const updatedMessages = [...lastPage.messages];
+        updatedMessages[optimisticIdx] = msg;
+        updatedPages[lastPageIndex] = {
+          ...lastPage,
+          messages: updatedMessages,
+        };
+      } else {
+        updatedPages[lastPageIndex] = {
+          ...lastPage,
+          messages: [...lastPage.messages, msg],
+        };
+      }
+
       return { ...old, pages: updatedPages };
     },
   );
