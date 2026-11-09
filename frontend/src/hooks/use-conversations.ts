@@ -1,9 +1,14 @@
 import { conversationKeys } from "@/constants/query-keys";
 import { useSocket } from "@/hooks/use-socket";
 import { API } from "@/lib/axios-client";
-import type { ConversationType } from "@/types/conversation.type";
+import type { ConversationType, MessageType } from "@/types/conversation.type";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+
+interface ConversationUpdatePayload {
+  conversationId: string;
+  lastMessage: MessageType;
+}
 
 /**
  * Idiomatic TanStack Query v5 hook for user conversations.
@@ -35,10 +40,29 @@ export function useConversations() {
       );
     };
 
-    const handleUpdated = (updated: ConversationType) => {
+    const handleUpdated = (
+      payload: ConversationUpdatePayload | ConversationType,
+    ) => {
       queryClient.setQueryData<ConversationType[]>(
         conversationKeys.lists(),
-        (old = []) => [updated, ...old.filter((c) => c._id !== updated._id)],
+        (old = []) => {
+          const targetId =
+            "conversationId" in payload
+              ? payload.conversationId
+              : payload._id;
+          const target = old.find((c) => c._id === targetId);
+          if (!target) return old;
+
+          const lastMessage =
+            "lastMessage" in payload ? payload.lastMessage : target.lastMessage;
+          const updatedTarget: ConversationType = {
+            ...target,
+            lastMessage,
+            updatedAt: lastMessage?.createdAt || new Date().toISOString(),
+          };
+          const remaining = old.filter((c) => c._id !== targetId);
+          return [updatedTarget, ...remaining];
+        },
       );
     };
 
