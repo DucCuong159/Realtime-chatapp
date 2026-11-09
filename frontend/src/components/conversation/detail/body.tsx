@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/hooks/use-auth";
 import { useToggleReaction } from "@/hooks/use-conversation-actions";
-import { useConversationMessages } from "@/hooks/use-conversation-messages";
 import { useVirtualChatScroll } from "@/hooks/use-virtual-chat-scroll";
 import { cn } from "@/lib/utils";
 import type { MessageType } from "@/types/conversation.type";
@@ -57,6 +56,9 @@ interface ConversationBodyProps {
   messages: MessageType[];
   onReply: (message: MessageType) => void;
   isSendingMsg?: boolean;
+  hasMore: boolean;
+  isFetchingMore: boolean;
+  fetchMoreMessages: () => Promise<unknown>;
 }
 
 const ConversationBody = ({
@@ -64,12 +66,13 @@ const ConversationBody = ({
   messages,
   onReply,
   isSendingMsg = false,
+  hasMore,
+  isFetchingMore,
+  fetchMoreMessages,
 }: ConversationBodyProps) => {
   const { user } = useAuth();
   const currentUserId = user?._id || null;
 
-  const { hasMore, isFetchingMore, fetchMoreMessages } =
-    useConversationMessages(conversationId);
   const { mutate: toggleReaction } = useToggleReaction();
 
   const isOutgoingMessage = useCallback(

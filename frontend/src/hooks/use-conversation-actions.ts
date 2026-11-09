@@ -7,6 +7,7 @@ import type {
   ConversationType,
   CreateConversationType,
   CreateMessageType,
+  MessageReactionType,
   MessageType,
   PaginationType,
 } from "@/types/conversation.type";
@@ -24,15 +25,15 @@ interface MessagesPage {
 }
 
 interface SendMessageContext {
-  previousMessages?: InfiniteData<MessagesPage>;
   previousConversations?: ConversationType[];
   conversationId: string;
   tempId: string;
 }
 
 interface ToggleReactionContext {
-  previousMessages?: InfiniteData<MessagesPage>;
   conversationId: string;
+  messageId: string;
+  previousReactions?: MessageReactionType[];
 }
 
 /**
@@ -69,10 +70,6 @@ export function useSendMessage() {
       await queryClient.cancelQueries({
         queryKey: conversationKeys.lists(),
       });
-
-      const previousMessages = queryClient.getQueryData<
-        InfiniteData<MessagesPage>
-      >(conversationKeys.messages(convId));
 
       const previousConversations = queryClient.getQueryData<
         ConversationType[]
@@ -124,7 +121,6 @@ export function useSendMessage() {
       );
 
       return {
-        previousMessages,
         previousConversations,
         conversationId: convId,
         tempId,
@@ -175,18 +171,41 @@ export function useSendMessage() {
 
     onError: (_err, _payload, ctx) => {
       if (ctx) {
-        if (ctx.previousMessages) {
-          queryClient.setQueryData(
-            conversationKeys.messages(ctx.conversationId),
-            ctx.previousMessages,
-          );
-        }
-        if (ctx.previousConversations) {
-          queryClient.setQueryData(
-            conversationKeys.lists(),
-            ctx.previousConversations,
-          );
-        }
+        // Surgically remove only the optimistic message with tempId,
+        // preserving any new socket messages or reactions that arrived in the meantime.
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(
+          conversationKeys.messages(ctx.conversationId),
+          (current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                messages: page.messages.filter((m) => m._id !== ctx.tempId),
+              })),
+            };
+          },
+        );
+
+        // For the conversations list, only revert lastMessage if it still references our tempId
+        queryClient.setQueryData<ConversationType[]>(
+          conversationKeys.lists(),
+          (current = []) =>
+            current.map((c) => {
+              if (c._id !== ctx.conversationId) return c;
+              if (c.lastMessage?._id === ctx.tempId) {
+                const prevConv = ctx.previousConversations?.find(
+                  (pc) => pc._id === ctx.conversationId,
+                );
+                return {
+                  ...c,
+                  lastMessage: prevConv?.lastMessage ?? null,
+                  updatedAt: prevConv?.updatedAt ?? c.updatedAt,
+                };
+              }
+              return c;
+            }),
+        );
       }
       toast.error("Failed to send message");
     },
@@ -229,9 +248,21 @@ export function useToggleReaction() {
         queryKey: conversationKeys.messages(conversationId),
       });
 
-      const previousMessages = queryClient.getQueryData<
-        InfiniteData<MessagesPage>
-      >(conversationKeys.messages(conversationId));
+      const currentData = queryClient.getQueryData<InfiniteData<MessagesPage>>(
+        conversationKeys.messages(conversationId),
+      );
+
+      // Capture previous reactions for this specific message before mutating
+      let previousReactions: MessageReactionType[] | undefined;
+      if (currentData) {
+        for (const page of currentData.pages) {
+          const target = page.messages.find((m) => m._id === messageId);
+          if (target) {
+            previousReactions = [...(target.reactions || [])];
+            break;
+          }
+        }
+      }
 
       if (user?._id) {
         queryClient.setQueryData<InfiniteData<MessagesPage>>(
@@ -261,14 +292,29 @@ export function useToggleReaction() {
         );
       }
 
-      return { previousMessages, conversationId };
+      return { conversationId, messageId, previousReactions };
     },
 
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previousMessages) {
-        queryClient.setQueryData(
+      if (ctx?.previousReactions !== undefined && ctx.messageId) {
+        // Surgically revert only the specific message's reactions,
+        // preserving all other messages and any incoming socket updates
+        queryClient.setQueryData<InfiniteData<MessagesPage>>(
           conversationKeys.messages(ctx.conversationId),
-          ctx.previousMessages,
+          (current) => {
+            if (!current) return current;
+            return {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                messages: page.messages.map((m) =>
+                  m._id === ctx.messageId
+                    ? { ...m, reactions: ctx.previousReactions! }
+                    : m,
+                ),
+              })),
+            };
+          },
         );
       }
       toast.error("Failed to update reaction");

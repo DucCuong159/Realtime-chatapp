@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSendMessage } from "@/hooks/use-conversation-actions";
 import useConversationId from "@/hooks/use-conversation-id";
 import { useConversationMessages } from "@/hooks/use-conversation-messages";
+import { useConversationSocket } from "@/hooks/use-conversation-socket";
 import { useSocket } from "@/hooks/use-socket";
 import { isArrayEmpty } from "@/lib/utils";
 import type { MessageType } from "@/types/conversation.type";
@@ -18,8 +19,14 @@ const SingleConversation = () => {
     conversation,
     messages,
     isLoading: isSingleConversationLoading,
+    hasMore,
+    isFetchingMore,
+    fetchMoreMessages,
   } = useConversationMessages(conversationId);
   const { isPending: isSendingMsg } = useSendMessage();
+
+  // Install real-time socket listeners once for this active conversation page
+  useConversationSocket(conversationId);
 
   const { socket } = useSocket();
   const { user } = useAuth();
@@ -87,6 +94,9 @@ const SingleConversation = () => {
           messages={messages}
           onReply={setReplyTo}
           isSendingMsg={isSendingMsg}
+          hasMore={hasMore}
+          isFetchingMore={isFetchingMore}
+          fetchMoreMessages={fetchMoreMessages}
         />
       )}
 
