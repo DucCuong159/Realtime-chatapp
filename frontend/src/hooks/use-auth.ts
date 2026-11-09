@@ -1,5 +1,5 @@
 import { API } from "@/lib/axios-client";
-import { queryClient } from "@/lib/query-client";
+import { clearAuthSessionCache } from "@/lib/query-client";
 import type { LoginType, RegisterType, UserType } from "@/types/auth.type";
 import type { ProfileFormType } from "@/validators/user.validator";
 import { toast } from "sonner";
@@ -61,7 +61,7 @@ export const useAuth = create<AuthState>()(
         } catch {
           // handle error in interceptor
         } finally {
-          queryClient.clear();
+          await clearAuthSessionCache();
           set({ user: null });
           useSocket.getState().disconnectSocket();
         }
@@ -74,7 +74,7 @@ export const useAuth = create<AuthState>()(
           useSocket.getState().connectSocket();
           toast.success("Authenticated successfully");
         } catch {
-          queryClient.clear();
+          await clearAuthSessionCache();
           set({ user: null });
           useSocket.getState().disconnectSocket();
         } finally {
@@ -112,7 +112,7 @@ useAuth.subscribe((state) => {
   const currentUserId = state.user?._id ?? null;
   if (currentUserId !== previousUserId) {
     previousUserId = currentUserId;
-    queryClient.clear();
+    void clearAuthSessionCache();
   }
 });
 

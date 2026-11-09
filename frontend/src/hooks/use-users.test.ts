@@ -1,8 +1,9 @@
 import { userKeys } from "@/constants/query-keys";
 import { API } from "@/lib/axios-client";
+import { createMockUser } from "@/test/test-fixtures";
 import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useUsers } from "./use-users";
+import { fetchUsers, useUsers } from "./use-users";
 
 vi.mock("@/lib/axios-client", () => ({
   API: {
@@ -26,18 +27,15 @@ describe("useUsers spec (TanStack Query v5)", () => {
     expect(typeof useUsers).toBe("function");
   });
 
-  it("fetches user directory from /user/all", async () => {
-    const mockUsers = [{ _id: "u1", name: "Alice", email: "alice@test.com" }];
+  it("fetches user directory from /user/all via production fetchUsers", async () => {
+    const mockUsers = [createMockUser({ _id: "u1", name: "Alice" })];
     vi.mocked(API.get).mockResolvedValueOnce({
       data: { users: mockUsers },
     });
 
     const data = await queryClient.fetchQuery({
       queryKey: userKeys.lists(),
-      queryFn: async () => {
-        const res = await API.get("/user/all");
-        return res.data.users;
-      },
+      queryFn: fetchUsers,
     });
 
     expect(data).toEqual(mockUsers);

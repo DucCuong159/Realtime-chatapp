@@ -130,7 +130,7 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       if (index === -1 || !virtuosoRef.current) return false;
 
       virtuosoRef.current.scrollToIndex({
-        index: firstItemIndex + index,
+        index,
         align: "center",
         behavior: "auto",
       });
@@ -142,7 +142,7 @@ export function useVirtualChatScroll<T extends { _id: string }>({
       );
       return true;
     },
-    [items, firstItemIndex, highlightDurationMs],
+    [items, highlightDurationMs],
   );
 
   // Scroll side-effects for conversation changes and new messages

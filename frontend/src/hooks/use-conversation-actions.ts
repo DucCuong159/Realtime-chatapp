@@ -1,4 +1,7 @@
-import { conversationKeys } from "@/constants/query-keys";
+import {
+  conversationKeys,
+  conversationMutationKeys,
+} from "@/constants/query-keys";
 import { useAuth } from "@/hooks/use-auth";
 import { API } from "@/lib/axios-client";
 import { toggleUserReaction } from "@/lib/reaction.utils";
@@ -15,31 +18,110 @@ import {
   useMutation,
   useQueryClient,
   type InfiniteData,
+  type UseMutationResult,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-interface MessagesPage {
+export interface MessagesPage {
   conversation: ConversationType;
   messages: MessageType[];
   pagination: PaginationType;
 }
 
-interface SendMessageContext {
+export interface SendMessageContext {
   previousConversations?: ConversationType[];
   conversationId: string;
   tempId: string;
 }
 
-interface ToggleReactionContext {
+export interface ToggleReactionContext {
   conversationId: string;
   messageId: string;
   previousReactions?: MessageReactionType[];
 }
 
+export type UseSendMessageResult = UseMutationResult<
+  { userMessage: MessageType },
+  Error,
+  CreateMessageType,
+  SendMessageContext
+>;
+
+export type UseToggleReactionResult = UseMutationResult<
+  unknown,
+  Error,
+  { conversationId: string; messageId: string; emoji: string },
+  ToggleReactionContext
+>;
+
+export type UseCreateConversationResult = UseMutationResult<
+  ConversationType,
+  Error,
+  CreateConversationType
+>;
+
+/**
+ * Pure cache updater: appends an optimistic message to the last page of an infinite query.
+ */
+export function appendOptimisticMessageToPages(
+  old: InfiniteData<MessagesPage> | undefined,
+  optimisticMsg: MessageType,
+): InfiniteData<MessagesPage> | undefined {
+  if (!old || old.pages.length === 0) return old;
+  const lastPageIndex = old.pages.length - 1;
+  const lastPage = old.pages[lastPageIndex];
+  const updatedPages = [...old.pages];
+  updatedPages[lastPageIndex] = {
+    ...lastPage,
+    messages: [...lastPage.messages, optimisticMsg],
+  };
+  return { ...old, pages: updatedPages };
+}
+
+/**
+ * Pure cache updater: replaces an optimistic message with the server message in-place.
+ */
+export function replaceOptimisticMessageInPages(
+  old: InfiniteData<MessagesPage> | undefined,
+  tempId: string,
+  serverMsg: MessageType,
+): InfiniteData<MessagesPage> | undefined {
+  if (!old) return old;
+  const alreadyExists = old.pages.some((page) =>
+    page.messages.some((m) => m._id === serverMsg._id),
+  );
+  return {
+    ...old,
+    pages: old.pages.map((page) => ({
+      ...page,
+      messages: page.messages
+        .map((m) => (m._id === tempId ? serverMsg : m))
+        .filter((m) => !(alreadyExists && m._id === tempId)),
+    })),
+  };
+}
+
+/**
+ * Pure cache updater: surgically removes an optimistic message by tempId.
+ */
+export function removeOptimisticMessageFromPages(
+  old: InfiniteData<MessagesPage> | undefined,
+  tempId: string,
+): InfiniteData<MessagesPage> | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    pages: old.pages.map((page) => ({
+      ...page,
+      messages: page.messages.filter((m) => m._id !== tempId),
+    })),
+  };
+}
+
 /**
  * Mutation hook for sending a message with optimistic cache insertion and rollback on failure.
  */
-export function useSendMessage() {
+export function useSendMessage(): UseSendMessageResult {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -49,6 +131,7 @@ export function useSendMessage() {
     CreateMessageType,
     SendMessageContext
   >({
+    mutationKey: conversationMutationKeys.sendMessage,
     mutationFn: async (payload: CreateMessageType) => {
       const { data } = await API.post("/conversation/message/send", {
         conversationId: payload.conversationId,
@@ -92,17 +175,7 @@ export function useSendMessage() {
       // Optimistically append to messages cache
       queryClient.setQueryData<InfiniteData<MessagesPage>>(
         conversationKeys.messages(convId),
-        (old) => {
-          if (!old || old.pages.length === 0) return old;
-          const lastPageIndex = old.pages.length - 1;
-          const lastPage = old.pages[lastPageIndex];
-          const updatedPages = [...old.pages];
-          updatedPages[lastPageIndex] = {
-            ...lastPage,
-            messages: [...lastPage.messages, optimisticMsg],
-          };
-          return { ...old, pages: updatedPages };
-        },
+        (old) => appendOptimisticMessageToPages(old, optimisticMsg),
       );
 
       // Optimistically update conversation list lastMessage
@@ -136,21 +209,7 @@ export function useSendMessage() {
       // Replace optimistic message in-place without refetching or discarding older pages
       queryClient.setQueryData<InfiniteData<MessagesPage>>(
         conversationKeys.messages(convId),
-        (old) => {
-          if (!old) return old;
-          const alreadyExists = old.pages.some((page) =>
-            page.messages.some((m) => m._id === userMessage._id),
-          );
-          return {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              messages: page.messages
-                .map((m) => (m._id === tempId ? userMessage : m))
-                .filter((m) => !(alreadyExists && m._id === tempId)),
-            })),
-          };
-        },
+        (old) => replaceOptimisticMessageInPages(old, tempId, userMessage),
       );
 
       // Update conversation list lastMessage
@@ -175,16 +234,7 @@ export function useSendMessage() {
         // preserving any new socket messages or reactions that arrived in the meantime.
         queryClient.setQueryData<InfiniteData<MessagesPage>>(
           conversationKeys.messages(ctx.conversationId),
-          (current) => {
-            if (!current) return current;
-            return {
-              ...current,
-              pages: current.pages.map((page) => ({
-                ...page,
-                messages: page.messages.filter((m) => m._id !== ctx.tempId),
-              })),
-            };
-          },
+          (current) => removeOptimisticMessageFromPages(current, ctx.tempId),
         );
 
         // For the conversations list, only revert lastMessage if it still references our tempId
@@ -225,7 +275,7 @@ export function useSendMessage() {
 /**
  * Mutation hook for toggling a reaction on a message with optimistic update and rollback.
  */
-export function useToggleReaction() {
+export function useToggleReaction(): UseToggleReactionResult {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -235,6 +285,7 @@ export function useToggleReaction() {
     { conversationId: string; messageId: string; emoji: string },
     ToggleReactionContext
   >({
+    mutationKey: conversationMutationKeys.toggleReaction,
     mutationFn: async ({ messageId, emoji }) => {
       const { data } = await API.post(
         `/conversation/message/${messageId}/reaction`,
@@ -325,10 +376,11 @@ export function useToggleReaction() {
 /**
  * Mutation hook for creating a new 1-on-1 or group conversation.
  */
-export function useCreateConversation() {
+export function useCreateConversation(): UseCreateConversationResult {
   const queryClient = useQueryClient();
 
   return useMutation({
+    mutationKey: conversationMutationKeys.createConversation,
     mutationFn: async (
       payload: CreateConversationType,
     ): Promise<ConversationType> => {

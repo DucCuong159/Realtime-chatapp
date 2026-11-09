@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { API } from "@/lib/axios-client";
-import { queryClient } from "@/lib/query-client";
+import { clearAuthSessionCache } from "@/lib/query-client";
 import { useAuth } from "./use-auth";
 
 vi.mock("@/lib/axios-client", () => ({
@@ -14,7 +14,9 @@ vi.mock("@/lib/axios-client", () => ({
 vi.mock("@/lib/query-client", () => ({
   queryClient: {
     clear: vi.fn(),
+    cancelQueries: vi.fn(),
   },
+  clearAuthSessionCache: vi.fn(async () => {}),
 }));
 
 vi.mock("sonner", () => ({
@@ -104,12 +106,12 @@ describe("useAuth cache invalidation & isolation", () => {
 
     await useAuth.getState().logout();
 
-    expect(queryClient.clear).toHaveBeenCalled();
+    expect(clearAuthSessionCache).toHaveBeenCalled();
     expect(useAuth.getState().user).toBeNull();
   });
 
   it("clears queryClient cache when user identity changes", () => {
-    vi.mocked(queryClient.clear).mockClear();
+    vi.mocked(clearAuthSessionCache).mockClear();
 
     useAuth.setState({
       user: {
@@ -123,7 +125,7 @@ describe("useAuth cache invalidation & isolation", () => {
       },
     });
 
-    expect(queryClient.clear).toHaveBeenCalled();
+    expect(clearAuthSessionCache).toHaveBeenCalled();
   });
 });
 

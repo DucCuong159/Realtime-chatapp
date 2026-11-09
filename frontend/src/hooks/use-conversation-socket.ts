@@ -21,7 +21,7 @@ export function appendNewMessageToCache(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
   msg: MessageType,
-) {
+): void {
   queryClient.setQueryData<InfiniteData<MessagesPage>>(
     conversationKeys.messages(conversationId),
     (old) => {
@@ -68,7 +68,7 @@ export function updateReactionsInCache(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
   payload: MessageReactionUpdatePayload,
-) {
+): void {
   queryClient.setQueryData<InfiniteData<MessagesPage>>(
     conversationKeys.messages(conversationId),
     (old) => {
@@ -92,7 +92,7 @@ export function handleAIStreamUpdate(
   queryClient: ReturnType<typeof useQueryClient>,
   conversationId: string,
   payload: AIStreamPayload,
-) {
+): void {
   const { chunk, done, message, sender, error } = payload;
 
   queryClient.setQueryData<InfiniteData<MessagesPage>>(
@@ -156,7 +156,7 @@ export function handleAIStreamUpdate(
  * Mount this hook ONCE per active conversation page (in SingleConversation),
  * keeping cache observers (useConversationMessages) pure and side-effect free.
  */
-export function useConversationSocket(conversationId?: string | null) {
+export function useConversationSocket(conversationId?: string | null): void {
   const queryClient = useQueryClient();
   const { socket } = useSocket();
 

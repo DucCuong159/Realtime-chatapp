@@ -3,14 +3,15 @@ import ConversationFooter from "@/components/conversation/detail/footer";
 import ConversationHeader from "@/components/conversation/detail/header";
 import EmptyState from "@/components/conversation/empty-state";
 import { Spinner } from "@/components/ui/spinner";
+import { conversationMutationKeys } from "@/constants/query-keys";
 import { useAuth } from "@/hooks/use-auth";
-import { useSendMessage } from "@/hooks/use-conversation-actions";
 import useConversationId from "@/hooks/use-conversation-id";
 import { useConversationMessages } from "@/hooks/use-conversation-messages";
 import { useConversationSocket } from "@/hooks/use-conversation-socket";
 import { useSocket } from "@/hooks/use-socket";
 import { isArrayEmpty } from "@/lib/utils";
 import type { MessageType } from "@/types/conversation.type";
+import { useIsMutating } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 const SingleConversation = () => {
@@ -23,7 +24,8 @@ const SingleConversation = () => {
     isFetchingMore,
     fetchMoreMessages,
   } = useConversationMessages(conversationId);
-  const { isPending: isSendingMsg } = useSendMessage();
+  const isSendingMsg =
+    useIsMutating({ mutationKey: conversationMutationKeys.sendMessage }) > 0;
 
   // Install real-time socket listeners once for this active conversation page
   useConversationSocket(conversationId);

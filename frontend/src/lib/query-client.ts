@@ -18,6 +18,17 @@ export const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Cancels all in-flight queries and immediately clears the entire query cache.
+ * Must be executed on all auth changes (logout, login, identity switch, 401)
+ * to guarantee that pending async queries from a previous user session cannot
+ * finish and populate the cache for the next user.
+ */
+export async function clearAuthSessionCache(): Promise<void> {
+  await queryClient.cancelQueries();
+  queryClient.clear();
+}
+
 declare global {
   interface Window {
     __TANSTACK_QUERY_CLIENT__?: QueryClient;

@@ -1,6 +1,11 @@
 import { conversationKeys } from "@/constants/query-keys";
 import { API } from "@/lib/axios-client";
-import type { UserType } from "@/types/auth.type";
+import {
+  createMockConversation,
+  createMockMessage,
+  createMockPagination,
+  createMockUser,
+} from "@/test/test-fixtures";
 import type { ConversationType, MessageType } from "@/types/conversation.type";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,9 +47,9 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
 
   it("fetches paginated conversation messages via cursor", async () => {
     const mockPage = {
-      conversation: { _id: "c1", participants: [] },
-      messages: [{ _id: "m1", conversationId: "c1", content: "Hello" }],
-      pagination: { hasMore: false, nextCursor: null },
+      conversation: createMockConversation({ _id: "c1" }),
+      messages: [createMockMessage({ _id: "m1", conversationId: "c1", content: "Hello" })],
+      pagination: createMockPagination(),
     };
 
     vi.mocked(API.get).mockResolvedValueOnce({ data: mockPage });
@@ -69,6 +74,7 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
     const convId = "c1";
 
     it("replaces optimistic message with matching content and sender in-place", () => {
+      const sender = createMockUser({ _id: "u1", name: "User 1" });
       const initialCache: InfiniteData<{
         conversation: ConversationType;
         messages: MessageType[];
@@ -76,20 +82,19 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
       }> = {
         pages: [
           {
-            conversation: { _id: convId, participants: [] } as unknown as ConversationType,
+            conversation: createMockConversation({ _id: convId }),
             messages: [
-              {
+              createMockMessage({
                 _id: "temp-uuid-1",
                 conversationId: convId,
                 content: "Hello world",
-                sender: { _id: "u1", name: "User 1" } as unknown as UserType,
+                sender,
                 status: "sending...",
-                reactions: [],
                 createdAt: "2026-11-09T01:00:00Z",
                 updatedAt: "2026-11-09T01:00:00Z",
-              } as unknown as MessageType,
+              }),
             ],
-            pagination: { hasMore: false, nextCursor: null },
+            pagination: createMockPagination(),
           },
         ],
         pageParams: [undefined],
@@ -97,16 +102,15 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
 
       queryClient.setQueryData(conversationKeys.messages(convId), initialCache);
 
-      const serverMsg = {
+      const serverMsg = createMockMessage({
         _id: "mongo-id-1",
         conversationId: convId,
         content: "Hello world",
-        sender: { _id: "u1", name: "User 1" } as unknown as UserType,
+        sender,
         status: "",
-        reactions: [],
         createdAt: "2026-11-09T01:00:01Z",
         updatedAt: "2026-11-09T01:00:01Z",
-      } as unknown as MessageType;
+      });
 
       appendNewMessageToCache(queryClient, convId, serverMsg);
 
@@ -126,15 +130,15 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
       }> = {
         pages: [
           {
-            conversation: { _id: convId, participants: [] } as unknown as ConversationType,
+            conversation: createMockConversation({ _id: convId }),
             messages: [
-              {
+              createMockMessage({
                 _id: "mongo-id-1",
                 conversationId: convId,
                 content: "Existing message",
-              } as unknown as MessageType,
+              }),
             ],
-            pagination: { hasMore: false, nextCursor: null },
+            pagination: createMockPagination(),
           },
         ],
         pageParams: [undefined],
@@ -142,11 +146,11 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
 
       queryClient.setQueryData(conversationKeys.messages(convId), initialCache);
 
-      const duplicateMsg = {
+      const duplicateMsg = createMockMessage({
         _id: "mongo-id-1",
         conversationId: convId,
         content: "Existing message",
-      } as unknown as MessageType;
+      });
 
       appendNewMessageToCache(queryClient, convId, duplicateMsg);
 
@@ -164,15 +168,15 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
       }> = {
         pages: [
           {
-            conversation: { _id: convId, participants: [] } as unknown as ConversationType,
+            conversation: createMockConversation({ _id: convId }),
             messages: [
-              {
+              createMockMessage({
                 _id: "m1",
                 conversationId: convId,
                 content: "Old message",
-              } as unknown as MessageType,
+              }),
             ],
-            pagination: { hasMore: false, nextCursor: null },
+            pagination: createMockPagination(),
           },
         ],
         pageParams: [undefined],
@@ -180,12 +184,13 @@ describe("useConversationMessages spec (TanStack Query v5)", () => {
 
       queryClient.setQueryData(conversationKeys.messages(convId), initialCache);
 
-      const otherUserMsg = {
+      const otherUser = createMockUser({ _id: "u2", name: "User 2" });
+      const otherUserMsg = createMockMessage({
         _id: "m2",
         conversationId: convId,
         content: "Message from User 2",
-        sender: { _id: "u2", name: "User 2" } as unknown as UserType,
-      } as unknown as MessageType;
+        sender: otherUser,
+      });
 
       appendNewMessageToCache(queryClient, convId, otherUserMsg);
 

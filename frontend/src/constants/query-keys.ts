@@ -15,3 +15,10 @@ export const userKeys = {
   lists: () => [...userKeys.all, "list"] as const,
 };
 
+export const conversationMutationKeys = {
+  all: ["conversations", "mutation"] as const,
+  sendMessage: ["conversations", "sendMessage"] as const,
+  toggleReaction: ["conversations", "toggleReaction"] as const,
+  createConversation: ["conversations", "createConversation"] as const,
+};
+

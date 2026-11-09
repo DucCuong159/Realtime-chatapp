@@ -7,6 +7,7 @@ import type {
 } from "@/types/conversation.type";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
+import { useConversationSocket } from "./use-conversation-socket";
 
 export interface MessagesPage {
   conversation: ConversationType;
@@ -14,16 +15,41 @@ export interface MessagesPage {
   pagination: PaginationType;
 }
 
+export interface UseConversationMessagesOptions {
+  /**
+   * If true, also registers the Socket.IO listener for incoming messages, reactions, and AI chunks.
+   * Defaults to false so multiple hook consumers remain pure observers without duplicate subscriptions.
+   */
+  subscribe?: boolean;
+}
+
+export interface UseConversationMessagesResult {
+  conversation: ConversationType | undefined;
+  messages: MessageType[];
+  isLoading: boolean;
+  hasMore: boolean;
+  fetchMoreMessages: () => Promise<unknown>;
+  isFetchingMore: boolean;
+  refetch: () => Promise<unknown>;
+}
+
 export { appendNewMessageToCache } from "./use-conversation-socket";
 
 /**
- * Pure TanStack Query v5 observer hook for conversation messages.
+ * TanStack Query v5 hook for conversation messages.
  * Handles cursor-based bidirectional infinite pagination.
  *
- * (Real-time Socket.IO synchronization is handled separately by `useConversationSocket`
- * to avoid duplicate listeners when multiple components observe the same conversation).
+ * Real-time Socket.IO synchronization is opt-in via `options.subscribe` or
+ * directly via `useConversationSocket`, guaranteeing only one designated subscriber
+ * per conversation to prevent duplicate listeners or double AI chunk appending.
  */
-export function useConversationMessages(conversationId?: string | null) {
+export function useConversationMessages(
+  conversationId?: string | null,
+  options?: UseConversationMessagesOptions,
+): UseConversationMessagesResult {
+  // Only connect socket listeners if explicitly designated as the subscriber
+  useConversationSocket(options?.subscribe ? conversationId : null);
+
   const query = useInfiniteQuery({
     queryKey: conversationKeys.messages(conversationId || ""),
     queryFn: async ({ pageParam }): Promise<MessagesPage> => {

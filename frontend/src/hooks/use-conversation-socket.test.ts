@@ -1,9 +1,14 @@
 import { conversationKeys } from "@/constants/query-keys";
-import type { UserType } from "@/types/auth.type";
+import {
+  createMockConversation,
+  createMockMessage,
+  createMockPagination,
+  createMockReaction,
+  createMockUser,
+} from "@/test/test-fixtures";
 import type {
   AIStreamPayload,
   ConversationType,
-  MessageReactionType,
   MessageReactionUpdatePayload,
   MessageType,
 } from "@/types/conversation.type";
@@ -47,16 +52,16 @@ describe("useConversationSocket spec", () => {
     }> = {
       pages: [
         {
-          conversation: { _id: convId, participants: [] } as unknown as ConversationType,
+          conversation: createMockConversation({ _id: convId }),
           messages: [
-            {
+            createMockMessage({
               _id: "m1",
               conversationId: convId,
               content: "Hello",
               reactions: [],
-            } as unknown as MessageType,
+            }),
           ],
-          pagination: { hasMore: false, nextCursor: null },
+          pagination: createMockPagination(),
         },
       ],
       pageParams: [undefined],
@@ -67,12 +72,7 @@ describe("useConversationSocket spec", () => {
     const reactionPayload: MessageReactionUpdatePayload = {
       conversationId: convId,
       messageId: "m1",
-      reactions: [
-        {
-          emoji: "❤️",
-          user: { _id: "u1", name: "User 1", avatar: null },
-        } as MessageReactionType,
-      ],
+      reactions: [createMockReaction({ emoji: "❤️" })],
     };
 
     updateReactionsInCache(queryClient, convId, reactionPayload);
@@ -93,9 +93,9 @@ describe("useConversationSocket spec", () => {
     }> = {
       pages: [
         {
-          conversation: { _id: convId, participants: [] } as unknown as ConversationType,
+          conversation: createMockConversation({ _id: convId }),
           messages: [],
-          pagination: { hasMore: false, nextCursor: null },
+          pagination: createMockPagination(),
         },
       ],
       pageParams: [undefined],
@@ -109,7 +109,7 @@ describe("useConversationSocket spec", () => {
       chunk: "Hello",
       done: false,
       message: null,
-      sender: { _id: "ai-1", name: "AI Assistant" } as unknown as UserType,
+      sender: createMockUser({ _id: "ai-1", name: "AI Assistant" }),
     };
     handleAIStreamUpdate(queryClient, convId, chunk1);
 
@@ -140,12 +140,12 @@ describe("useConversationSocket spec", () => {
       conversationId: convId,
       chunk: null,
       done: true,
-      message: {
+      message: createMockMessage({
         _id: "m_ai_final",
         conversationId: convId,
         content: "Hello world!",
         streaming: false,
-      } as unknown as MessageType,
+      }),
     };
     handleAIStreamUpdate(queryClient, convId, donePayload);
 
