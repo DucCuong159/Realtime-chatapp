@@ -5,6 +5,7 @@ import type {
   MessageType,
   PaginationType,
 } from "@/types/conversation.type";
+import type { Socket } from "socket.io-client";
 
 /**
  * Type-safe test fixture factory for UserType.
@@ -88,4 +89,19 @@ export function createMockReaction(
     user: createMockUser(),
     ...overrides,
   };
+}
+
+/**
+ * Type-safe test fixture factory for Socket mock.
+ * Encapsulates third-party Socket.IO client interface casting in one place.
+ */
+export function createMockSocket(overrides: Partial<Socket> = {}): Socket {
+  return {
+    connected: false,
+    on: () => {},
+    off: () => {},
+    emit: () => {},
+    disconnect: () => {},
+    ...overrides,
+  } as unknown as Socket;
 }

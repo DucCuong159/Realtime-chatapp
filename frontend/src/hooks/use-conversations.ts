@@ -2,6 +2,7 @@ import { conversationKeys } from "@/constants/query-keys";
 import { useSocket } from "@/hooks/use-socket";
 import { API } from "@/lib/axios-client";
 import type { ConversationType, MessageType } from "@/types/conversation.type";
+import type { QueryClient } from "@tanstack/react-query";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -47,6 +48,54 @@ export function updateConversationInList(
 }
 
 /**
+ * Pure cache updater for inserting a new conversation at top if not already present.
+ */
+export function handleConversationNew(
+  queryClient: Pick<QueryClient, "setQueryData">,
+  conversation: ConversationType,
+): void {
+  queryClient.setQueryData<ConversationType[]>(
+    conversationKeys.lists(),
+    (old = []) =>
+      old.some((c) => c._id === conversation._id)
+        ? old
+        : [conversation, ...old],
+  );
+}
+
+/**
+ * Pure cache updater/syncer for conversation:updated socket events.
+ * If the conversation already exists in cache, updates and bumps it to top.
+ * If not yet in cache, triggers an invalidation to fetch the fresh list.
+ */
+export function handleConversationUpdated(
+  queryClient: Pick<
+    QueryClient,
+    "getQueryData" | "setQueryData" | "invalidateQueries"
+  >,
+  payload: ConversationUpdatePayload,
+): void {
+  const targetId =
+    "conversationId" in payload ? payload.conversationId : payload._id;
+  const currentList =
+    queryClient.getQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+    ) || [];
+  const exists = currentList.some((c) => c._id === targetId);
+
+  if (!exists) {
+    void queryClient.invalidateQueries({
+      queryKey: conversationKeys.lists(),
+    });
+  } else {
+    queryClient.setQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+      (old = []) => updateConversationInList(old, payload),
+    );
+  }
+}
+
+/**
  * Idiomatic TanStack Query v5 hook for user conversations.
  * Handles fetching, caching, and realtime socket events.
  */
@@ -64,20 +113,11 @@ export function useConversations(): UseConversationsResult {
     if (!socket) return;
 
     const handleNew = (conversation: ConversationType) => {
-      queryClient.setQueryData<ConversationType[]>(
-        conversationKeys.lists(),
-        (old = []) =>
-          old.some((c) => c._id === conversation._id)
-            ? old
-            : [conversation, ...old],
-      );
+      handleConversationNew(queryClient, conversation);
     };
 
     const handleUpdated = (payload: ConversationUpdatePayload) => {
-      queryClient.setQueryData<ConversationType[]>(
-        conversationKeys.lists(),
-        (old = []) => updateConversationInList(old, payload),
-      );
+      handleConversationUpdated(queryClient, payload);
     };
 
     socket.on("conversation:new", handleNew);

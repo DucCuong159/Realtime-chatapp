@@ -1,7 +1,20 @@
+import type { UserType } from "@/types/auth.type";
 import type { ConversationType } from "@/types/conversation.type";
 import { useIsUserOnline } from "./use-is-user-online";
 
-function getGroupDetails(conversation?: ConversationType | null) {
+export interface ConversationDetailsResult {
+  name: string;
+  subheading: string;
+  avatar: string;
+  isGroup: boolean;
+  isOnline: boolean;
+  otherUser: UserType | null;
+  isAI?: boolean;
+}
+
+function getGroupDetails(
+  conversation?: ConversationType | null,
+): ConversationDetailsResult {
   const count = conversation?.participants?.length ?? 0;
   return {
     name: conversation?.groupName || "Unnamed Group",
@@ -14,9 +27,9 @@ function getGroupDetails(conversation?: ConversationType | null) {
 }
 
 function getDirectDetails(
-  other: ReturnType<NonNullable<ConversationType["participants"]>["find"]>,
+  other: UserType | undefined,
   isOnline: boolean,
-) {
+): ConversationDetailsResult {
   const subheading = other?.isAI
     ? "Assistant"
     : isOnline
@@ -37,7 +50,7 @@ function getDirectDetails(
 export const useConversationDetails = (
   conversation?: ConversationType | null,
   currentUserId?: string | null,
-) => {
+): ConversationDetailsResult => {
   const isGroup = Boolean(conversation?.isGroup);
   const other = conversation?.participants?.find(
     (p) => p._id !== currentUserId,

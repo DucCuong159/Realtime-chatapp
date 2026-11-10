@@ -6,6 +6,8 @@ import { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchConversations,
+  handleConversationNew,
+  handleConversationUpdated,
   updateConversationInList,
   useConversations,
 } from "./use-conversations";
@@ -97,5 +99,65 @@ describe("useConversations spec (TanStack Query v5)", () => {
     expect(updatedList?.[0]._id).toBe("c2");
     expect(updatedList?.[0].lastMessage?._id).toBe("m_new");
     expect(updatedList?.[0].updatedAt).toBe("2026-11-09T02:00:00Z");
+  });
+
+  it("handles conversation:updated via handleConversationUpdated by updating cache if conversation exists", () => {
+    const c1 = createMockConversation({ _id: "c1" });
+    const c2 = createMockConversation({ _id: "c2" });
+    queryClient.setQueryData(conversationKeys.lists(), [c1, c2]);
+
+    const newLastMessage = createMockMessage({
+      _id: "m_new",
+      conversationId: "c2",
+      content: "Hello from c2",
+      createdAt: "2026-11-09T03:00:00Z",
+    });
+
+    handleConversationUpdated(queryClient, {
+      conversationId: "c2",
+      lastMessage: newLastMessage,
+    });
+
+    const updatedList = queryClient.getQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+    );
+    expect(updatedList?.[0]._id).toBe("c2");
+    expect(updatedList?.[0].lastMessage?._id).toBe("m_new");
+  });
+
+  it("invalidates conversation list when handleConversationUpdated receives an unlisted conversation", () => {
+    const c1 = createMockConversation({ _id: "c1" });
+    queryClient.setQueryData(conversationKeys.lists(), [c1]);
+
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    handleConversationUpdated(queryClient, {
+      conversationId: "c_unlisted",
+      lastMessage: createMockMessage({ conversationId: "c_unlisted" }),
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: conversationKeys.lists(),
+    });
+  });
+
+  it("adds new conversation to the front via handleConversationNew and avoids duplicates", () => {
+    const c1 = createMockConversation({ _id: "c1" });
+    queryClient.setQueryData(conversationKeys.lists(), [c1]);
+
+    const c2 = createMockConversation({ _id: "c2" });
+    handleConversationNew(queryClient, c2);
+
+    let list = queryClient.getQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+    );
+    expect(list?.map((c) => c._id)).toEqual(["c2", "c1"]);
+
+    // Attempting to add duplicate c2 should not duplicate
+    handleConversationNew(queryClient, c2);
+    list = queryClient.getQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+    );
+    expect(list?.map((c) => c._id)).toEqual(["c2", "c1"]);
   });
 });
