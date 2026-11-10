@@ -15,6 +15,11 @@ export const userKeys = {
   lists: () => [...userKeys.all, "list"] as const,
 };
 
+export const aiKeys = {
+  all: ["ai"] as const,
+  models: () => [...aiKeys.all, "models"] as const,
+};
+
 export const conversationMutationKeys = {
   all: ["conversations", "mutation"] as const,
   sendMessage: ["conversations", "sendMessage"] as const,
