@@ -3,41 +3,40 @@ import ConversationFooter from "@/components/conversation/detail/footer";
 import ConversationHeader from "@/components/conversation/detail/header";
 import EmptyState from "@/components/conversation/empty-state";
 import { Spinner } from "@/components/ui/spinner";
+import { conversationMutationKeys } from "@/constants/query-keys";
 import { useAuth } from "@/hooks/use-auth";
-import { useConversation } from "@/hooks/use-conversation";
 import useConversationId from "@/hooks/use-conversation-id";
+import { useConversationMessages } from "@/hooks/use-conversation-messages";
+import { useConversationSocket } from "@/hooks/use-conversation-socket";
 import { useSocket } from "@/hooks/use-socket";
 import { isArrayEmpty } from "@/lib/utils";
-import type {
-  MessageReactionUpdatePayload,
-  MessageType,
-} from "@/types/conversation.type";
+import type { MessageType } from "@/types/conversation.type";
+import { useIsMutating } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 const SingleConversation = () => {
   const conversationId = useConversationId();
   const {
-    fetchSingleConversation,
-    isSingleConversationLoading,
-    singleConversation,
-    addNewMessage,
-    updateMessageReactions,
-  } = useConversation();
+    conversation,
+    messages,
+    isLoading: isSingleConversationLoading,
+    hasMore,
+    isFetchingMore,
+    fetchMoreMessages,
+  } = useConversationMessages(conversationId);
+  const isSendingMsg =
+    useIsMutating({ mutationKey: conversationMutationKeys.sendMessage }) > 0;
+
+  // Install real-time socket listeners once for this active conversation page
+  useConversationSocket(conversationId);
 
   const { socket } = useSocket();
   const { user } = useAuth();
 
   const currentUserId = user?._id || null;
-  const conversation = singleConversation?.conversation;
-  const messages = singleConversation?.messages || [];
   const isAiConversation = conversation?.isAiConversation ?? false;
 
   const [replyTo, setReplyTo] = useState<MessageType | null>(null);
-
-  useEffect(() => {
-    if (!conversationId) return;
-    void fetchSingleConversation(conversationId);
-  }, [fetchSingleConversation, conversationId]);
 
   useEffect(() => {
     if (!conversationId || !socket) return;
@@ -57,30 +56,6 @@ const SingleConversation = () => {
       socket.emit("conversation:leave", conversationId);
     };
   }, [conversationId, socket]);
-
-  useEffect(() => {
-    if (!socket || !conversationId) return;
-
-    const handleNewMessage = (msg: MessageType) =>
-      addNewMessage(msg.conversationId, msg);
-
-    const handleReactionUpdate = (payload: MessageReactionUpdatePayload) => {
-      if (payload.conversationId === conversationId) {
-        updateMessageReactions(
-          payload.conversationId,
-          payload.messageId,
-          payload.reactions,
-        );
-      }
-    };
-
-    socket.on("message:new", handleNewMessage);
-    socket.on("message:reaction:update", handleReactionUpdate);
-    return () => {
-      socket.off("message:new", handleNewMessage);
-      socket.off("message:reaction:update", handleReactionUpdate);
-    };
-  }, [socket, addNewMessage, updateMessageReactions, conversationId]);
 
   if (
     isSingleConversationLoading ||
@@ -120,6 +95,10 @@ const SingleConversation = () => {
           conversationId={conversationId}
           messages={messages}
           onReply={setReplyTo}
+          isSendingMsg={isSendingMsg}
+          hasMore={hasMore}
+          isFetchingMore={isFetchingMore}
+          fetchMoreMessages={fetchMoreMessages}
         />
       )}
 

@@ -9,7 +9,9 @@
 
 - **Framework**: React 19 + TypeScript 6 (Strict mode via `tsc -b`)
 - **Styling**: Tailwind CSS 4 + shadcn/ui (Base UI)
-- **State Management**: Zustand (client state only)
+- **Server State / Cache**: TanStack Query v5 (`@tanstack/react-query`)
+- **Client State**: Zustand (auth, call WebRTC) + React local `useState` / URL params
+- **Virtualization**: react-virtuoso (chat message list)
 - **Routing**: React Router DOM v7
 - **Form**: React Hook Form + Zod validation
 - **Realtime**: Socket.IO Client
@@ -71,8 +73,13 @@ frontend/src/
 ### State Management
 
 - **KHÔNG** lưu server state (API response cache) trong Zustand.
-- Zustand chỉ cho client state: UI flags, theme, current user session.
-- Data fetching dùng custom hooks (`src/hooks/use-*.ts`).
+- Server state và async data caching do **TanStack Query v5** quản lý tập trung:
+  - `src/hooks/use-conversations.ts`: Danh sách hội thoại và socket sync.
+  - `src/hooks/use-conversation-messages.ts`: Phân trang tin nhắn con trỏ (infinite query) và socket sync.
+  - `src/hooks/use-conversation-actions.ts`: Mutations gửi tin nhắn, toggle reaction (optimistic update & rollback), tạo cuộc trò chuyện.
+  - `src/hooks/use-users.ts`: Danh bạ người dùng.
+- Zustand CHỈ dùng cho client state thuần túy: Auth session (`useAuth`), Socket connection (`useSocket`), WebRTC Call state (`useCallStore`).
+- UI ephemeral state (draft reply, active conversation) dùng React `useState` nội bộ và URL params (`useParams()`).
 
 ### Realtime (Socket.IO)
 

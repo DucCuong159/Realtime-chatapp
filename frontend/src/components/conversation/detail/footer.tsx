@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useAiModels } from "@/hooks/use-ai-models";
-import { useConversation } from "@/hooks/use-conversation";
+import { useSendMessage } from "@/hooks/use-conversation-actions";
 import type { MessageType } from "@/types/conversation.type";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Image as ImageIcon, SendHorizontal, X } from "lucide-react";
@@ -31,7 +31,8 @@ const ConversationFooter = ({
   isAiConversation,
   onCancelReply,
 }: Props) => {
-  const { sendMessage, isSendingMsg } = useConversation();
+  const sendMessageMutation = useSendMessage();
+  const isSendingMsg = sendMessageMutation.isPending;
   const { getEffectiveModelId } = useAiModels();
 
   const [image, setImage] = useState<string | null>(null);
@@ -86,7 +87,7 @@ const ConversationFooter = ({
   };
 
   const onSubmit = (values: MessageFormType) => {
-    if (isSendingMsg) return;
+    if (isSendingMsg || !conversationId) return;
     const messageContent = values.message?.trim();
     const currentImage = image;
 
@@ -101,15 +102,13 @@ const ConversationFooter = ({
       textareaRef.current.style.overflowY = "hidden";
     }
 
-    const payload = {
+    sendMessageMutation.mutate({
       conversationId,
       content: messageContent,
       image: currentImage || undefined,
-      replyTo: replyTo,
+      replyTo,
       aiModelId: isAiConversation ? getEffectiveModelId() : undefined,
-    };
-    // Send payload in background (non-blocking)
-    void sendMessage(payload, isAiConversation);
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

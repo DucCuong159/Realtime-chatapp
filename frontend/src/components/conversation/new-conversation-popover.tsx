@@ -1,7 +1,10 @@
-import { useConversation } from "@/hooks/use-conversation";
+import { getApiErrorMessage } from "@/lib/axios-client";
+import { useCreateConversation } from "@/hooks/use-conversation-actions";
+import { useUsers } from "@/hooks/use-users";
 import { ArrowLeft, PenBoxIcon, Search, UsersIcon } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import type { UserType } from "../../types/auth.type";
 import AvatarWithBadge from "../avatar-with-badge";
 import { Button } from "../ui/button";
@@ -16,13 +19,9 @@ import { Spinner } from "../ui/spinner";
 
 const NewConversationPopover = () => {
   const navigate = useNavigate();
-  const {
-    fetchAllUsers,
-    users,
-    isUsersLoading,
-    createConversation,
-    isCreatingConversation,
-  } = useConversation();
+  const { users, isLoading: isUsersLoading } = useUsers();
+  const { mutateAsync: createConversation, isPending: isCreatingConversation } =
+    useCreateConversation();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isGroupMode, setIsGroupMode] = useState(false);
@@ -31,10 +30,6 @@ const NewConversationPopover = () => {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    void fetchAllUsers();
-  }, [fetchAllUsers]);
 
   const toggleUserSelection = (id: string) => {
     setSelectedUsers((prev) =>
@@ -67,14 +62,22 @@ const NewConversationPopover = () => {
 
   const handleCreateGroup = async () => {
     if (!groupName.trim() || selectedUsers?.length === 0) return;
-    const response = await createConversation({
-      isGroup: true,
-      participants: selectedUsers,
-      groupName: groupName,
-    });
-    setIsOpen(false);
-    resetState();
-    void navigate(`/conversation/${response?._id}`);
+    try {
+      const response = await createConversation({
+        isGroup: true,
+        participants: selectedUsers,
+        groupName: groupName,
+      });
+      setIsOpen(false);
+      resetState();
+      if (response?._id) {
+        void navigate(`/conversation/${response._id}`);
+      }
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Failed to create group conversation"),
+      );
+    }
   };
 
   const handleCreateConversation = async (userId: string) => {
@@ -86,11 +89,15 @@ const NewConversationPopover = () => {
       });
       setIsOpen(false);
       resetState();
-      void navigate(`/conversation/${response?._id}`);
+      if (response?._id) {
+        void navigate(`/conversation/${response._id}`);
+      }
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Failed to create conversation"),
+      );
     } finally {
       setLoadingUserId(null);
-      setIsOpen(false);
-      resetState();
     }
   };
 

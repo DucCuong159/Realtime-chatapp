@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { API } from "@/lib/axios-client";
+import { clearAuthSessionCache } from "@/lib/query-client";
 import { useAuth } from "./use-auth";
 
 vi.mock("@/lib/axios-client", () => ({
@@ -8,6 +9,14 @@ vi.mock("@/lib/axios-client", () => ({
     post: vi.fn(),
     get: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/query-client", () => ({
+  queryClient: {
+    clear: vi.fn(),
+    cancelQueries: vi.fn(),
+  },
+  clearAuthSessionCache: vi.fn(async () => {}),
 }));
 
 vi.mock("sonner", () => ({
@@ -84,6 +93,39 @@ describe("useAuth updateProfile", () => {
     expect(result).toBe(false);
     expect(useAuth.getState().user?.name).toBe("Old Name");
     expect(useAuth.getState().isUpdatingProfile).toBe(false);
+  });
+});
+
+describe("useAuth cache invalidation & isolation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("clears queryClient cache on logout", async () => {
+    vi.mocked(API.post).mockResolvedValueOnce({ status: 200, data: {} });
+
+    await useAuth.getState().logout();
+
+    expect(clearAuthSessionCache).toHaveBeenCalled();
+    expect(useAuth.getState().user).toBeNull();
+  });
+
+  it("clears queryClient cache when user identity changes", () => {
+    vi.mocked(clearAuthSessionCache).mockClear();
+
+    useAuth.setState({
+      user: {
+        _id: "user-999",
+        name: "Different User",
+        email: "other@example.com",
+        avatar: null,
+        about: "Different",
+        createdAt: "2026-01-01",
+        updatedAt: "2026-01-01",
+      },
+    });
+
+    expect(clearAuthSessionCache).toHaveBeenCalled();
   });
 });
 

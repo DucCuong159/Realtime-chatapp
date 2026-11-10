@@ -18,7 +18,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 
 const formatTokenNum = (tokens?: number) => {
   if (!tokens) return "-";
@@ -45,10 +45,6 @@ const AiModelSelector = () => {
   } = useAiModels();
 
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    void fetchAiModels();
-  }, [fetchAiModels]);
 
   const activeModel =
     getSelectedModel() ||
