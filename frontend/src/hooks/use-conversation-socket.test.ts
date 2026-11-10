@@ -16,18 +16,36 @@ import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   handleAIStreamUpdate,
+  setupConversationSocketListeners,
   updateReactionsInCache,
   useConversationSocket,
 } from "./use-conversation-socket";
 
-vi.mock("./use-socket", () => ({
-  useSocket: vi.fn(() => ({
+vi.mock("@/lib/axios-client", () => ({
+  API: {
+    get: vi.fn().mockResolvedValue({
+      data: {
+        conversation: null,
+        messages: [],
+        pagination: { hasMore: false, nextCursor: null },
+      },
+    }),
+  },
+}));
+
+vi.mock("./use-socket", () => {
+  const mockStore = vi.fn(() => ({
     socket: {
       on: vi.fn(),
       off: vi.fn(),
     },
-  })),
-}));
+  }));
+  return {
+    useSocket: Object.assign(mockStore, {
+      getState: vi.fn(() => ({ socket: null })),
+    }),
+  };
+});
 
 describe("useConversationSocket spec", () => {
   let queryClient: QueryClient;
@@ -156,5 +174,49 @@ describe("useConversationSocket spec", () => {
     expect(current?.pages[0].messages[0]._id).toBe("m_ai_final");
     expect(current?.pages[0].messages[0].content).toBe("Hello world!");
     expect(current?.pages[0].messages[0].streaming).toBeFalsy();
+  });
+
+  it("registers listeners, ignores other conversations, and unregisters on teardown", async () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    const unlisteners: Record<string, (...args: unknown[]) => void> = {};
+
+    const mockSocket = {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        listeners[event] = handler;
+      }),
+      off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        unlisteners[event] = handler;
+      }),
+    };
+
+    const cleanup = setupConversationSocketListeners(queryClient, mockSocket, "c1");
+
+    // 1. Verify listeners are registered
+    expect(mockSocket.on).toHaveBeenCalledWith("message:new", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("message:reaction:update", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("conversation:ai", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("connect", expect.any(Function));
+
+    // 2. Ignore payload for another conversation
+    const setQueryDataSpy = vi.spyOn(queryClient, "setQueryData");
+    listeners["message:new"](createMockMessage({ conversationId: "c_other" }));
+    expect(setQueryDataSpy).not.toHaveBeenCalled();
+
+    // 3. Connect event triggers message reconciliation for the active conversation
+    const setSpy = vi.spyOn(queryClient, "setQueryData");
+    listeners["connect"]();
+    await vi.waitFor(() => {
+      expect(setSpy).toHaveBeenCalledWith(
+        conversationKeys.messages("c1"),
+        expect.any(Function),
+      );
+    });
+
+    // 4. Teardown unregisters all 4 listeners with the same handlers
+    cleanup();
+    expect(mockSocket.off).toHaveBeenCalledWith("message:new", listeners["message:new"]);
+    expect(mockSocket.off).toHaveBeenCalledWith("message:reaction:update", listeners["message:reaction:update"]);
+    expect(mockSocket.off).toHaveBeenCalledWith("conversation:ai", listeners["conversation:ai"]);
+    expect(mockSocket.off).toHaveBeenCalledWith("connect", listeners["connect"]);
   });
 });

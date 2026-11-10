@@ -4,6 +4,10 @@ import {
 } from "@/constants/query-keys";
 import { useAuth } from "@/hooks/use-auth";
 import { API } from "@/lib/axios-client";
+import {
+  getAuthSessionGeneration,
+  isAuthSessionCurrent,
+} from "@/lib/query-client";
 import { toggleUserReaction } from "@/lib/reaction.utils";
 import { generateUUID } from "@/lib/utils";
 import type {
@@ -11,8 +15,8 @@ import type {
   CreateConversationType,
   CreateMessageType,
   MessageReactionType,
+  MessagesPage,
   MessageType,
-  PaginationType,
 } from "@/types/conversation.type";
 import {
   useMutation,
@@ -22,22 +26,24 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-export interface MessagesPage {
-  conversation: ConversationType;
-  messages: MessageType[];
-  pagination: PaginationType;
-}
+export type { MessagesPage };
 
 export interface SendMessageContext {
   previousConversations?: ConversationType[];
   conversationId: string;
   tempId: string;
+  sessionGeneration?: number;
 }
 
 export interface ToggleReactionContext {
   conversationId: string;
   messageId: string;
   previousReactions?: MessageReactionType[];
+  sessionGeneration?: number;
+}
+
+export interface CreateConversationContext {
+  sessionGeneration?: number;
 }
 
 export type UseSendMessageResult = UseMutationResult<
@@ -57,7 +63,8 @@ export type UseToggleReactionResult = UseMutationResult<
 export type UseCreateConversationResult = UseMutationResult<
   ConversationType,
   Error,
-  CreateConversationType
+  CreateConversationType,
+  CreateConversationContext
 >;
 
 /**
@@ -80,6 +87,8 @@ export function appendOptimisticMessageToPages(
 
 /**
  * Pure cache updater: replaces an optimistic message with the server message in-place.
+ * If the server message was already inserted by a realtime socket event, removes
+ * the optimistic temporary message to avoid duplicates.
  */
 export function replaceOptimisticMessageInPages(
   old: InfiniteData<MessagesPage> | undefined,
@@ -94,9 +103,9 @@ export function replaceOptimisticMessageInPages(
     ...old,
     pages: old.pages.map((page) => ({
       ...page,
-      messages: page.messages
-        .map((m) => (m._id === tempId ? serverMsg : m))
-        .filter((m) => !(alreadyExists && m._id === tempId)),
+      messages: alreadyExists
+        ? page.messages.filter((m) => m._id !== tempId)
+        : page.messages.map((m) => (m._id === tempId ? serverMsg : m)),
     })),
   };
 }
@@ -114,6 +123,26 @@ export function removeOptimisticMessageFromPages(
     pages: old.pages.map((page) => ({
       ...page,
       messages: page.messages.filter((m) => m._id !== tempId),
+    })),
+  };
+}
+
+/**
+ * Pure cache updater: surgically reverts a specific message's reactions.
+ */
+export function revertMessageReactionsInPages(
+  old: InfiniteData<MessagesPage> | undefined,
+  messageId: string,
+  previousReactions: MessageReactionType[],
+): InfiniteData<MessagesPage> | undefined {
+  if (!old) return old;
+  return {
+    ...old,
+    pages: old.pages.map((page) => ({
+      ...page,
+      messages: page.messages.map((m) =>
+        m._id === messageId ? { ...m, reactions: previousReactions } : m,
+      ),
     })),
   };
 }
@@ -197,11 +226,18 @@ export function useSendMessage(): UseSendMessageResult {
         previousConversations,
         conversationId: convId,
         tempId,
+        sessionGeneration: getAuthSessionGeneration(),
       };
     },
 
     onSuccess: (data, _payload, ctx) => {
-      if (!ctx || !data?.userMessage) return;
+      if (
+        !ctx ||
+        !data?.userMessage ||
+        !isAuthSessionCurrent(ctx.sessionGeneration)
+      ) {
+        return;
+      }
       const { userMessage } = data;
       const convId = ctx.conversationId;
       const tempId = ctx.tempId;
@@ -229,7 +265,7 @@ export function useSendMessage(): UseSendMessageResult {
     },
 
     onError: (_err, _payload, ctx) => {
-      if (ctx) {
+      if (ctx && isAuthSessionCurrent(ctx.sessionGeneration)) {
         // Surgically remove only the optimistic message with tempId,
         // preserving any new socket messages or reactions that arrived in the meantime.
         queryClient.setQueryData<InfiniteData<MessagesPage>>(
@@ -260,8 +296,11 @@ export function useSendMessage(): UseSendMessageResult {
       toast.error("Failed to send message");
     },
 
-    onSettled: (_data, _err, payload) => {
-      if (payload.conversationId) {
+    onSettled: (_data, _err, payload, ctx) => {
+      if (
+        payload.conversationId &&
+        isAuthSessionCurrent(ctx?.sessionGeneration)
+      ) {
         // Only invalidate conversation list to update ordering/unread status
         // NEVER invalidate messages infinite query: avoids resetting prepended older history
         void queryClient.invalidateQueries({
@@ -343,29 +382,31 @@ export function useToggleReaction(): UseToggleReactionResult {
         );
       }
 
-      return { conversationId, messageId, previousReactions };
+      return {
+        conversationId,
+        messageId,
+        previousReactions,
+        sessionGeneration: getAuthSessionGeneration(),
+      };
     },
 
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previousReactions !== undefined && ctx.messageId) {
+      if (
+        ctx &&
+        isAuthSessionCurrent(ctx.sessionGeneration) &&
+        ctx.previousReactions !== undefined &&
+        ctx.messageId
+      ) {
         // Surgically revert only the specific message's reactions,
         // preserving all other messages and any incoming socket updates
         queryClient.setQueryData<InfiniteData<MessagesPage>>(
           conversationKeys.messages(ctx.conversationId),
-          (current) => {
-            if (!current) return current;
-            return {
-              ...current,
-              pages: current.pages.map((page) => ({
-                ...page,
-                messages: page.messages.map((m) =>
-                  m._id === ctx.messageId
-                    ? { ...m, reactions: ctx.previousReactions! }
-                    : m,
-                ),
-              })),
-            };
-          },
+          (current) =>
+            revertMessageReactionsInPages(
+              current,
+              ctx.messageId,
+              ctx.previousReactions!,
+            ),
         );
       }
       toast.error("Failed to update reaction");
@@ -388,7 +429,12 @@ export function useCreateConversation(): UseCreateConversationResult {
       return data.conversation;
     },
 
-    onSuccess: (newConv) => {
+    onMutate: () => ({
+      sessionGeneration: getAuthSessionGeneration(),
+    }),
+
+    onSuccess: (newConv, _payload, ctx) => {
+      if (!isAuthSessionCurrent(ctx?.sessionGeneration)) return;
       queryClient.setQueryData<ConversationType[]>(
         conversationKeys.lists(),
         (old = []) => [newConv, ...old.filter((c) => c._id !== newConv._id)],

@@ -5,6 +5,7 @@ import type { ConversationType, MessageType } from "@/types/conversation.type";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import type { SocketEventSubscriber } from "./use-conversation-socket";
 
 export type ConversationUpdatePayload =
   | { conversationId: string; lastMessage: MessageType }
@@ -25,7 +26,8 @@ export async function fetchConversations(): Promise<ConversationType[]> {
 }
 
 /**
- * Pure cache updater for updating a conversation's lastMessage and bumping it to top.
+ * Pure cache updater for updating a conversation in the list and bumping it to top.
+ * Handles both incremental { conversationId, lastMessage } updates and full ConversationType payloads.
  */
 export function updateConversationInList(
   old: ConversationType[] = [],
@@ -36,13 +38,19 @@ export function updateConversationInList(
   const target = old.find((c) => c._id === targetId);
   if (!target) return old;
 
-  const lastMessage =
-    "lastMessage" in payload ? payload.lastMessage : target.lastMessage;
-  const updatedTarget: ConversationType = {
-    ...target,
-    lastMessage,
-    updatedAt: lastMessage?.createdAt || new Date().toISOString(),
-  };
+  const isIncremental = "conversationId" in payload;
+  const updatedTarget: ConversationType = isIncremental
+    ? {
+        ...target,
+        lastMessage: payload.lastMessage,
+        updatedAt: payload.lastMessage?.createdAt || new Date().toISOString(),
+      }
+    : {
+        ...target,
+        ...payload,
+        updatedAt: payload.updatedAt || target.updatedAt,
+      };
+
   const remaining = old.filter((c) => c._id !== targetId);
   return [updatedTarget, ...remaining];
 }
@@ -96,6 +104,33 @@ export function handleConversationUpdated(
 }
 
 /**
+ * Attaches conversation socket listeners and returns a cleanup teardown function.
+ */
+export function setupConversationsSocketListeners(
+  queryClient: Pick<
+    QueryClient,
+    "getQueryData" | "setQueryData" | "invalidateQueries"
+  >,
+  socket: SocketEventSubscriber,
+): () => void {
+  const handleNew = (conversation: ConversationType) => {
+    handleConversationNew(queryClient, conversation);
+  };
+
+  const handleUpdated = (payload: ConversationUpdatePayload) => {
+    handleConversationUpdated(queryClient, payload);
+  };
+
+  socket.on("conversation:new", handleNew);
+  socket.on("conversation:updated", handleUpdated);
+
+  return () => {
+    socket.off("conversation:new", handleNew);
+    socket.off("conversation:updated", handleUpdated);
+  };
+}
+
+/**
  * Idiomatic TanStack Query v5 hook for user conversations.
  * Handles fetching, caching, and realtime socket events.
  */
@@ -111,22 +146,7 @@ export function useConversations(): UseConversationsResult {
 
   useEffect(() => {
     if (!socket) return;
-
-    const handleNew = (conversation: ConversationType) => {
-      handleConversationNew(queryClient, conversation);
-    };
-
-    const handleUpdated = (payload: ConversationUpdatePayload) => {
-      handleConversationUpdated(queryClient, payload);
-    };
-
-    socket.on("conversation:new", handleNew);
-    socket.on("conversation:updated", handleUpdated);
-
-    return () => {
-      socket.off("conversation:new", handleNew);
-      socket.off("conversation:updated", handleUpdated);
-    };
+    return setupConversationsSocketListeners(queryClient, socket);
   }, [socket, queryClient]);
 
   return {

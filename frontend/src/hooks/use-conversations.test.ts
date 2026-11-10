@@ -8,6 +8,7 @@ import {
   fetchConversations,
   handleConversationNew,
   handleConversationUpdated,
+  setupConversationsSocketListeners,
   updateConversationInList,
   useConversations,
 } from "./use-conversations";
@@ -159,5 +160,55 @@ describe("useConversations spec (TanStack Query v5)", () => {
       conversationKeys.lists(),
     );
     expect(list?.map((c) => c._id)).toEqual(["c2", "c1"]);
+  });
+
+  it("updates conversation with full ConversationType payload including groupName and updatedAt", () => {
+    const c1 = createMockConversation({
+      _id: "c1",
+      groupName: "Old Group Name",
+      updatedAt: "2026-11-09T01:00:00Z",
+    });
+    queryClient.setQueryData(conversationKeys.lists(), [c1]);
+
+    const fullUpdatedConv = createMockConversation({
+      _id: "c1",
+      groupName: "Renamed Group",
+      updatedAt: "2026-11-09T05:00:00Z",
+    });
+
+    queryClient.setQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+      (old = []) => updateConversationInList(old, fullUpdatedConv),
+    );
+
+    const updatedList = queryClient.getQueryData<ConversationType[]>(
+      conversationKeys.lists(),
+    );
+    expect(updatedList?.[0].groupName).toBe("Renamed Group");
+    expect(updatedList?.[0].updatedAt).toBe("2026-11-09T05:00:00Z");
+  });
+
+  it("attaches and removes socket listeners via setupConversationsSocketListeners", () => {
+    const listeners: Record<string, (...args: unknown[]) => void> = {};
+    const unlisteners: Record<string, (...args: unknown[]) => void> = {};
+
+    const mockSocket = {
+      on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        listeners[event] = handler;
+      }),
+      off: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
+        unlisteners[event] = handler;
+      }),
+    };
+
+    const cleanup = setupConversationsSocketListeners(queryClient, mockSocket);
+
+    expect(mockSocket.on).toHaveBeenCalledWith("conversation:new", expect.any(Function));
+    expect(mockSocket.on).toHaveBeenCalledWith("conversation:updated", expect.any(Function));
+
+    cleanup();
+
+    expect(mockSocket.off).toHaveBeenCalledWith("conversation:new", listeners["conversation:new"]);
+    expect(mockSocket.off).toHaveBeenCalledWith("conversation:updated", listeners["conversation:updated"]);
   });
 });

@@ -18,13 +18,31 @@ export const queryClient = new QueryClient({
   },
 });
 
+let authSessionGeneration = 0;
+
+/**
+ * Returns the current auth session generation counter.
+ */
+export function getAuthSessionGeneration(): number {
+  return authSessionGeneration;
+}
+
+/**
+ * Checks whether the given generation counter matches the current active auth session.
+ * Used by mutations to prevent writes from an earlier auth session after logout or account switch.
+ */
+export function isAuthSessionCurrent(generation?: number): boolean {
+  return generation === undefined || generation === authSessionGeneration;
+}
+
 /**
  * Cancels all in-flight queries and immediately clears the entire query cache.
- * Must be executed on all auth changes (logout, login, identity switch, 401)
- * to guarantee that pending async queries from a previous user session cannot
- * finish and populate the cache for the next user.
+ * Advances the session generation counter so any pending mutations from the previous
+ * session cannot populate the cache for the next user.
+ * Must be executed on all auth changes (logout, login, identity switch, 401).
  */
 export async function clearAuthSessionCache(): Promise<void> {
+  authSessionGeneration++;
   await queryClient.cancelQueries();
   queryClient.clear();
 }

@@ -29,7 +29,7 @@
 ## ✨ Key Features
 
 - ⚡ **Hybrid Real-Time Pipeline**: HTTP POST for data validation & media uploads; Socket.IO for real-time room broadcasting.
-- 🗄️ **Decoupled Server State & Instant Sync**: Powered by **TanStack Query v5** (`useConversations`, `useConversationMessages`, `useConversationActions`, `useUsers`). Zero API cache in Zustand. Real-time Socket.IO events directly update query caches without redundant refetches.
+- 🗄️ **Decoupled Server State & Instant Sync**: Powered by **TanStack Query v5** (`useConversations`, `useConversationMessages`, `useSendMessage`, `useToggleReaction`, `useCreateConversation`, `useUsers`, `useAiModels`). Zero API cache in Zustand. Real-time Socket.IO events directly update query caches without redundant refetches.
 - 📜 **Virtualized Infinite Chat & Zero-Jank Scroll**: Keyset pagination with MongoDB Compound Index `{ conversationId: 1, createdAt: -1 }` ($O(\log N)$) combined with **react-virtuoso** reverse-scroll virtualization and prepended index offset calculation.
 - 🔄 **Multi-Tab Sync & Echo Prevention**: Request header `x-socket-id` and `.except(socketId)` prevent duplicate messages on the sender's active tab while syncing all other tabs.
 - 🟢 **Accurate Online Presence**: Multi-tab tracking via `Map<userId, Set<socketId>>` — users only show offline when all sessions disconnect.

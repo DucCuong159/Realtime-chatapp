@@ -12,6 +12,7 @@ import {
   appendOptimisticMessageToPages,
   removeOptimisticMessageFromPages,
   replaceOptimisticMessageInPages,
+  revertMessageReactionsInPages,
   useCreateConversation,
   useSendMessage,
   useToggleReaction,
@@ -104,6 +105,50 @@ describe("useConversationActions spec (TanStack Query v5)", () => {
     expect(replaced?.pages[1].messages).toHaveLength(2);
     expect(replaced?.pages[1].messages[1]._id).toBe("mongo-real-id");
     expect(replaced?.pages[1].messages[1].status).toBe("sent");
+  });
+
+  it("deduplicates optimistic message when server message already arrived via socket before onSuccess", () => {
+    const convId = "c1";
+    const tempId = "temp-opt-uuid";
+    const serverMsgId = "m_server_123";
+
+    const serverMsg = createMockMessage({
+      _id: serverMsgId,
+      conversationId: convId,
+      content: "Hello world",
+      status: "sent",
+    });
+
+    const optimisticMsg = createMockMessage({
+      _id: tempId,
+      conversationId: convId,
+      content: "Hello world",
+      status: "sending...",
+    });
+
+    // Cache where socket event message:new already appended serverMsg
+    // so cache currently contains BOTH the optimistic message and the real server message
+    const cacheWithBoth: InfiniteData<MessagesPage> = {
+      pages: [
+        {
+          conversation: createMockConversation({ _id: convId }),
+          messages: [optimisticMsg, serverMsg],
+          pagination: createMockPagination(),
+        },
+      ],
+      pageParams: [undefined],
+    };
+
+    const reconciled = replaceOptimisticMessageInPages(
+      cacheWithBoth,
+      tempId,
+      serverMsg,
+    );
+
+    expect(reconciled?.pages[0].messages).toHaveLength(1);
+    expect(reconciled?.pages[0].messages[0]._id).toBe(serverMsgId);
+    expect(reconciled?.pages[0].messages.filter((m) => m._id === serverMsgId)).toHaveLength(1);
+    expect(reconciled?.pages[0].messages.some((m) => m._id === tempId)).toBe(false);
   });
 
   it("preserves intervening socket messages when a send fails and rolls back", async () => {
@@ -233,21 +278,10 @@ describe("useConversationActions spec (TanStack Query v5)", () => {
       (old) => appendOptimisticMessageToPages(old, socketMsg),
     );
 
-    // 3. Reaction mutation fails: surgical rollback reverts only m1's reactions
+    // 3. Reaction mutation fails: surgical rollback reverts only m1's reactions via production updater
     queryClient.setQueryData<InfiniteData<MessagesPage>>(
       conversationKeys.messages(convId),
-      (current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          pages: current.pages.map((page) => ({
-            ...page,
-            messages: page.messages.map((m) =>
-              m._id === "m1" ? { ...m, reactions: [] } : m,
-            ),
-          })),
-        };
-      },
+      (current) => revertMessageReactionsInPages(current, "m1", []),
     );
 
     // 4. Verify m1's reaction was reverted, and m_socket_intervening was NOT lost!

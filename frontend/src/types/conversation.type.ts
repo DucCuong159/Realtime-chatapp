@@ -80,3 +80,9 @@ export type AIStreamPayload = {
   sender?: UserType;
   error?: string;
 };
+
+export interface MessagesPage {
+  conversation: ConversationType;
+  messages: MessageType[];
+  pagination: PaginationType;
+}
