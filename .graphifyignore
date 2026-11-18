@@ -1,0 +1,4 @@
+# Vendored Yarn bundle and dependencies
+.yarn/
+**/.yarn/**
+yarn-classic.cjs
