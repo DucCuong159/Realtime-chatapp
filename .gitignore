@@ -49,3 +49,10 @@ Thumbs.db
 .node_repl_history
 *.pid
 *.pid.lock
+
+# Graphify
+graphify-out/cache/
+graphify-out/manifest.json
+graphify-out/.graphify_*
+
+

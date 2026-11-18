@@ -1,0 +1,4 @@
+# Exclude vendored yarn bundles from graphify
+.yarn/
+**/.yarn/**
+yarn-classic.cjs

@@ -118,6 +118,7 @@ _Toàn bộ kỹ năng dưới đây đều tồn tại thực tế tại thư m
 
 ### E. AI Features & LLM Integration
 
+- **Codebase Knowledge Graph & AST Exploration**: `.agent/skills/graphify/`
 - **LLM Application Patterns & Streaming**: `.agent/skills/llm-app-patterns/`
 - **Prompt Engineering**: `.agent/skills/prompt-engineering/`
 - **RAG & Context Retrieval**: `.agent/skills/rag-implementation/`
