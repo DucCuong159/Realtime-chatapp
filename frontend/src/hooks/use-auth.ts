@@ -1,4 +1,4 @@
-import { API } from "@/lib/axios-client";
+import { API, setUnauthorizedHandler } from "@/lib/axios-client";
 import { clearAuthSessionCache } from "@/lib/query-client";
 import type { LoginType, RegisterType, UserType } from "@/types/auth.type";
 import type { ProfileFormType } from "@/validators/user.validator";
@@ -115,4 +115,10 @@ useAuth.subscribe((state) => {
     void clearAuthSessionCache();
   }
 });
+
+// Register unauthorized handler to automatically logout on 401 response
+setUnauthorizedHandler?.(() => {
+  void useAuth.getState().logout();
+});
+
 

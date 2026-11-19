@@ -9,6 +9,7 @@ vi.mock("@/lib/axios-client", () => ({
     post: vi.fn(),
     get: vi.fn(),
   },
+  setUnauthorizedHandler: vi.fn(),
 }));
 
 vi.mock("@/lib/query-client", () => ({

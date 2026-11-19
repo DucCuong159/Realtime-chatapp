@@ -1,5 +1,4 @@
 import { HTTPSTATUS } from "@/config/http.config";
-import { useAuth } from "@/hooks/use-auth";
 import { useSocket } from "@/hooks/use-socket";
 import type { ApiErrorResponse } from "@/types/api.type";
 import axios from "axios";
@@ -65,11 +64,17 @@ export const API = axios.create({
   withCredentials: true,
 });
 
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export const setUnauthorizedHandler = (handler: UnauthorizedHandler): void => {
+  unauthorizedHandler = handler;
+};
+
 // ─── Request Interceptor ─────────────────────────────────────────────
 API.interceptors.request.use((config) => {
   const socket = useSocket.getState().socket;
-  const user = useAuth.getState().user;
-  if (socket?.id && user?._id) {
+  if (socket?.id) {
     config.headers.set("x-socket-id", socket.id);
   }
   return config;
@@ -97,7 +102,7 @@ API.interceptors.response.use(
           toast.error(getApiErrorMessage(error));
           break;
         }
-        void useAuth.getState().logout();
+        unauthorizedHandler?.();
         break;
       }
       case HTTPSTATUS.FORBIDDEN:

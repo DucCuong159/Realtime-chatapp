@@ -2,18 +2,19 @@ import { parseCookie } from "cookie";
 import { Server as HTTPServer } from "http";
 import jwt from "jsonwebtoken";
 import { Server as SocketServer, type Socket } from "socket.io";
+import { z } from "zod";
 import { Env } from "../config/env.config.js";
-import type { ConversationDocument } from "../models/Conversation.js";
+import ConversationModel, {
+  type ConversationDocument,
+} from "../models/Conversation.js";
 import type { MessageDocument } from "../models/Message.js";
-import { validateConversationParticipantsService } from "../services/conversation.service.js";
-import {
-  type ActiveCallInfo,
-  registerCallSignaling,
-  terminateCallSession,
-} from "./call-signaling.js";
 import { AppError } from "../utils/app-error.js";
 import { socketReactionSchema } from "../validators/message.validator.js";
-import { z } from "zod";
+import {
+  registerCallSignaling,
+  terminateCallSession,
+  type ActiveCallInfo,
+} from "./call-signaling.js";
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
@@ -92,7 +93,14 @@ export const initializeSocket = (httpServer: HTTPServer) => {
       "conversation:join",
       async (conversationId: string, callback?: (err?: string) => void) => {
         try {
-          await validateConversationParticipantsService(conversationId, userId);
+          const isParticipant = await ConversationModel.exists({
+            _id: conversationId,
+            participants: userId,
+          });
+          if (!isParticipant) {
+            callback?.("Unauthorized or conversation not found");
+            return;
+          }
           await socket.join(`conversation:${conversationId}`);
           callback?.();
         } catch (error) {
@@ -121,9 +129,8 @@ export const initializeSocket = (httpServer: HTTPServer) => {
         try {
           const { messageId, emoji } = socketReactionSchema.parse(data);
 
-          const { toggleMessageReactionService } = await import(
-            "../services/message.service.js"
-          );
+          const { toggleMessageReactionService } =
+            await import("../services/message.service.js");
           const result = await toggleMessageReactionService(
             userId,
             messageId,
@@ -161,7 +168,13 @@ export const initializeSocket = (httpServer: HTTPServer) => {
 
     // ================= WebRTC Voice Call Signaling =================
     if (io) {
-      registerCallSignaling(io, socket, userId, onlineUsers, activeCallBySocket);
+      registerCallSignaling(
+        io,
+        socket,
+        userId,
+        onlineUsers,
+        activeCallBySocket,
+      );
     }
 
     socket.on("disconnect", async () => {
@@ -303,4 +316,3 @@ export const emitMessageReactionUpdate = (
     reactions,
   });
 };
-
