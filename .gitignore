@@ -50,9 +50,7 @@ Thumbs.db
 *.pid
 *.pid.lock
 
-# Graphify
-graphify-out/cache/
-graphify-out/manifest.json
-graphify-out/.graphify_*
+# Graphify (local build artifacts)
+graphify-out/
 
 
